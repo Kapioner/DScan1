@@ -1,6 +1,6 @@
 [package]
 name = "dscan-scanner"
-description = "Skaner sieci: parsowanie celów, wrapper nmap, podgrupy i pula workerów, ograniczanie tempa."
+description = "Skaner DScan: parsowanie i walidacja celów, wrapper nmap."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -8,6 +8,13 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
+dscan-core.workspace = true
+ipnet.workspace = true
+chrono.workspace = true
+serde.workspace = true
+tokio.workspace = true
+quick-xml.workspace = true
+hickory-resolver.workspace = true
 
 [lints]
 workspace = true

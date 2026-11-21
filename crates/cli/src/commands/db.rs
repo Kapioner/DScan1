@@ -2,9 +2,9 @@ use std::fmt::Write;
 
 use clap::{Args, Subcommand};
 use dscan_config::CliOverrides;
-use dscan_db::{MigrationInfo, PgPool};
+use dscan_db::MigrationInfo;
 
-use super::{Command, Context, pool_options};
+use super::{Command, Context, cipher_from_config, connect_database};
 use crate::error::CliError;
 
 #[derive(Debug, Args)]
@@ -15,7 +15,7 @@ pub struct DbArgs {
 
 #[derive(Debug, Subcommand)]
 pub enum DbAction {
-    /// Wykonuje zaległe migracje schematu bazy.
+    /// Wykonuje zaległe migracje schematu bazy (wymaga klucza szyfrowania).
     Migrate,
     /// Pokazuje, które migracje są już zastosowane.
     Status,
@@ -23,7 +23,11 @@ pub enum DbAction {
 
 impl Command for DbArgs {
     async fn execute(&self, context: &Context) -> Result<(), CliError> {
-        let pool = connect_to_database(context).await?;
+        let config = context.load_config(CliOverrides::default())?;
+        if let DbAction::Migrate = self.action {
+            cipher_from_config(&config)?;
+        }
+        let pool = connect_database(&config).await?;
         if let DbAction::Migrate = self.action {
             dscan_db::run_migrations(&pool).await?;
             println!("Migracje wykonane.");
@@ -32,14 +36,6 @@ impl Command for DbArgs {
         print!("{}", format_migration_status(&status));
         Ok(())
     }
-}
-
-/// Łączy się z bazą wskazaną w `DSCAN_DATABASE_URL`.
-pub async fn connect_to_database(context: &Context) -> Result<PgPool, CliError> {
-    let config = context.load_config(CliOverrides::default())?;
-    let url = config.require_database_url()?;
-    let options = pool_options(&config.settings.database);
-    Ok(dscan_db::connect(url.expose(), options).await?)
 }
 
 /// Tabela stanu migracji, np. `[x] 0001 initial schema`.

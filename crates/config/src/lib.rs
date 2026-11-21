@@ -24,7 +24,7 @@ pub use overrides::CliOverrides;
 pub use schedule::{parse_clock_time, window_length_minutes};
 pub use secret::{
     DATABASE_URL_ENV, DatabaseUrl, ENCRYPTION_KEY_ENV, ENCRYPTION_KEY_LEN, EncryptionKey,
-    decode_hex_key, mask_url_password,
+    NEW_ENCRYPTION_KEY_ENV, decode_hex_key, mask_url_password,
 };
 pub use settings::{
     DatabaseSettings, RateLimitSettings, ScheduleSettings, ScopeSettings, ServerSettings, Settings,

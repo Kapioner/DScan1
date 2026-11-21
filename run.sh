@@ -43,11 +43,18 @@ ensure_env_var() {
     fi
 }
 
+# Eksportuje zmienne z .env. Zmienna już ustawiona (np. podana przed ./run.sh
+# w linii poleceń) ma pierwszeństwo przed wartością z pliku.
 load_env() {
-    set -a
-    # shellcheck disable=SC1090
-    source "$ENV_FILE"
-    set +a
+    local name value
+    while IFS='=' read -r name value; do
+        case "$name" in
+            '' | '#'*) continue ;;
+        esac
+        if [ -z "${!name+x}" ]; then
+            export "$name=$value"
+        fi
+    done < "$ENV_FILE"
 }
 
 prepare_env_file() {
@@ -64,12 +71,19 @@ prepare_env_file() {
     load_env
 }
 
-# Bazy potrzebują tylko: serve (domyślne) i db.
+# Polecenia korzystające z bazy (serve jest domyślne).
 command_needs_database() {
     case "${1:-serve}" in
-        serve | db) return 0 ;;
+        serve | db | user | targets | import | keys) return 0 ;;
         *) return 1 ;;
     esac
+}
+
+# Skan wymaga programu nmap na hoście.
+warn_if_nmap_missing() {
+    if [ "${1:-}" = "scan" ] && ! command -v nmap > /dev/null 2>&1; then
+        log "Brak programu nmap — zainstaluj go (np. sudo apt install nmap / brew install nmap)."
+    fi
 }
 
 start_database() {
@@ -81,6 +95,9 @@ start_database() {
         log "(Zainstaluj Dockera albo ustaw w $ENV_FILE USE_DOCKER_POSTGRES=0 i własny adres bazy.)"
         return
     fi
+    if [ -n "$(docker compose ps --status running --quiet postgres 2> /dev/null)" ]; then
+        return
+    fi
     log "Uruchamiam PostgreSQL (docker compose)…"
     docker compose --progress quiet up -d --wait postgres
 }
@@ -90,6 +107,7 @@ prepare_env_file
 if command_needs_database "$@"; then
     start_database
 fi
+warn_if_nmap_missing "$@"
 cargo build --release --quiet -p dscan
 
 if [ "$#" -eq 0 ]; then

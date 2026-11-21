@@ -49,9 +49,10 @@ pub fn compute_migration_status(
 }
 
 /// Wersje zapisane przez sqlx w tabeli `_sqlx_migrations` (pusta lista, gdy tabeli jeszcze nie ma).
+/// Nazwa tabeli bez schematu — PostgreSQL szuka jej według `search_path` (testy używają osobnych schematów).
 async fn applied_versions(pool: &PgPool) -> Result<Vec<i64>, DbError> {
     let table_exists: bool =
-        sqlx::query_scalar("SELECT to_regclass('public._sqlx_migrations') IS NOT NULL")
+        sqlx::query_scalar("SELECT to_regclass('_sqlx_migrations') IS NOT NULL")
             .fetch_one(pool)
             .await
             .map_err(DbError::Query)?;

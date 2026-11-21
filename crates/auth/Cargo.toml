@@ -1,0 +1,15 @@
+[package]
+name = "dscan-auth"
+description = "Hasła i loginy DScan: skróty argon2id, walidacja haseł i nazw użytkowników."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+argon2.workspace = true
+password-hash.workspace = true
+
+[lints]
+workspace = true
