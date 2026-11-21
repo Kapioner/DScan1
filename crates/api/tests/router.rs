@@ -58,6 +58,20 @@ async fn openapi_describes_health_endpoint() {
 }
 
 #[tokio::test]
+async fn openapi_describes_scan_endpoints() {
+    let (_, body) = send(test_router(), get("/api/openapi.json")).await;
+    assert!(body["paths"]["/api/v1/scans"]["get"].is_object());
+    assert!(body["paths"]["/api/v1/scans/{id}"]["get"].is_object());
+}
+
+#[tokio::test]
+async fn scans_without_database_give_internal_error() {
+    let (status, body) = send(test_router(), get("/api/v1/scans")).await;
+    assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR);
+    assert_eq!(body["error"], "wewnętrzny błąd serwera");
+}
+
+#[tokio::test]
 async fn unknown_path_returns_json_404() {
     let (status, body) = send(test_router(), get("/api/v1/nie-ma")).await;
 

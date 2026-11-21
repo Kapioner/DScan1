@@ -50,7 +50,7 @@ nmap ma CAP_NET_RAW do skanów SYN (`nmap --privileged -sS …`).
 | Polecenie | Stan | Opis |
 |---|---|---|
 | `serve` | działa | Serwer API; łączy się z bazą i wykonuje migracje |
-| `scan CEL… [--mode discovery\|services] [--xml PLIK]` | działa (lokalnie) | Skan nmap celów z `[scope]`; wynik w terminalu, surowy XML do pliku |
+| `scan CEL… [--mode discovery\|services] [--parallel N] [--quiet]` | działa | Skan nmap celów z `[scope]` w podgrupach, równolegle; postęp z prognozą, wyniki w bazie |
 | `targets check CEL…` | działa | Sprawdza cele bez skanowania: poprawność, DNS, duplikaty, zakres |
 | `targets list` | działa | Cele zapisane w bazie (z odszyfrowanymi notatkami) |
 | `import PLIK [--dry-run]` | działa | Import celów z CSV/JSON z raportem odrzuconych wierszy |
@@ -70,17 +70,26 @@ Polecenia administracyjne działające bezpośrednio na bazie (`db migrate`, `us
 ./run.sh targets check 10.10.0.0/24 app.lab.local
 ```
 ```bash
-./run.sh scan 10.10.0.0/24 --xml wynik.xml
+./run.sh scan 10.10.0.0/22 --parallel 4
 ```
 
 - Skanowane są **wyłącznie** cele w `[scope] allowed_networks`; pozostałe są pomijane i wypisywane.
   Sieć tylko częściowo dozwolona jest w całości pomijana.
 - Domeny są rozwiązywane systemowym DNS; nakładające się cele są scalane (`10.0.0.0/24` + `10.0.0.5` = jeden zakres),
   a adresy są wyliczane strumieniowo, bez trzymania ich w pamięci.
+- **Podgrupy (S4):** cele są dzielone na sieci po `limits.subgroup_size` adresów (domyślnie 256 = /24).
+  Każda podgrupa to jeden proces nmap; naraz działa najwyżej `limits.max_parallel_nmap` procesów.
+  Wynik podgrupy trafia do bazy od razu po jej zakończeniu, a błąd jednej podgrupy nie przerywa reszty.
+- **Tempo (S7):** `limits.nmap_max_rate` to limit **łączny**, dzielony między równoległe procesy
+  (100 pakietów/s przy 4 procesach = 4 × 25). Dodatkowo nie przekracza przepustowości `scope.max_bandwidth_kbps`
+  (szacunek: 74 B na pakiet). Zapytania HTTP (od zadania H1) ogranicza `limits.http_requests_per_second`
+  i budżet `limits.http_requests_per_host` na host.
+- **Czas (S6):** w terminalu po każdej podgrupie widać postęp i prognozę czasu do końca; w bazie są czasy
+  całego przebiegu i każdej podgrupy. Ten sam postęp i prognozę zwraca API `GET /api/v1/scans`.
+- Bezpiecznik: skan większy niż `limits.max_addresses_per_scan` (domyślnie 1 048 576 adresów) jest odrzucany.
 - `--mode discovery` = `nmap -sn` (tylko aktywne hosty); `--mode services` (domyślnie) = `nmap -sV`
-  na portach z `[scope] allowed_ports`. Zawsze z `--max-rate` z `[limits]` (lub flagi `--max-rate`).
-- Wymaga zainstalowanego nmap (`sudo apt install nmap`). Na razie skan działa lokalnie i nie zapisuje wyników w bazie
-  (to zadania S4/B5); po wdrożeniu RBAC (C5) będzie zlecany przez API.
+  na portach z `[scope] allowed_ports`. Surowy XML każdej podgrupy jest zapisywany w bazie (zaszyfrowany).
+- Wymaga zainstalowanego nmap (`sudo apt install nmap`). Po wdrożeniu RBAC (C5) skan będzie zlecany przez API.
 
 ### Import celów
 
@@ -94,6 +103,7 @@ z numerem wiersza i powodem; poprawne są zapisywane w bazie (istniejące są po
 
 ### Szyfrowanie i rotacja klucza
 
+Które dane są szyfrowane, a które jawne i dlaczego: [`docs/klasyfikacja-danych.md`](docs/klasyfikacja-danych.md).
 Pola wrażliwe (notatki, banery, nagłówki, ciasteczka, certyfikaty, surowy XML, nadpisania) są szyfrowane
 AES-256-GCM po stronie aplikacji: losowy nonce dla każdej wartości, nazwa kolumny jako dane uwierzytelniane (AAD),
 bajt wersji formatu. Baza widzi tylko szyfrogram.
@@ -117,6 +127,8 @@ Zmienne podane w linii poleceń mają pierwszeństwo przed wartościami z `.env`
 | Endpoint | Opis |
 |---|---|
 | `GET /api/v1/health` | Stan usługi i połączenia z bazą |
+| `GET /api/v1/scans?limit=N` | Ostatnie przebiegi: stan, postęp, czas trwania, prognoza do końca |
+| `GET /api/v1/scans/{id}` | Jeden przebieg |
 | `GET /api/openapi.json` | Opis API (OpenAPI 3.1), np. do Swagger Editor lub Postmana |
 
 Błędy zwracane są jako JSON `{"error": "..."}`. Żądania większe niż `server.max_body_bytes` dostają 413.
@@ -135,7 +147,7 @@ Kolejność ważności: **wartości domyślne < plik TOML < zmienne `DSCAN_*` < 
 | Sekcja | Zawartość |
 |---|---|
 | `[scope]` | dozwolone sieci i porty, limit ruchu (dane od organizatora laboratorium) |
-| `[limits]` | `nmap --max-rate`, równoległe procesy nmap, limity zapytań HTTP |
+| `[limits]` | łączne tempo nmap, równoległe procesy, rozmiar podgrupy, limit adresów, limity zapytań HTTP |
 | `[[schedule.windows]]` | okna czasowe skanowania (`HH:MM`, mogą przechodzić przez północ) |
 | `[stability]` | K przebiegów do statusu „nieaktywny”, N ponowień, odstęp ponowień |
 | `[server]` | adres nasłuchiwania API, limit rozmiaru żądania |
@@ -157,15 +169,18 @@ i limity ruchu z regulaminu organizatora.
 | `dscan-crypto` | `crates/crypto` | AES-256-GCM dla pól wrażliwych |
 | `dscan-auth` | `crates/auth` | Hasła argon2id, walidacja loginów |
 | `dscan-api` | `crates/api` | REST API (axum, tower-http, utoipa) |
-| `dscan-scanner` | `crates/scanner` | Cele (parsowanie, DNS, scalanie, zakres, iterator adresów) i wrapper nmap |
+| `dscan-scanner` | `crates/scanner` | Cele (parsowanie, DNS, scalanie, zakres), wrapper nmap, podgrupy, pula workerów, tempo |
+| `dscan-engine` | `crates/engine` | Przebieg skanu: podgrupy → pula → zapis w bazie, postęp i prognoza (Observer) |
 | `dscan-integrations` | `crates/integrations` | Import celów z CSV/JSON |
-| `dscan-fingerprint` | `crates/fingerprint` | Fingerprinting HTTP/TLS i sygnatury, *w przygotowaniu* |
+| `dscan-fingerprint` | `crates/fingerprint` | Limiter zapytań HTTP (governor); klient HTTP/TLS i sygnatury *w przygotowaniu* |
 | `dscan-web` | `crates/web` | UI (askama + htmx), *w przygotowaniu* |
 | `dscan` | `crates/cli` | Binarka `dscan` (clap) |
 
-Schemat bazy (migracja `0001`): `targets`, `scan_runs`, `subgroups`, `hosts`, `services`,
+Schemat bazy (migracje `0001`, `0002`): `targets`, `scan_runs`, `subgroups`, `hosts`, `services`,
 `http_info`, `detections`, `signatures`, `changes`, `overrides`, `users`, `roles`, `audit_log`.
-Kolumny z danymi wrażliwymi to `BYTEA`, przygotowane pod szyfrowanie AES-256-GCM (zadanie B2).
+Kolumny z danymi wrażliwymi to `BYTEA` z szyfrogramem AES-256-GCM. Wyniki są zapisywane wsadowo
+(INSERT z wieloma wierszami, po 1000): 10 000 hostów z 20 000 usług zapisuje się w ok. 0,6 s.
+Indeksy pod porównania przebiegów: `hosts (ip, scan_run_id)`, `services (host_id, port, protocol) INCLUDE (fingerprint_hash, state)`.
 
 ## Weryfikacja (to samo robi CI)
 

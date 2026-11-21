@@ -1,4 +1,4 @@
-# Testowanie DScan w Neovimie (zadania 1–15 planu)
+# Testowanie DScan w Neovimie (zadania 1–20 planu)
 
 Aplikacja: **DScan** (*Defect Scan*), binarka `dscan`.
 
@@ -18,8 +18,8 @@ Polecenia `./target/release/dscan …` **nie** wczytują `.env` (sekretów), a `
 ## 1. Workspace i CI (D1)
 
 1. `:!cargo metadata --no-deps --format-version 1 | grep -o '"name":"dscan[a-z-]*"'`
-   → 11 crate'ów: `dscan`, `dscan-core`, `dscan-config`, `dscan-db`, `dscan-api`, `dscan-crypto`,
-   `dscan-auth`, `dscan-scanner`, `dscan-integrations`, `dscan-fingerprint`, `dscan-web`.
+   → 12 crate'ów: `dscan`, `dscan-core`, `dscan-config`, `dscan-db`, `dscan-api`, `dscan-crypto`,
+   `dscan-auth`, `dscan-scanner`, `dscan-engine`, `dscan-integrations`, `dscan-fingerprint`, `dscan-web`.
 2. `:!cargo fmt --all -- --check` → brak wyjścia.
 3. `:!cargo clippy --workspace --all-targets -- -D warnings` → bez ostrzeżeń.
 4. `:!cargo test --workspace 2>&1 | grep "test result"` → wszystkie wiersze `ok`, 0 failed.
@@ -174,11 +174,12 @@ Uruchom serwer w terminalu (`:tabnew | terminal`, `./run.sh`), wróć do pierwsz
 Wymaga nmap na hoście (`:!nmap --version`).
 
 1. **Wykrywanie hostów:** `:!./run.sh scan 127.0.0.1 --mode discovery` → `127.0.0.1` i `Aktywne hosty: 1`.
-2. **Usługi:** `:!./run.sh scan 127.0.0.1 --xml /tmp/wynik.xml` → np. `5432/tcp open postgresql PostgreSQL DB …`
+2. **Usługi:** `:!./run.sh scan 127.0.0.1` → np. `5432/tcp open postgresql PostgreSQL DB …`
    (porty z `[scope] allowed_ports`).
-3. Surowy XML: `:e /tmp/wynik.xml` → `<nmaprun … args="nmap -sV -p … -n --max-rate 100 -oX - -iL -"`.
-   Wróć do poprzedniego bufora: `Ctrl-^`.
-4. Limit tempa z flagi: `:!./run.sh scan 127.0.0.1 --max-rate 20 --mode discovery` → `Uruchamiam nmap (--max-rate 20)`.
+3. Surowy XML jest w bazie (zaszyfrowany):
+   `:!docker compose exec -T postgres psql -U dscan -d dscan -c "SELECT scan_run_id, length(raw_nmap_xml) FROM subgroups ORDER BY id DESC LIMIT 3"`
+   → liczba bajtów szyfrogramu przy każdej podgrupie.
+4. Limit tempa z flagi: `:!./run.sh scan 127.0.0.1 --max-rate 20 --mode discovery` → `… po 20 pakietów/s`.
 5. **Cel spoza zakresu:** `:!./run.sh scan 8.8.8.8; echo "kod=$?"` → `brak celów do skanowania w dozwolonym zakresie`, `kod=1`.
    Żaden pakiet nie zostaje wysłany.
 6. Testy (w tym z prawdziwym nmap i lokalnym „serwerem SSH”):
@@ -216,6 +217,63 @@ Wymaga nmap na hoście (`:!nmap --version`).
    `DSCAN_ENCRYPTION_KEY=$NOWY DSCAN_NEW_ENCRYPTION_KEY=<stary klucz z .env> ./run.sh keys rotate`.
 5. Testy szyfrowania: `:!cargo test -q -p dscan-crypto 2>&1 | grep "test result"` → `ok`
    (zły klucz, zły kontekst kolumny, zmodyfikowane dane — wszystkie odrzucone).
+
+## 15. Klasyfikacja danych wrażliwych (B4)
+
+1. `:e docs/klasyfikacja-danych.md` → poziomy (sekret / poufne / wewnętrzne), tabela 7 szyfrowanych kolumn
+   z uzasadnieniem i tabela danych jawnych z powodem.
+2. Zgodność z kodem: `:!cargo test -q -p dscan-db classification 2>&1 | grep "test result"` → `ok`.
+   Sprawdź, że test pilnuje dokumentu: usuń w buforze wiersz z `services.banner` (`dd`), zapisz,
+   uruchom test ponownie → błąd `nie opisuje services.banner`. Cofnij (`u`, `:w`).
+
+## 16. Wydajny zapis wyników (B5)
+
+1. `:!./run.sh db status` → `[x] 0002 scan progress and indexes`.
+2. Test 10 000 hostów + 20 000 usług na bazie z Dockera:
+   `:!set -a; . ./.env; set +a; DSCAN_TEST_DATABASE_URL=$DSCAN_DATABASE_URL cargo test -q -p dscan-db --test scan_results -- --nocapture 2>&1 | grep -E "zapis|test result"`
+   → `zapis 10 000 hostów i 20 000 usług: …ms` (ok. 1 s lub mniej) i `ok`.
+3. Indeksy: `:!docker compose exec -T postgres psql -U dscan -d dscan -c '\di *_idx'`
+   → m.in. `hosts_ip_run_idx`, `services_comparison_idx`, `scan_runs_started_idx`.
+4. Kod: `:e crates/db/src/results.rs` — `push_values` buduje jeden INSERT dla 1000 wierszy.
+
+## 17. Podgrupy i pula workerów (S4)
+
+1. `:!DSCAN_LIMITS__SUBGROUP_SIZE=32 ./run.sh scan 127.0.0.0/25 --mode discovery --parallel 2 --quiet`
+   → `Przebieg #N: 128 adresów w 4 podgrupach; do 2 procesów nmap naraz…`, cztery wiersze `[k/4] podgrupa …`,
+   `Przebieg #N zakończony (completed)`.
+2. Podgrupy w bazie:
+   `:!docker compose exec -T postgres psql -U dscan -d dscan -c "SELECT scan_run_id, sequence_no, addresses, status FROM subgroups ORDER BY id DESC LIMIT 4"`
+   → `127.0.0.0/27`, `127.0.0.32/27`, … ze statusem `completed`.
+3. Zły rozmiar podgrupy: `:!DSCAN_LIMITS__SUBGROUP_SIZE=100 ./run.sh config validate`
+   → `wymagana potęga dwójki`.
+4. Bezpiecznik: `:!DSCAN_LIMITS__MAX_ADDRESSES_PER_SCAN=10 ./run.sh scan 127.0.0.0/28 --mode discovery`
+   → `skan obejmuje 16 adresów, a limit to 10`.
+5. Testy puli (limit równoległości, błąd jednej podgrupy):
+   `:!cargo test -q -p dscan-scanner pool 2>&1 | grep "test result"` → `ok`.
+
+## 18. Ograniczanie tempa (S7)
+
+1. `:!./run.sh scan 127.0.0.1 --mode discovery --parallel 4 --max-rate 100 --quiet`
+   → `do 4 procesów nmap naraz po 25 pakietów/s` (limit łączny podzielony na procesy).
+2. Limit z przepustowości: `:!DSCAN_SCOPE__MAX_BANDWIDTH_KBPS=64 ./run.sh scan 127.0.0.1 --mode discovery --parallel 1 --max-rate 5000 --quiet`
+   → `po 108 pakietów/s` (64 kbit/s ÷ 74 B na pakiet).
+3. Argument przekazany do nmap: uruchom w terminalu (`:tabnew | terminal`)
+   `./run.sh scan 127.0.0.0/28 --parallel 2` i w pierwszej karcie (`1gt`) `:!pgrep -a nmap | grep -o "max-rate [0-9]*"`
+   → `max-rate 50` przy każdym procesie.
+4. Limiter HTTP (dla przyszłego klienta HTTP): `:!cargo test -q -p dscan-fingerprint 2>&1 | grep "test result"` → `ok`.
+
+## 19. Pomiar czasu i prognoza (S6)
+
+1. Uruchom serwer w terminalu (`:tabnew | terminal`, `./run.sh`), w drugim terminalu (`:tabnew | terminal`):
+   `DSCAN_LIMITS__SUBGROUP_SIZE=4 ./run.sh scan 127.0.0.0/28 --parallel 1`
+   → po każdej podgrupie `| 25% | pozostało ok. 0:47` itd.
+2. W trakcie skanu z pierwszej karty (`1gt`):
+   `:!curl -s 'localhost:8080/api/v1/scans?limit=1'`
+   → `"status":"running"`, `"progress_percent":25.0`, `"elapsed_seconds":…`, `"estimated_remaining_seconds":…`.
+3. Po zakończeniu to samo polecenie → `"status":"completed"`, `"estimated_remaining_seconds":null`.
+4. Czasy podgrup w bazie:
+   `:!docker compose exec -T postgres psql -U dscan -d dscan -c "SELECT sequence_no, round(EXTRACT(EPOCH FROM finished_at - started_at)::numeric, 1) AS sekundy FROM subgroups ORDER BY id DESC LIMIT 4"`.
+5. Nieistniejący przebieg: `:!curl -s localhost:8080/api/v1/scans/999999` → `{"error":"nie znaleziono zasobu"}`.
 
 ## Na koniec
 

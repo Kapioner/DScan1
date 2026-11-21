@@ -1,0 +1,217 @@
+//! Test silnika na prawdziwej bazie (pomijany bez `DSCAN_TEST_DATABASE_URL`) z atrapą
+//! skanera zamiast nmap. Każdy test działa we własnym schemacie PostgreSQL.
+
+// Plik testowy: unwrap() w funkcjach pomocniczych jest tu dozwolony.
+#![allow(clippy::unwrap_used)]
+
+use std::sync::{Arc, Mutex};
+
+use chrono::Utc;
+use dscan_core::models::{Host, Protocol, ScanStatus, Service, ServiceState};
+use dscan_crypto::Cipher;
+use dscan_db::{PgPool, run_migrations};
+use dscan_engine::{
+    EngineError, ScanJobSettings, ScanObserver, ScanProgress, SubgroupReport, run_scan_job,
+};
+use dscan_scanner::ScannerError;
+use dscan_scanner::nmap::ScanOutput;
+use dscan_scanner::pool::SubgroupScanner;
+use ipnet::IpNet;
+use sqlx::Executor;
+use sqlx::postgres::PgPoolOptions;
+
+/// Atrapa: w każdej podgrupie „znajduje” pierwszy adres z otwartym portem 22;
+/// podgrupa 10.0.3.0/24 kończy się błędem.
+struct FakeScanner;
+
+impl SubgroupScanner for FakeScanner {
+    async fn scan(&self, targets: &[IpNet]) -> Result<ScanOutput, ScannerError> {
+        if targets[0].to_string() == "10.0.3.0/24" {
+            return Err(ScannerError::NmapFailed {
+                exit_code: Some(1),
+                stderr: "awaria".into(),
+            });
+        }
+        let mut host = Host::new(targets[0].network(), Utc::now());
+        host.services
+            .push(Service::new(22, Protocol::Tcp, ServiceState::Open));
+        Ok(ScanOutput {
+            hosts: vec![host],
+            raw_xml: "<nmaprun/>".into(),
+        })
+    }
+}
+
+/// Obserwator zapisujący zdarzenia.
+#[derive(Default)]
+struct RecordingObserver {
+    events: Mutex<Vec<String>>,
+}
+
+impl ScanObserver for RecordingObserver {
+    fn scan_started(&self, progress: &ScanProgress) {
+        self.events
+            .lock()
+            .unwrap()
+            .push(format!("start {}", progress.total_subgroups));
+    }
+    fn subgroup_finished(&self, report: &SubgroupReport, progress: &ScanProgress) {
+        let state = if report.error.is_some() {
+            "błąd"
+        } else {
+            "ok"
+        };
+        self.events.lock().unwrap().push(format!(
+            "{state} {}/{}",
+            progress.finished_subgroups, progress.total_subgroups
+        ));
+    }
+}
+
+async fn test_pool() -> Option<(PgPool, String, String)> {
+    let Ok(url) = std::env::var("DSCAN_TEST_DATABASE_URL") else {
+        eprintln!("pomijam test: brak zmiennej DSCAN_TEST_DATABASE_URL");
+        return None;
+    };
+    let schema = format!(
+        "test_engine_{}_{}",
+        std::process::id(),
+        Utc::now().timestamp_subsec_nanos()
+    );
+    let admin = PgPoolOptions::new()
+        .max_connections(1)
+        .connect(&url)
+        .await
+        .unwrap();
+    admin
+        .execute(format!("CREATE SCHEMA {schema}").as_str())
+        .await
+        .unwrap();
+    let search_path = format!("SET search_path TO {schema}");
+    let pool = PgPoolOptions::new()
+        .max_connections(4)
+        .after_connect(move |connection, _| {
+            let search_path = search_path.clone();
+            Box::pin(async move {
+                connection.execute(search_path.as_str()).await?;
+                Ok(())
+            })
+        })
+        .connect(&url)
+        .await
+        .unwrap();
+    run_migrations(&pool).await.unwrap();
+    Some((pool, schema, url))
+}
+
+async fn drop_schema(url: &str, schema: &str) {
+    let admin = PgPoolOptions::new()
+        .max_connections(1)
+        .connect(url)
+        .await
+        .unwrap();
+    admin
+        .execute(format!("DROP SCHEMA {schema} CASCADE").as_str())
+        .await
+        .unwrap();
+}
+
+fn settings(max_addresses: u64) -> ScanJobSettings {
+    ScanJobSettings {
+        profile: "test".into(),
+        subgroup_size: 256,
+        parallel: 3,
+        max_addresses,
+    }
+}
+
+#[tokio::test]
+async fn job_saves_every_subgroup_and_reports_progress() {
+    let Some((pool, schema, url)) = test_pool().await else {
+        return;
+    };
+    let networks: Vec<IpNet> = vec!["10.0.0.0/22".parse().unwrap()]; // 4 podgrupy po 256
+    let observer = RecordingObserver::default();
+    let cipher = Cipher::new(&[3; 32]);
+
+    let summary = run_scan_job(
+        &pool,
+        &cipher,
+        &networks,
+        Arc::new(FakeScanner),
+        &settings(10_000),
+        &observer,
+    )
+    .await
+    .unwrap();
+
+    assert_eq!(summary.subgroups, 4);
+    assert_eq!(summary.failed_subgroups, 1);
+    assert_eq!(summary.status, ScanStatus::Failed);
+    assert_eq!(summary.hosts.len(), 3);
+
+    let run = dscan_db::get_scan_run(&pool, summary.run_id)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(run.completed_subgroups, 4);
+    assert_eq!(run.completed_addresses, 1024);
+    assert!(run.finished_at.is_some());
+
+    let statuses: Vec<String> =
+        sqlx::query_scalar("SELECT status FROM subgroups ORDER BY sequence_no")
+            .fetch_all(&pool)
+            .await
+            .unwrap();
+    assert_eq!(
+        statuses,
+        vec!["completed", "completed", "completed", "failed"]
+    );
+    let services: i64 = sqlx::query_scalar("SELECT count(*) FROM services")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(services, 3);
+
+    let events = observer.events.lock().unwrap().clone();
+    assert_eq!(events.first().map(String::as_str), Some("start 4"));
+    assert_eq!(events.len(), 5);
+    assert!(events.last().unwrap().ends_with("4/4"));
+
+    pool.close().await;
+    drop_schema(&url, &schema).await;
+}
+
+#[tokio::test]
+async fn too_many_addresses_are_refused_before_scanning() {
+    let Some((pool, schema, url)) = test_pool().await else {
+        return;
+    };
+    let networks: Vec<IpNet> = vec!["10.0.0.0/16".parse().unwrap()];
+
+    let result = run_scan_job(
+        &pool,
+        &Cipher::new(&[3; 32]),
+        &networks,
+        Arc::new(FakeScanner),
+        &settings(1000),
+        &RecordingObserver::default(),
+    )
+    .await;
+
+    assert!(matches!(
+        result,
+        Err(EngineError::TooManyAddresses {
+            count: 65_536,
+            limit: 1000
+        })
+    ));
+    let runs: i64 = sqlx::query_scalar("SELECT count(*) FROM scan_runs")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(runs, 0);
+
+    pool.close().await;
+    drop_schema(&url, &schema).await;
+}

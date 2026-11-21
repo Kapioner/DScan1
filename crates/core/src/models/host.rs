@@ -17,6 +17,17 @@ pub enum HostStatus {
     Unstable,
 }
 
+impl HostStatus {
+    /// Nazwa zapisywana w bazie (kolumna `hosts.status`).
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            HostStatus::Active => "active",
+            HostStatus::Inactive => "inactive",
+            HostStatus::Unstable => "unstable",
+        }
+    }
+}
+
 /// Host wykryty w sieci wraz z jego usługami.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Host {

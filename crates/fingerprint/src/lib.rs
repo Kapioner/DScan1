@@ -1,4 +1,7 @@
-//! Fingerprinting usług: klient HTTP/HTTPS, ekstrakcja informacji, certyfikaty TLS, silnik sygnatur.
+//! Fingerprinting usług: klient HTTP/HTTPS, certyfikaty TLS, silnik sygnatur.
 //!
-//! Crate utworzony w etapie D1 (struktura workspace). Implementacja pojawi się
-//! w kolejnych zadaniach planu.
+//! Na tym etapie: limiter zapytań HTTP (zadanie S7), z którego skorzysta klient HTTP (H1).
+
+mod rate_limit;
+
+pub use rate_limit::{BudgetExceeded, HttpRateLimiter};

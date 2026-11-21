@@ -9,6 +9,8 @@ repository.workspace = true
 
 [dependencies]
 dscan-db.workspace = true
+dscan-core.workspace = true
+chrono.workspace = true
 axum.workspace = true
 tokio.workspace = true
 tower-http.workspace = true

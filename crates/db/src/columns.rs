@@ -1,5 +1,6 @@
 //! Rejestr kolumn z danymi wrażliwymi. Każda wartość w nich jest zaszyfrowana
 //! (patrz [`crate::Encrypted`]), a rotacja klucza przechodzi po wszystkich kolumnach z tej listy.
+//! Uzasadnienie wyboru kolumn: `docs/klasyfikacja-danych.md`.
 
 use dscan_crypto::CryptoError;
 
@@ -73,6 +74,19 @@ mod tests {
     #[test]
     fn context_combines_table_and_column() {
         assert_eq!(SERVICES_BANNER.context(), "services.banner");
+    }
+
+    /// Dokument klasyfikacji danych (B4) musi wymieniać każdą szyfrowaną kolumnę.
+    #[test]
+    fn classification_document_lists_every_encrypted_column() {
+        let document = include_str!("../../../docs/klasyfikacja-danych.md");
+        for column in &ENCRYPTED_COLUMNS {
+            let entry = format!("`{}`", column.context());
+            assert!(
+                document.contains(&entry),
+                "docs/klasyfikacja-danych.md nie opisuje {entry}"
+            );
+        }
     }
 
     #[test]

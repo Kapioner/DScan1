@@ -5,6 +5,7 @@ use std::path::PathBuf;
 use dscan_auth::AuthError;
 use dscan_config::ConfigError;
 use dscan_db::DbError;
+use dscan_engine::EngineError;
 use dscan_integrations::ImportError;
 use dscan_scanner::ScannerError;
 
@@ -14,6 +15,7 @@ pub enum CliError {
     Config(ConfigError),
     Database(DbError),
     Scanner(ScannerError),
+    Engine(EngineError),
     Import(ImportError),
     Auth(AuthError),
     /// Nie udało się otworzyć portu (zajęty albo brak uprawnień).
@@ -45,6 +47,7 @@ impl fmt::Display for CliError {
             CliError::Config(error) => write!(f, "{error}"),
             CliError::Database(error) => write!(f, "{error}"),
             CliError::Scanner(error) => write!(f, "{error}"),
+            CliError::Engine(error) => write!(f, "{error}"),
             CliError::Import(error) => write!(f, "{error}"),
             CliError::Auth(error) => write!(f, "{error}"),
             CliError::Bind { address, source } => {
@@ -88,6 +91,12 @@ impl From<DbError> for CliError {
 impl From<ScannerError> for CliError {
     fn from(error: ScannerError) -> Self {
         CliError::Scanner(error)
+    }
+}
+
+impl From<EngineError> for CliError {
+    fn from(error: EngineError) -> Self {
+        CliError::Engine(error)
     }
 }
 
