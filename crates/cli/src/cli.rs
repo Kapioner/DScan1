@@ -1,0 +1,105 @@
+//! Definicja wiersza poleceń (clap derive). Każda podkomenda ma własny typ
+//! argumentów w module [`crate::commands`].
+
+use std::path::PathBuf;
+
+use clap::{Parser, Subcommand};
+
+use crate::commands::config::ConfigArgs;
+use crate::commands::db::DbArgs;
+use crate::commands::planned::{
+    DiffArgs, ExportArgs, ImportArgs, KeysArgs, ScanArgs, SigArgs, TargetsArgs, UserArgs,
+};
+use crate::commands::serve::ServeArgs;
+
+/// DScan (Defect Scan): skanowanie i inwentaryzacja usług sieciowych.
+#[derive(Debug, Parser)]
+#[command(name = "dscan", version, propagate_version = true)]
+pub struct Cli {
+    /// Plik konfiguracji TOML (domyślnie ./dscan.toml, jeśli istnieje).
+    #[arg(short, long, global = true, env = "DSCAN_CONFIG", value_name = "PLIK")]
+    pub config: Option<PathBuf>,
+
+    #[command(subcommand)]
+    pub command: Commands,
+}
+
+/// Wszystkie podkomendy `dscan`.
+#[derive(Debug, Subcommand)]
+pub enum Commands {
+    /// Uruchamia serwer API (wykonuje też migracje bazy).
+    Serve(ServeArgs),
+    /// Uruchamia skan podanych celów.
+    Scan(ScanArgs),
+    /// Zarządza listą celów skanowania.
+    Targets(TargetsArgs),
+    /// Importuje cele lub wyniki skanów z pliku.
+    Import(ImportArgs),
+    /// Eksportuje hosty, usługi lub zmiany do pliku.
+    Export(ExportArgs),
+    /// Porównuje dwa przebiegi skanu.
+    Diff(DiffArgs),
+    /// Zarządza sygnaturami technologii.
+    Sig(SigArgs),
+    /// Zarządza użytkownikami.
+    User(UserArgs),
+    /// Wyświetla i sprawdza konfigurację.
+    Config(ConfigArgs),
+    /// Zarządza bazą danych (migracje).
+    Db(DbArgs),
+    /// Zarządza kluczami szyfrowania.
+    Keys(KeysArgs),
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use clap::CommandFactory;
+
+    const ALL_SUBCOMMANDS: [&str; 11] = [
+        "serve", "scan", "targets", "import", "export", "diff", "sig", "user", "config", "db",
+        "keys",
+    ];
+
+    #[test]
+    fn cli_definition_is_consistent() {
+        Cli::command().debug_assert();
+    }
+
+    #[test]
+    fn all_planned_subcommands_exist_with_help() {
+        let command = Cli::command();
+        for name in ALL_SUBCOMMANDS {
+            let subcommand = command
+                .find_subcommand(name)
+                .unwrap_or_else(|| panic!("brak podkomendy {name}"));
+            assert!(subcommand.get_about().is_some(), "brak opisu dla {name}");
+        }
+    }
+
+    #[test]
+    fn nested_subcommands_have_help() {
+        let command = Cli::command();
+        for subcommand in command.get_subcommands() {
+            for nested in subcommand.get_subcommands() {
+                assert!(
+                    nested.get_about().is_some(),
+                    "brak opisu dla {} {}",
+                    subcommand.get_name(),
+                    nested.get_name()
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn global_config_flag_works_after_subcommand() {
+        let cli = Cli::try_parse_from(["dscan", "config", "show", "--config", "a.toml"]).unwrap();
+        assert_eq!(cli.config, Some(PathBuf::from("a.toml")));
+    }
+
+    #[test]
+    fn missing_subcommand_is_an_error() {
+        assert!(Cli::try_parse_from(["dscan"]).is_err());
+    }
+}

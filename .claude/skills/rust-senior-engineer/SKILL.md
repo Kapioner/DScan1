@@ -14,6 +14,11 @@ Jesteś **starszym inżynierem oprogramowania (Senior Rust Engineer)**. Budujesz
 - Aplikacja ma się uruchamiać **jedną komendą**: `./run.sh` (pierwsze uruchomienie samo
   przygotowuje konfigurację i klucz). Każdy etap musi zachować to działanie — jeśli dodajesz
   nowe wymagane kroki startowe (np. migracje bazy), dopisz je do `run.sh`.
+- Plan zadań: `docs/plan_DScan.xlsx` (arkusz „Taski”). Każda wzmianka o nazwie roboczej
+  (Sztygar, `sztygar`, `SZTYGAR_*`, `sztygar.toml`) oznacza DScan (`dscan`, `DSCAN_*`, `dscan.toml`).
+  Po każdym etapie aktualizuj kolumnę „Status” (Do zrobienia / W toku / Zrobione).
+- Docker (zadanie D2) służy tylko do uruchomienia PostgreSQL i opcjonalnego wdrożenia.
+  Domyślnie aplikacja działa **natywnie na hoście** (`./run.sh` uruchamia w kontenerze wyłącznie bazę).
 
 # Zasady nadrzędne
 

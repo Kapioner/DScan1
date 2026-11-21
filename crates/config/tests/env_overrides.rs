@@ -47,6 +47,27 @@ fn invalid_encryption_key_in_env_is_an_error() {
 }
 
 #[test]
+fn unrelated_dscan_variables_are_ignored() {
+    Jail::expect_with(|jail| {
+        jail.set_env("DSCAN_TEST_DATABASE_URL", "postgres://x/y");
+        jail.set_env("DSCAN_CONFIG", "inny.toml");
+
+        assert!(ConfigLoader::new().load().is_ok());
+        Ok(())
+    });
+}
+
+#[test]
+fn typo_in_env_field_name_is_an_error() {
+    Jail::expect_with(|jail| {
+        jail.set_env("DSCAN_LIMITS__NMAP_MAXRATE", "5");
+
+        assert!(ConfigLoader::new().load().is_err());
+        Ok(())
+    });
+}
+
+#[test]
 fn env_list_value_is_parsed() {
     Jail::expect_with(|jail| {
         jail.set_env("DSCAN_SCOPE__ALLOWED_PORTS", r#"["22","80-90"]"#);

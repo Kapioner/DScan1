@@ -1,13 +1,14 @@
 use std::process::ExitCode;
 
-fn main() -> ExitCode {
-    let args: Vec<String> = std::env::args().skip(1).collect();
+use clap::Parser;
+use dscan::cli::Cli;
 
-    match dscan::app::run(&args) {
-        Ok(output) => {
-            print!("{output}");
-            ExitCode::SUCCESS
-        }
+#[tokio::main]
+async fn main() -> ExitCode {
+    let cli = Cli::parse();
+
+    match dscan::app::run(cli).await {
+        Ok(()) => ExitCode::SUCCESS,
         Err(error) => {
             eprintln!("Błąd: {error}");
             ExitCode::FAILURE

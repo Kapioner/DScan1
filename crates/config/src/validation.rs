@@ -1,6 +1,8 @@
 use dscan_core::models::parse_port_range;
 
-use crate::{ConfigError, Settings, parse_clock_time};
+use crate::{
+    AppConfig, ConfigError, DATABASE_URL_ENV, ENCRYPTION_KEY_ENV, Settings, parse_clock_time,
+};
 
 /// Sprawdza poprawność wartości, których nie wyrazi sam system typów
 /// (zakresy portów, godziny, niezerowe limity).
@@ -28,31 +30,68 @@ fn validate_windows(settings: &Settings) -> Result<(), ConfigError> {
 
 fn validate_limits(settings: &Settings) -> Result<(), ConfigError> {
     let limits = &settings.limits;
+    // (nazwa ustawienia, czy wartość jest zerem)
     let checks = [
-        ("limits.nmap_max_rate", limits.nmap_max_rate),
-        ("limits.max_parallel_nmap", limits.max_parallel_nmap),
+        ("limits.nmap_max_rate", limits.nmap_max_rate == 0),
+        ("limits.max_parallel_nmap", limits.max_parallel_nmap == 0),
         (
             "limits.http_requests_per_second",
-            limits.http_requests_per_second,
+            limits.http_requests_per_second == 0,
         ),
         (
             "limits.http_requests_per_host",
-            limits.http_requests_per_host,
+            limits.http_requests_per_host == 0,
         ),
         (
             "scope.max_bandwidth_kbps",
-            settings.scope.max_bandwidth_kbps,
+            settings.scope.max_bandwidth_kbps == 0,
         ),
         (
             "stability.inactive_after_missed_runs",
-            settings.stability.inactive_after_missed_runs,
+            settings.stability.inactive_after_missed_runs == 0,
+        ),
+        ("server.max_body_bytes", settings.server.max_body_bytes == 0),
+        (
+            "database.max_connections",
+            settings.database.max_connections == 0,
+        ),
+        (
+            "database.connect_timeout_seconds",
+            settings.database.connect_timeout_seconds == 0,
         ),
     ];
 
-    match checks.iter().find(|(_, value)| *value == 0) {
+    match checks.iter().find(|(_, is_zero)| *is_zero) {
         Some((name, _)) => Err(ConfigError::ZeroLimit(name)),
         None => Ok(()),
     }
+}
+
+/// Ostrzeżenia o ustawieniach poprawnych, ale prawdopodobnie niezamierzonych
+/// (do `config validate`). Nie blokują uruchomienia.
+pub fn collect_warnings(config: &AppConfig) -> Vec<String> {
+    let mut warnings = Vec::new();
+
+    if config.settings.scope.allowed_networks.is_empty() {
+        warnings.push("scope.allowed_networks jest puste — żaden cel nie będzie dozwolony".into());
+    }
+    if config.encryption_key.is_none() {
+        warnings.push(format!(
+            "brak {ENCRYPTION_KEY_ENV} — dane wrażliwe nie będą mogły być zapisane"
+        ));
+    }
+    if config.database_url.is_none() {
+        warnings.push(format!(
+            "brak {DATABASE_URL_ENV} — polecenia serve i db nie zadziałają"
+        ));
+    }
+    if !config.settings.server.listen.ip().is_loopback() {
+        warnings.push(format!(
+            "server.listen = {} — API będzie dostępne z sieci, nie tylko lokalnie",
+            config.settings.server.listen
+        ));
+    }
+    warnings
 }
 
 #[cfg(test)]
@@ -84,6 +123,28 @@ mod tests {
 
         let error = validate_settings(&settings).unwrap_err();
         assert!(matches!(error, ConfigError::InvalidTime(_)));
+    }
+
+    #[test]
+    fn default_config_without_secrets_has_warnings() {
+        let config = crate::ConfigLoader::new().without_env().load().unwrap();
+
+        let warnings = collect_warnings(&config);
+
+        assert_eq!(warnings.len(), 3);
+        assert!(warnings.iter().any(|w| w.contains("allowed_networks")));
+        assert!(warnings.iter().any(|w| w.contains("DSCAN_ENCRYPTION_KEY")));
+        assert!(warnings.iter().any(|w| w.contains("DSCAN_DATABASE_URL")));
+    }
+
+    #[test]
+    fn public_listen_address_gives_warning() {
+        let mut config = crate::ConfigLoader::new().without_env().load().unwrap();
+        config.settings.server.listen = "0.0.0.0:8080".parse().unwrap();
+
+        let warnings = collect_warnings(&config);
+
+        assert!(warnings.iter().any(|w| w.contains("0.0.0.0:8080")));
     }
 
     #[test]

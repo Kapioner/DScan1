@@ -4,8 +4,10 @@
 # Kolejność ważności: wartości domyślne < ten plik < zmienne DSCAN_<SEKCJA>__<POLE>
 # np. DSCAN_LIMITS__NMAP_MAX_RATE=50
 #
-# Klucz szyfrowania NIE należy do tego pliku — tylko zmienna DSCAN_ENCRYPTION_KEY
-# (64 znaki hex; wygeneruj: openssl rand -hex 32).
+# Sekrety NIE należą do tego pliku — tylko zmienne środowiskowe:
+#   DSCAN_ENCRYPTION_KEY  klucz szyfrowania
+#                         (64 znaki hex; wygeneruj: openssl rand -hex 32)
+#   DSCAN_DATABASE_URL    adres bazy, np. postgres://dscan:haslo@127.0.0.1:5433/dscan
 
 # --- Środowisko testowe od organizatora (D3) --------------------------------
 # UWAGA: poniższe wartości są przykładowe. Zastąp je danymi z regulaminu
@@ -44,3 +46,17 @@ inactive_after_missed_runs = 3
 unstable_retries = 2
 # Odstęp między ponownymi próbami (sekundy).
 retry_delay_seconds = 30
+
+# --- Serwer HTTP (API) -------------------------------------------------------
+[server]
+# Adres nasłuchiwania. 127.0.0.1 = tylko lokalnie; 0.0.0.0 = z sieci.
+listen = "127.0.0.1:8080"
+# Maksymalny rozmiar żądania w bajtach (np. wgrywany plik CSV).
+max_body_bytes = 2097152
+
+# --- Baza danych PostgreSQL ---------------------------------------------------
+# Adres bazy (z hasłem) podaje się WYŁĄCZNIE w zmiennej DSCAN_DATABASE_URL
+# (./run.sh ustawia ją automatycznie w pliku .env).
+[database]
+max_connections = 10
+connect_timeout_seconds = 5

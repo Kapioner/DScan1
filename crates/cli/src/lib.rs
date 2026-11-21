@@ -1,3 +1,7 @@
-//! Logika binarki `dscan`. `main.rs` jedynie przekazuje argumenty do [`app::run`].
+//! Logika binarki `dscan`. `main.rs` tylko parsuje argumenty i wywołuje [`app::run`].
 
 pub mod app;
+pub mod cli;
+pub mod commands;
+pub mod error;
+mod logging;

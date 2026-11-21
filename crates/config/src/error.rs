@@ -17,6 +17,9 @@ pub enum ConfigError {
     ZeroLimit(&'static str),
     InvalidEncryptionKey(String),
     MissingEncryptionKey,
+    MissingDatabaseUrl,
+    /// Nie udało się zamienić konfiguracji na tekst TOML (`config show`).
+    Render(String),
 }
 
 impl fmt::Display for ConfigError {
@@ -44,6 +47,14 @@ impl fmt::Display for ConfigError {
                 "brak klucza szyfrowania — ustaw zmienną {}",
                 crate::ENCRYPTION_KEY_ENV
             ),
+            ConfigError::MissingDatabaseUrl => write!(
+                f,
+                "brak adresu bazy danych — ustaw zmienną {} (zrobi to ./run.sh)",
+                crate::DATABASE_URL_ENV
+            ),
+            ConfigError::Render(reason) => {
+                write!(f, "nie można wypisać konfiguracji: {reason}")
+            }
         }
     }
 }
