@@ -226,6 +226,7 @@ mod tests {
             cookies: Vec::new(),
             redirect_chain: Vec::new(),
             tls_verified: Some(false),
+            certificate: None,
         };
         assert_eq!(
             format_http(&http),

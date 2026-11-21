@@ -15,11 +15,15 @@ scraper.workspace = true
 serde.workspace = true
 serde_yaml.workspace = true
 regex.workspace = true
+rustls.workspace = true
+tokio-rustls.workspace = true
+x509-parser.workspace = true
+sha2.workspace = true
+chrono.workspace = true
+tokio.workspace = true
 
 [dev-dependencies]
-tokio.workspace = true
 axum.workspace = true
-chrono.workspace = true
 
 [lints]
 workspace = true

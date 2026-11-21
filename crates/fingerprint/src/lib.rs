@@ -15,6 +15,7 @@ mod probe;
 mod rate_limit;
 mod redirect;
 pub mod signatures;
+mod tls;
 mod web_service;
 
 pub use client::{HttpFetcher, HttpOptions, RawResponse};
@@ -24,4 +25,10 @@ pub use hosts::{WebAnalysis, fingerprint_hosts};
 pub use probe::{ProbeResult, is_safe_probe_path, merge_probe_paths, probe_paths};
 pub use rate_limit::{BudgetExceeded, HttpRateLimiter};
 pub use redirect::{is_same_host, resolve_location};
+pub use tls::{fetch_certificate, parse_certificate};
 pub use web_service::{WebScheme, service_url, web_scheme};
+
+/// Bajty jako małe znaki hex (np. odcisk SHA-256 certyfikatu).
+pub(crate) fn encode_hex_lower(bytes: &[u8]) -> String {
+    bytes.iter().map(|byte| format!("{byte:02x}")).collect()
+}

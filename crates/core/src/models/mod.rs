@@ -1,5 +1,6 @@
 //! Struktury danych opisujące cele, wyniki skanów i zmiany między przebiegami.
 
+mod certificate;
 mod change;
 mod compare;
 mod detection;
@@ -10,6 +11,7 @@ mod scan_run;
 mod service;
 mod target;
 
+pub use certificate::CertificateInfo;
 pub use change::{Change, ChangeKind};
 pub use compare::{compare_runs, fingerprint_input, service_fingerprint};
 pub use detection::{Detection, Evidence, EvidenceKind, MAX_CONFIDENCE, cap_confidence};

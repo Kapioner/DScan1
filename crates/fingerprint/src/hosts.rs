@@ -2,7 +2,7 @@ use dscan_core::models::Host;
 
 use crate::probe::{merge_probe_paths, probe_paths};
 use crate::signatures::{SignatureSet, WebEvidence};
-use crate::{HttpFetcher, service_url, to_http_info, web_scheme};
+use crate::{HttpFetcher, WebScheme, fetch_certificate, service_url, to_http_info, web_scheme};
 
 /// Analiza usług WWW: sygnatury i lista ścieżek do sondowania.
 pub struct WebAnalysis {
@@ -24,7 +24,8 @@ impl WebAnalysis {
     }
 }
 
-/// Odpytuje każdą otwartą usługę WWW na hostach: strona główna (H1, H2), sondy ścieżek (H6)
+/// Odpytuje każdą otwartą usługę WWW na hostach: strona główna (H1, H2), certyfikat TLS (H3),
+/// sondy ścieżek (H6)
 /// i dopasowanie sygnatur (H5). Wynik trafia do `service.http` i `service.detections`.
 /// Usługa, której nie udało się odpytać, zostaje bez tych informacji (skan trwa dalej).
 /// Zwraca liczbę usług z odczytanymi informacjami.
@@ -44,7 +45,12 @@ pub async fn fingerprint_hosts(
             let Ok(response) = fetcher.fetch(&url, ip).await else {
                 continue;
             };
-            let info = to_http_info(&response);
+            let mut info = to_http_info(&response);
+            if scheme == WebScheme::Https {
+                info.certificate = fetch_certificate(ip, service.port, fetcher.timeout())
+                    .await
+                    .ok();
+            }
             let body = String::from_utf8_lossy(&response.body);
             let probes = probe_paths(
                 fetcher,

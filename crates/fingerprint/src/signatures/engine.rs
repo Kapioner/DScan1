@@ -43,6 +43,15 @@ impl SignatureSet {
         Ok(SignatureSet { signatures })
     }
 
+    /// Wbudowane sygnatury uzupełnione o sygnatury z dodatkowego pliku YAML (np. od organizatora).
+    pub fn builtin_with(extra_yaml: Option<&str>) -> Result<SignatureSet, SignatureError> {
+        let mut set = Self::builtin()?;
+        if let Some(text) = extra_yaml {
+            set.signatures.extend(Self::from_yaml(text)?.signatures);
+        }
+        Ok(set)
+    }
+
     /// Wbudowany zestaw sygnatur (`signatures/default.yaml`).
     pub fn builtin() -> Result<SignatureSet, SignatureError> {
         Self::from_yaml(BUILTIN_SIGNATURES)
@@ -151,6 +160,7 @@ mod tests {
                 .collect(),
             redirect_chain: Vec::new(),
             tls_verified: None,
+            certificate: None,
         }
     }
 

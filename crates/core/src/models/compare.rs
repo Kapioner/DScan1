@@ -1,7 +1,7 @@
 //! Porównanie przebiegów (zadanie M1).
 //!
 //! Każda otwarta usługa ma odcisk — skrót SHA-256 z cech, które opisują „co tam działa”:
-//! produkt, wersja, nazwa usługi, kod i tytuł HTTP, stabilne nagłówki i stan TLS.
+//! produkt, wersja, nazwa usługi, kod i tytuł HTTP, stabilne nagłówki, stan TLS i certyfikat.
 //! Dwa przebiegi porównujemy po kluczu (IP, port, protokół):
 //! klucz tylko w nowszym = usługa nowa, tylko w starszym = zniknęła, inny odcisk = zmieniona.
 
@@ -30,6 +30,9 @@ pub fn fingerprint_input(service: &Service) -> String {
             http.title.as_deref().unwrap_or("")
         ));
         parts.push(format!("http.tls_verified={:?}", http.tls_verified));
+        if let Some(certificate) = &http.certificate {
+            parts.push(format!("tls.certificate={}", certificate.sha256));
+        }
         for name in FINGERPRINT_HEADERS {
             if let Some(value) = http.header(name) {
                 parts.push(format!("header.{name}={value}"));
@@ -153,6 +156,7 @@ mod tests {
                 cookies: Vec::new(),
                 redirect_chain: Vec::new(),
                 tls_verified: None,
+                certificate: None,
             });
             service_fingerprint(&s)
         };
