@@ -2,13 +2,21 @@
 //! interakcje przez htmx (dołączony do binarki — działa bez internetu).
 //!
 //! Na tym etapie: układ strony, logowanie i wylogowanie, menu zależne od roli,
-//! pulpit z listą przebiegów odświeżaną co 5 s, formularz celów (F3: wpis ręczny, wgranie
+//! pulpit (F2: znaleziska, zmiany, technologie, postęp skanów, formularz „Uruchom skan”
+//! z wyborem profilu, wstrzymanie i wznowienie), lista przebiegów odświeżana co 5 s, formularz celów (F3: wpis ręczny, wgranie
 //! CSV/JSON z podglądem błędów, usuwanie) oraz listy profili i użytkowników.
 
 mod assets;
+mod compare;
+mod dashboard;
+mod edits;
+mod host_views;
+mod hosts;
 mod login;
 mod menu;
 mod pages;
+mod profiles_form;
+mod service_view;
 mod session;
 mod targets_form;
 mod views;
@@ -32,8 +40,21 @@ pub fn web_routes() -> Router<AppState> {
         .route("/", get(pages::dashboard))
         .route("/targets", get(pages::targets))
         .route("/profiles", get(pages::profiles))
+        .route("/hosts", get(hosts::hosts_page))
+        .route("/hosts/{ip}", get(hosts::host_page))
+        .route("/ui/hosts/{ip}/edit", post(edits::edit_result))
+        .route("/compare", get(compare::compare_page))
+        .route("/ui/profiles", post(profiles_form::create_profile))
+        .route("/ui/profiles/{id}", post(profiles_form::update_profile))
+        .route(
+            "/ui/profiles/{id}/delete",
+            post(profiles_form::delete_profile),
+        )
         .route("/users", get(pages::users))
         .route("/ui/partials/scans", get(pages::scans_partial))
+        .route("/ui/partials/overview", get(dashboard::overview_partial))
+        .route("/ui/scans", post(dashboard::start_scan))
+        .route("/ui/scans/{id}/{action}", post(dashboard::control_scan))
         .route("/ui/targets", post(targets_form::add_target))
         .route("/ui/targets/import", post(targets_form::import_file))
         .route("/ui/targets/{id}", delete(targets_form::delete_target))

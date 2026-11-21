@@ -1,18 +1,15 @@
-use std::sync::Arc;
-
-use chrono::Utc;
+use chrono::{Local, Utc};
 use clap::{Args, ValueEnum};
+use dscan_engine::adaptive::adaptive_subgroup_size;
+use dscan_engine::windows::window_stop;
 use dscan_engine::{
-    RateSettings, ScanJobSettings, ScanJobSummary, ScanObserver, ScanProgress, SubgroupReport,
-    WebFingerprintScanner, nmap_scanner, rate_per_process, run_scan_job,
+    EngineError, RateSettings, ScanObserver, ScanProgress, ScanRequest, SubgroupReport, create_job,
+    drive_job, effective_settings, prepare_scan, rate_per_process,
 };
-use dscan_scanner::nmap::{NmapProfile, ports_argument};
-use dscan_scanner::pool::SubgroupScanner;
-use ipnet::IpNet;
+use tokio::sync::watch;
 
 use super::scan_report::{format_hosts, format_progress_line, format_summary};
-use super::targets::{build_plan, format_plan};
-use super::web_setup::{build_analysis, build_fetcher};
+use super::targets::format_plan;
 use super::{Command, Context, OverrideArgs, cipher_from_config, connect_database};
 use crate::error::CliError;
 
@@ -26,14 +23,7 @@ pub enum ScanMode {
 }
 
 impl ScanMode {
-    fn profile(self) -> NmapProfile {
-        match self {
-            ScanMode::Discovery => NmapProfile::Discovery,
-            ScanMode::Services => NmapProfile::Services,
-        }
-    }
-
-    fn name(self) -> &'static str {
+    pub fn name(self) -> &'static str {
         match self {
             ScanMode::Discovery => "discovery",
             ScanMode::Services => "services",
@@ -46,92 +36,113 @@ pub struct ScanArgs {
     /// Cele: adresy IP, sieci CIDR lub domeny. Skanowane są tylko cele z [scope] allowed_networks.
     #[arg(required = true, value_name = "CEL")]
     pub targets: Vec<String>,
-    /// Rodzaj skanu.
-    #[arg(long, value_enum, default_value_t = ScanMode::Services)]
-    pub mode: ScanMode,
+    /// Nazwany profil z [profiles] w dscan.toml (porty, tempo, okna, ponowienia…).
+    #[arg(long, value_name = "NAZWA")]
+    pub profile: Option<String>,
+    /// Rodzaj skanu (domyślnie z profilu albo `services`).
+    #[arg(long, value_enum)]
+    pub mode: Option<ScanMode>,
     /// Nie wypisuj listy hostów na końcu (tylko podsumowanie).
     #[arg(long)]
     pub quiet: bool,
+    /// Tylko plan: liczba adresów, podgrupy i szacowany czas — bez wysyłania pakietów (C8).
+    #[arg(long)]
+    pub dry_run: bool,
+    /// Skan bezpośrednio z tej binarki (bez serwera i RBAC) — wymaga klucza szyfrowania i dostępu do bazy.
+    #[arg(long)]
+    pub local: bool,
     #[command(flatten)]
     pub overrides: OverrideArgs,
 }
 
+impl ScanArgs {
+    pub fn request(&self) -> ScanRequest {
+        ScanRequest {
+            targets: self.targets.clone(),
+            profile: self.profile.clone(),
+            mode: self.mode.map(|mode| mode.name().to_string()),
+            ..ScanRequest::default()
+        }
+    }
+}
+
 impl Command for ScanArgs {
-    /// Skan uruchamiany z tej binarki: podgrupy skanowane równolegle przez nmap, wyniki
-    /// zapisywane w bazie na bieżąco. Po wdrożeniu RBAC (C5) skan będzie zlecany przez API.
     async fn execute(&self, context: &Context) -> Result<(), CliError> {
-        let config = context.load_config(self.overrides.to_overrides())?;
-        let cipher = cipher_from_config(&config)?;
-        let plan = build_plan(&config, &self.targets).await?;
-        eprint!("{}", format_plan(&plan));
-        if plan.networks.is_empty() {
+        if self.dry_run {
+            return super::scan_plan::dry_run(self, context).await;
+        }
+        if !self.local {
+            return crate::client::commands::scan_via_api(self).await;
+        }
+        run_local(self, context).await
+    }
+}
+
+/// Skan lokalny: ten sam silnik co serwer, postęp w terminalu. Okna czasowe profilu są
+/// respektowane — poza oknem skan nie startuje, a o końcu okna jest wstrzymywany (S9).
+async fn run_local(args: &ScanArgs, context: &Context) -> Result<(), CliError> {
+    let config = context.load_config(args.overrides.to_overrides())?;
+    let cipher = cipher_from_config(&config)?;
+    let request = args.request();
+    let (settings, ..) = effective_settings(
+        &config.settings,
+        request.profile.as_deref(),
+        request.mode.as_deref(),
+    )?;
+    let windows: Vec<(String, String)> = settings
+        .schedule
+        .windows
+        .iter()
+        .map(|w| (w.start.clone(), w.end.clone()))
+        .collect();
+    let stop_at = window_stop(&windows, Local::now()).map_err(|_| EngineError::OutsideWindow)?;
+
+    let mut prepared = match prepare_scan(&config.settings, &request).await {
+        Err(EngineError::NoTargetsInScope(plan)) => {
+            eprint!("{}", format_plan(&plan));
             return Err(CliError::NoTargetsInScope);
         }
+        other => other?,
+    };
+    eprint!("{}", format_plan(&prepared.plan));
+    let pool = connect_database(&config).await?;
+    prepared.job.subgroup_size =
+        adaptive_subgroup_size(&pool, &settings, &prepared.job.mode, stop_at).await?;
+    let plan = create_job(&pool, &prepared.plan.networks, &prepared.job).await?;
 
-        let limits = &config.settings.limits;
-        let rate = RateSettings {
-            max_rate: limits.nmap_max_rate,
-            bandwidth_kbps: config.settings.scope.max_bandwidth_kbps,
-            parallel: limits.max_parallel_nmap,
-        };
-        let ports = ports_argument(&config.settings.scope.allowed_ports);
-        let nmap = nmap_scanner(self.mode.profile(), ports, rate);
-        let settings = ScanJobSettings {
-            profile: self.mode.name().to_string(),
-            subgroup_size: limits.subgroup_size,
-            parallel: limits.max_parallel_nmap,
-            max_addresses: limits.max_addresses_per_scan,
-        };
-
-        let pool = connect_database(&config).await?;
-        let job = Job {
-            pool: &pool,
-            cipher: &cipher,
-            networks: &plan.networks,
-            settings: &settings,
-            rate,
-        };
-        // Fingerprinting HTTP ma sens tylko po skanie usług (discovery nie zna portów).
-        let summary = if self.mode == ScanMode::Services && config.settings.http.enabled {
-            let fetcher = Arc::new(build_fetcher(&config)?);
-            let analysis = Arc::new(build_analysis(&config, &plan.hostnames)?);
-            job.run(WebFingerprintScanner::new(nmap, fetcher, analysis))
-                .await?
-        } else {
-            job.run(nmap).await?
-        };
-
-        eprint!("{}", format_summary(&summary));
-        if !self.quiet {
-            print!("{}", format_hosts(&summary.hosts));
-        }
-        Ok(())
+    let (stop_sender, stop) = watch::channel(false);
+    if let Some(at) = stop_at {
+        eprintln!(
+            "Okno czasowe kończy się o {} — wtedy skan zostanie wstrzymany.",
+            at.with_timezone(&Local).format("%H:%M")
+        );
+        tokio::spawn(async move {
+            tokio::time::sleep((at - Utc::now()).to_std().unwrap_or_default()).await;
+            let _ = stop_sender.send(true);
+        });
     }
-}
+    let rate = RateSettings {
+        max_rate: settings.limits.nmap_max_rate,
+        bandwidth_kbps: settings.scope.max_bandwidth_kbps,
+        parallel: settings.limits.max_parallel_nmap,
+    };
+    let observer = TerminalObserver { rate };
+    let summary = drive_job(
+        &pool,
+        &cipher,
+        plan,
+        prepared.scanner,
+        &prepared.job,
+        &observer,
+        stop,
+    )
+    .await?;
 
-/// Parametry jednego przebiegu (żeby nie powtarzać ich dla obu rodzajów skanera).
-struct Job<'a> {
-    pool: &'a dscan_db::PgPool,
-    cipher: &'a dscan_crypto::Cipher,
-    networks: &'a [IpNet],
-    settings: &'a ScanJobSettings,
-    rate: RateSettings,
-}
-
-impl Job<'_> {
-    async fn run<S: SubgroupScanner>(&self, scanner: S) -> Result<ScanJobSummary, CliError> {
-        let observer = TerminalObserver { rate: self.rate };
-        let scanner = Arc::new(scanner);
-        Ok(run_scan_job(
-            self.pool,
-            self.cipher,
-            self.networks,
-            scanner,
-            self.settings,
-            &observer,
-        )
-        .await?)
+    eprint!("{}", format_summary(&summary));
+    if !args.quiet {
+        print!("{}", format_hosts(&summary.hosts));
     }
+    Ok(())
 }
 
 /// Wypisuje postęp skanu na stderr (wyniki idą na stdout, więc można je przekierować do pliku).

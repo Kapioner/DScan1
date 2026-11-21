@@ -26,6 +26,8 @@ pub struct ProfileData {
     /// `None` = tylko ręczne uruchamianie.
     pub frequency_minutes: Option<i32>,
     pub enabled: bool,
+    /// Limit tempa nmap (pakiety/s) dla tego profilu (F4); `None` = `[limits] nmap_max_rate`.
+    pub max_rate: Option<i32>,
 }
 
 /// Profil zapisany w bazie.
@@ -54,12 +56,13 @@ type ProfileRow = (
     String,
     Option<i32>,
     bool,
+    Option<i32>,
     DateTime<Utc>,
     DateTime<Utc>,
 );
 
 const PROFILE_COLUMNS: &str = "id, name, mode, target_group, ports, windows::text, \
-                               frequency_minutes, enabled, created_at, updated_at";
+                               frequency_minutes, enabled, max_rate, created_at, updated_at";
 
 pub async fn list_profiles(pool: &PgPool) -> Result<Vec<ScanProfile>, DbError> {
     let rows: Vec<ProfileRow> = sqlx::query_as(&format!(
@@ -84,8 +87,8 @@ pub async fn get_profile(pool: &PgPool, id: i64) -> Result<Option<ScanProfile>, 
 
 pub async fn create_profile(pool: &PgPool, data: &ProfileData) -> Result<ProfileSaved, DbError> {
     let query = format!(
-        "INSERT INTO scan_profiles (name, mode, target_group, ports, windows, frequency_minutes, enabled) \
-         VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7) RETURNING {PROFILE_COLUMNS}"
+        "INSERT INTO scan_profiles (name, mode, target_group, ports, windows, frequency_minutes, enabled, max_rate) \
+         VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7, $8) RETURNING {PROFILE_COLUMNS}"
     );
     save(pool, &query, None, data).await
 }
@@ -98,8 +101,8 @@ pub async fn update_profile(
 ) -> Result<ProfileSaved, DbError> {
     let query = format!(
         "UPDATE scan_profiles SET name = $1, mode = $2, target_group = $3, ports = $4, \
-         windows = $5::jsonb, frequency_minutes = $6, enabled = $7, updated_at = now() \
-         WHERE id = $8 RETURNING {PROFILE_COLUMNS}"
+         windows = $5::jsonb, frequency_minutes = $6, enabled = $7, max_rate = $8, \
+         updated_at = now() WHERE id = $9 RETURNING {PROFILE_COLUMNS}"
     );
     save(pool, &query, Some(id), data).await
 }
@@ -128,7 +131,8 @@ async fn save(
         .bind(&data.ports)
         .bind(windows)
         .bind(data.frequency_minutes)
-        .bind(data.enabled);
+        .bind(data.enabled)
+        .bind(data.max_rate);
     if let Some(id) = id {
         statement = statement.bind(id);
     }
@@ -152,6 +156,7 @@ fn profile_from_row(row: ProfileRow) -> Result<ScanProfile, DbError> {
         windows,
         frequency_minutes,
         enabled,
+        max_rate,
         created_at,
         updated_at,
     ) = row;
@@ -167,6 +172,7 @@ fn profile_from_row(row: ProfileRow) -> Result<ScanProfile, DbError> {
             windows,
             frequency_minutes,
             enabled,
+            max_rate,
         },
         created_at,
         updated_at,

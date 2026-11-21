@@ -20,6 +20,14 @@ pub enum ConfigError {
     MissingDatabaseUrl,
     InvalidSubgroupSize(u32),
     InvalidProbePath(String),
+    UnknownProfile {
+        name: String,
+        available: Vec<String>,
+    },
+    InvalidProfile {
+        name: String,
+        reason: String,
+    },
     /// Nie udało się zamienić konfiguracji na tekst TOML (`config show`).
     Render(String),
 }
@@ -62,6 +70,16 @@ impl fmt::Display for ConfigError {
                 f,
                 "http.probe_paths: niedozwolona ścieżka '{path}' (wymagana zwykła ścieżka od /, bez .., ? i #)"
             ),
+            ConfigError::UnknownProfile { name, available } => write!(
+                f,
+                "nie ma profilu '{name}' (zdefiniowane w [profiles]: {})",
+                if available.is_empty() {
+                    "brak".to_string()
+                } else {
+                    available.join(", ")
+                }
+            ),
+            ConfigError::InvalidProfile { name, reason } => write!(f, "profil '{name}': {reason}"),
             ConfigError::Render(reason) => {
                 write!(f, "nie można wypisać konfiguracji: {reason}")
             }

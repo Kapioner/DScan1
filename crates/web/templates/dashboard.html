@@ -2,9 +2,36 @@
 {% block title %}Pulpit{% endblock %}
 {% block content %}
 <h1>Pulpit</h1>
+{% if can_scan %}
+<section class="card">
+  <h2>Uruchom skan</h2>
+  <form hx-post="/ui/scans" hx-target="#scan-notice" hx-swap="innerHTML" class="inline-form">
+    <label>Cele <input name="targets" required placeholder="10.0.0.0/24 lab.local"></label>
+    <label>Profil
+      <select name="profile">
+        <option value="">(ustawienia domyślne)</option>
+        {% for name in profiles %}<option value="{{ name }}">{{ name }}</option>{% endfor %}
+      </select>
+    </label>
+    <label>Tryb
+      <select name="mode">
+        <option value="">(z profilu)</option>
+        <option value="services">usługi</option>
+        <option value="discovery">wykrywanie hostów</option>
+      </select>
+    </label>
+    <button type="submit">Uruchom</button>
+  </form>
+  <div id="scan-notice"></div>
+</section>
+{% endif %}
+<div hx-get="/ui/partials/overview" hx-trigger="load, every 10s" hx-swap="innerHTML">
+  <p class="muted">Wczytywanie…</p>
+</div>
 <section class="card">
   <h2>Przebiegi skanów</h2>
-  <p class="muted">Lista odświeża się co 5 sekund. Skan uruchomisz poleceniem <code>./run.sh scan CEL…</code>.</p>
+  <p class="muted">Lista odświeża się co 5 sekund.</p>
+  <div id="control-notice"></div>
   <div hx-get="/ui/partials/scans" hx-trigger="load, every 5s" hx-swap="innerHTML">
     <p class="muted">Wczytywanie…</p>
   </div>

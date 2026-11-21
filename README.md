@@ -49,20 +49,26 @@ nmap ma CAP_NET_RAW do skanów SYN (`nmap --privileged -sS …`).
 
 ## Polecenia (`dscan --help`)
 
-| Polecenie | Stan | Opis |
+| Polecenie | Tryb | Opis |
 |---|---|---|
-| `serve` | działa | Interfejs WWW i API; migracje bazy, konto administratora przy pierwszym starcie |
-| `scan CEL… [--mode discovery\|services] [--parallel N] [--quiet]` | działa | Skan nmap celów z `[scope]` w podgrupach, równolegle, z fingerprintingiem HTTP; postęp z prognozą, wyniki w bazie |
-| `targets check CEL…` | działa | Sprawdza cele bez skanowania: poprawność, DNS, duplikaty, zakres |
-| `diff A B` | działa | Porównanie dwóch przebiegów: usługi nowe, zniknięte, zmienione |
-| `sig list`, `sig test SYGNATURA --host URL` | działa | Wbudowane sygnatury; test sygnatury na usłudze WWW z zakresu |
-| `targets list` | działa | Cele zapisane w bazie (z odszyfrowanymi notatkami) |
-| `import PLIK [--dry-run]` | działa | Import celów z CSV/JSON z raportem odrzuconych wierszy |
-| `user create-admin LOGIN`, `user list` | działa | Konto administratora (hasło argon2id), lista użytkowników |
-| `keys generate`, `keys rotate` | działa | Nowy klucz; przeszyfrowanie wszystkich pól wrażliwych |
-| `config show`, `config validate` | działa | Efektywna konfiguracja (sekrety ukryte), sprawdzenie i ostrzeżenia |
-| `db migrate`, `db status` | działa | Migracje schematu bazy |
-| `targets add/remove`, `export`, `import --kind results` | zdefiniowane | Mają `--help`; logika powstanie w kolejnych zadaniach planu |
+| `serve` | lokalnie | Interfejs WWW, API i harmonogram skanów; migracje bazy, konto administratora przy pierwszym starcie |
+| `login --user NAZWA [--server URL]`, `logout` | API | Logowanie; token w `~/.config/dscan/credentials.json` (uprawnienia 600) |
+| `scan CEL… [--profile NAZWA] [--mode discovery\|services] [--quiet] [--local]` | API (`--local`: lokalnie) | Skan nmap celów z `[scope]` w podgrupach z fingerprintingiem HTTP; postęp, zmiany, obecność hostów |
+| `stop N`, `resume N` | API | Wstrzymanie trwającego skanu, wznowienie od niedokończonych podgrup |
+| `import PLIK [--kind targets\|results] [--format csv\|json\|nmap-xml] [--dry-run] [--local]` | API (`--local`: lokalnie) | Import celów albo wyników skanów (nmap XML, JSON, CSV) |
+| `export hosts\|services\|changes [--format json\|csv] [--run N] [--port P] [--state S] [--technology T] [--edited] [-o PLIK]` | API | Eksport z filtrami (uprawnienia według roli) |
+| `diff A B` | API | Porównanie dwóch przebiegów: usługi nowe, zniknięte, zmienione |
+| `sig list`, `sig test SYGNATURA --host URL` | API | Sygnatury serwera; test sygnatury na usłudze WWW z zakresu |
+| `targets add CEL… [--group G]`, `targets remove CEL…` | API | Dodawanie i usuwanie celów |
+| `targets check CEL…`, `targets list` | lokalnie | Sprawdzenie celów bez skanowania; cele zapisane w bazie |
+| `user create-admin LOGIN`, `user list` | lokalnie | Konto administratora (hasło argon2id), lista użytkowników |
+| `keys generate`, `keys rotate` | lokalnie | Nowy klucz; przeszyfrowanie wszystkich pól wrażliwych |
+| `config show`, `config validate` | lokalnie | Efektywna konfiguracja (sekrety ukryte), sprawdzenie i ostrzeżenia |
+| `db migrate`, `db status` | lokalnie | Migracje schematu bazy |
+
+**Tryb API (C5):** polecenia oznaczone „API” wysyłają żądania do serwera (`./run.sh` w drugim terminalu)
+z tokenem z `dscan login`, więc obowiązują je te same role co interfejs WWW. Ścieżkę pliku z tokenem
+zmienia zmienna `DSCAN_CREDENTIALS`. `--local` (skan, import) działa bez serwera, bezpośrednio na bazie.
 
 Flaga globalna `-c/--config PLIK` (lub zmienna `DSCAN_CONFIG`) wskazuje plik konfiguracji.
 Polecenia administracyjne działające bezpośrednio na bazie (`db migrate`, `user create-admin`,
@@ -117,13 +123,36 @@ Polecenia administracyjne działające bezpośrednio na bazie (`db migrate`, `us
   stabilnych nagłówków i stanu TLS). Po udanym skanie DScan porównuje go z poprzednim udanym przebiegiem tego samego
   trybu po kluczu (IP, port, protokół): **nowa / zniknęła / zmieniona**. Zmiany są zapisywane w bazie i wypisywane;
   dowolne dwa przebiegi porówna `./run.sh diff A B`.
-- Wymaga zainstalowanego nmap (`sudo apt install nmap`). Po wdrożeniu RBAC (C5) skan będzie zlecany przez API.
+- **Profile (C4):** nazwane zestawy ustawień w `[profiles.NAZWA]` w `dscan.toml` (tryb, porty, tempo, równoległość,
+  rozmiar podgrup, `host_timeout_seconds`, `max_retries`, okna czasowe, ścieżki sond); wybór: `--profile NAZWA` albo lista w UI.
+- **Harmonogram (S8):** `dscan serve` co minutę sprawdza profile z bazy (`/api/v1/profiles`): w oknie czasowym
+  i po upływie `frequency_minutes` od ostatniego przebiegu startuje skan celów z grupy profilu.
+- **Okna i wznawianie (S9):** o końcu okna procesy nmap są zatrzymywane, niedokończone podgrupy wracają do kolejki,
+  a przebieg dostaje stan `paused`. Wznowienie: harmonogram w następnym oknie, `dscan resume N` albo przycisk „Wznów” w UI.
+  Przebiegi przerwane restartem serwera są przy starcie oznaczane jako wstrzymane.
+- **Obecność hostów (S11):** po każdym udanym przebiegu zapisywana jest odpowiedź każdego adresu z zakresu skanu;
+  host bez odpowiedzi w `[stability] inactive_after_missed_runs` (K) kolejnych przebiegach dostaje stan „nieaktywny”.
+- Wymaga zainstalowanego nmap (`sudo apt install nmap`).
 
-### Import celów
+### Import i eksport
 
 ```bash
 ./run.sh import docs/examples/cele.csv --dry-run
 ```
+```bash
+./run.sh import --kind results wynik-nmap.xml
+```
+```bash
+./run.sh export services --format csv --technology wordpress -o uslugi.csv
+```
+
+**Wyniki (I2):** nmap XML (`-oX`), JSON (format `dscan export hosts`) i CSV (format `dscan export services`)
+przechodzą to samo przetwarzanie co skan: przebieg w bazie, obecność hostów i porównanie z poprzednim przebiegiem
+tego samego profilu (domyślnie `import`). Hosty spoza `[scope]` są pomijane. **Eksport (I3):** hosty (JSON), usługi
+i zmiany (JSON/CSV); filtry `--run`, `--port`, `--state`, `--technology`, `--edited`. Rola tylko do odczytu dostaje
+eksport bez notatek operatorów i nie może filtrować po ręcznych poprawkach.
+
+**Cele (I1):**
 
 CSV z nagłówkiem `target` (opcjonalnie `group`, `note`; dopuszczalne `cel`, `grupa`, `notatka`) albo tablica JSON
 napisów lub obiektów — przykłady w [`docs/examples/`](docs/examples/). Błędne i powtórzone wiersze trafiają do raportu
@@ -155,6 +184,10 @@ Zmienne podane w linii poleceń mają pierwszeństwo przed wartościami z `.env`
 Strony renderowane w Ruście (askama), interakcje przez htmx (wkompilowany w binarkę — działa bez internetu).
 Logowanie formularzem, menu zależne od roli (np. „Użytkownicy” tylko dla administracji), pulpit z listą
 przebiegów odświeżaną co 5 s (postęp, czas, prognoza), cele i profile skanów.
+**Pulpit (F2):** karty (hosty, otwarte usługi, ważne znaleziska, hosty aktywne/nieaktywne), trwające skany z paskiem
+postępu, czasem i prognozą, najważniejsze znaleziska (panele administracyjne, CI/CD, kamery, środowiska testowe,
+TLS niezweryfikowany), usługi nowe/zniknięte/zmienione od poprzedniego skanu i statystyki technologii — odświeżane co 10 s.
+Formularz „Uruchom skan” z wyborem profilu z `[profiles]` oraz przyciski „Wstrzymaj”/„Wznów” (tylko role z `targets:write`).
 **Formularz celów (F3):** wpis ręczny, wgranie pliku CSV/JSON z tabelą odrzuconych wierszy (opcja „tylko sprawdź”)
 i usuwanie — dostępne dla ról z prawem zapisu; pozostali widzą tylko listę.
 Nagłówki bezpieczeństwa: `Content-Security-Policy` (tylko zasoby z własnego serwera), `X-Frame-Options: DENY`.
@@ -162,8 +195,17 @@ Nagłówki bezpieczeństwa: `Content-Security-Policy` (tylko zasoby z własnego 
 ## API
 
 Wszystko poza `health`, `auth/login` i `openapi.json` wymaga sesji: ciasteczka `dscan_session`
-(przeglądarka) albo nagłówka `Authorization: Bearer <token>` (token zwraca logowanie). Zapis celów
-i profili wymaga uprawnienia `targets:write` (role: administracja, dodawanie/usuwanie/modyfikacja).
+(przeglądarka) albo nagłówka `Authorization: Bearer <token>` (token zwraca logowanie).
+
+**RBAC (A3):** middleware sprawdza uprawnienia **każdego** żądania według jednej tabeli
+([`crates/api/src/auth/rbac.rs`](crates/api/src/auth/rbac.rs)); trasa spoza tabeli wymaga roli administratora.
+
+| Rola | Uprawnienia | Co może |
+|---|---|---|
+| `administracja` | wszystko | także konta użytkowników |
+| `dodawanie_usuwanie_modyfikacja` | `targets:write`, `results:write`, `read` | cele, profile, skany, import, sygnatury, poprawki |
+| `modyfikacja_odczyt` | `results:write`, `read` | ręczne poprawki wyników, odczyt i eksport |
+| `odczyt` | `read` | odczyt, dashboard, eksport bez notatek |
 
 | Endpoint | Opis |
 |---|---|
@@ -175,6 +217,15 @@ i profili wymaga uprawnienia `targets:write` (role: administracja, dodawanie/usu
 | `GET /api/v1/scans?limit=N`, `GET /api/v1/scans/{id}` | Przebiegi: stan, postęp, czas trwania, prognoza do końca |
 | `GET /api/v1/scans/{id}/hosts` | Hosty przebiegu z usługami, HTTP i detekcjami (z dowodami), z nałożonymi poprawkami |
 | `GET/PUT/DELETE /api/v1/overrides` | Ręczne poprawki wyników (A6): `hostname`, `host_note`, `product`, `version`, `service_name`, `service_note` |
+| `POST /api/v1/scans` | Zlecenie skanu `{"targets":[…],"profile":"…","mode":"…"}` → 202 z numerem przebiegu |
+| `POST /api/v1/scans/{id}/stop`, `POST /api/v1/scans/{id}/resume` | Wstrzymanie i wznowienie (S9) |
+| `GET /api/v1/scans/{id}/changes`, `GET /api/v1/diff?from=A&to=B` | Zmiany przebiegu; porównanie dowolnych dwóch |
+| `GET /api/v1/scan-profiles` | Nazwy profili z `[profiles]` (C4) |
+| `POST /api/v1/imports/targets`, `POST /api/v1/imports/results` | Import `{"format","content","dry_run"}` (I1, I2) |
+| `GET /api/v1/exports/{hosts\|services\|changes}` | Eksport z filtrami `format, run, port, state, technology, edited` (I3) |
+| `GET /api/v1/signatures`, `POST /api/v1/signatures/test` | Sygnatury i ich test na usłudze |
+| `GET /api/v1/dashboard` | Znaleziska, zmiany, technologie, trwające skany, obecność hostów (A8) |
+| `GET /api/v1/users` | Konta (tylko administracja) |
 | `GET /api/openapi.json` | Opis API (OpenAPI 3.1), np. do Swagger Editor lub Postmana |
 
 Błędy zwracane są jako JSON `{"error": "..."}` (400, 401, 403, 404, 409, 413).

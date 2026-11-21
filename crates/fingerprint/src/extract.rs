@@ -36,6 +36,7 @@ pub fn to_http_info(response: &RawResponse) -> HttpInfo {
         redirect_chain: response.redirects.clone(),
         tls_verified: response.tls_verified,
         certificate: None,
+        favicon: None,
     }
 }
 

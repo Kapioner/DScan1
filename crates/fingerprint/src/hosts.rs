@@ -4,6 +4,7 @@ use std::net::IpAddr;
 use dscan_core::models::{Detection, Host};
 
 use crate::environment::environment_findings;
+use crate::favicon::fetch_favicon;
 use crate::probe::{merge_probe_paths, probe_paths};
 use crate::signatures::{SignatureSet, WebEvidence};
 use crate::{HttpFetcher, WebScheme, fetch_certificate, service_url, to_http_info, web_scheme};
@@ -104,11 +105,12 @@ pub async fn fingerprint_hosts(
                 analysis.max_probes,
             )
             .await;
+            info.favicon = fetch_favicon(fetcher, &info.url, ip, &body).await;
             let evidence = WebEvidence {
                 info: &info,
                 body: &body,
                 probes: &probes,
-                favicon_hash: None,
+                favicon_hash: info.favicon.as_ref().map(|favicon| favicon.mmh3),
             };
             service.detections = analysis.analyze(&evidence, &hostnames);
             service.http = Some(info);

@@ -134,6 +134,7 @@ fn profile(name: &str) -> ProfileData {
         }],
         frequency_minutes: Some(1440),
         enabled: true,
+        max_rate: Some(50),
     }
 }
 
@@ -201,6 +202,7 @@ async fn http_info_is_saved_with_encrypted_headers_and_cookies() {
         redirect_chain: Vec::new(),
         tls_verified: Some(false),
         certificate: None,
+        favicon: None,
     });
     host.services = vec![web, Service::new(22, Protocol::Tcp, ServiceState::Open)];
 

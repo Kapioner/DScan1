@@ -4,144 +4,12 @@
 // Plik testowy: unwrap() w funkcjach pomocniczych jest tu dozwolony.
 #![allow(clippy::unwrap_used)]
 
-use axum::Router;
-use axum::body::Body;
-use axum::http::{Request, StatusCode, header};
-use dscan_api::{AppState, AuthConfig, build_router};
+mod common;
+
+use axum::http::StatusCode;
+use common::TestApp;
 use dscan_crypto::Cipher;
-use dscan_db::{PgPool, run_migrations};
-use http_body_util::BodyExt;
-use serde_json::{Value, json};
-use sqlx::Executor;
-use sqlx::postgres::PgPoolOptions;
-use tower::ServiceExt;
-
-struct TestApp {
-    router: Router,
-    pool: PgPool,
-    schema: String,
-    url: String,
-}
-
-impl TestApp {
-    async fn start() -> Option<TestApp> {
-        let Ok(url) = std::env::var("DSCAN_TEST_DATABASE_URL") else {
-            eprintln!("pomijam test: brak zmiennej DSCAN_TEST_DATABASE_URL");
-            return None;
-        };
-        let schema = format!(
-            "test_api_{}_{}",
-            std::process::id(),
-            chrono::Utc::now().timestamp_subsec_nanos()
-        );
-        let admin = PgPoolOptions::new()
-            .max_connections(1)
-            .connect(&url)
-            .await
-            .unwrap();
-        admin
-            .execute(format!("CREATE SCHEMA {schema}").as_str())
-            .await
-            .unwrap();
-        let search_path = format!("SET search_path TO {schema}");
-        let pool = PgPoolOptions::new()
-            .max_connections(3)
-            .after_connect(move |connection, _| {
-                let search_path = search_path.clone();
-                Box::pin(async move {
-                    connection.execute(search_path.as_str()).await?;
-                    Ok(())
-                })
-            })
-            .connect(&url)
-            .await
-            .unwrap();
-        run_migrations(&pool).await.unwrap();
-        let auth = AuthConfig {
-            session_hours: 1,
-            secure_cookies: false,
-        };
-        let router = build_router(
-            AppState::new(pool.clone(), Cipher::new(&[2; 32]), auth),
-            1 << 20,
-        );
-        Some(TestApp {
-            router,
-            pool,
-            schema,
-            url,
-        })
-    }
-
-    async fn add_user(&self, username: &str, password: &str, role: &str) {
-        let hash = dscan_auth::hash_password(password).unwrap();
-        sqlx::query("INSERT INTO users (username, password_hash, role_id) SELECT $1, $2, id FROM roles WHERE name = $3")
-            .bind(username)
-            .bind(hash)
-            .bind(role)
-            .execute(&self.pool)
-            .await
-            .unwrap();
-    }
-
-    async fn call(
-        &self,
-        method: &str,
-        path: &str,
-        token: Option<&str>,
-        body: Option<Value>,
-    ) -> (StatusCode, Value, Option<String>) {
-        let mut request = Request::builder().method(method).uri(path);
-        if let Some(token) = token {
-            request = request.header(header::AUTHORIZATION, format!("Bearer {token}"));
-        }
-        let request = match body {
-            Some(body) => request
-                .header(header::CONTENT_TYPE, "application/json")
-                .body(Body::from(body.to_string())),
-            None => request.body(Body::empty()),
-        }
-        .unwrap();
-        let response = self.router.clone().oneshot(request).await.unwrap();
-        let status = response.status();
-        let cookie = response
-            .headers()
-            .get(header::SET_COOKIE)
-            .map(|v| v.to_str().unwrap().to_string());
-        let bytes = response.into_body().collect().await.unwrap().to_bytes();
-        (
-            status,
-            serde_json::from_slice(&bytes).unwrap_or(Value::Null),
-            cookie,
-        )
-    }
-
-    async fn login(&self, username: &str, password: &str) -> String {
-        let (status, body, _) = self
-            .call(
-                "POST",
-                "/api/v1/auth/login",
-                None,
-                Some(json!({"username": username, "password": password})),
-            )
-            .await;
-        assert_eq!(status, StatusCode::OK);
-        body["token"].as_str().unwrap().to_string()
-    }
-
-    async fn stop(self) {
-        self.pool.close().await;
-        let admin = PgPoolOptions::new()
-            .max_connections(1)
-            .connect(&self.url)
-            .await
-            .unwrap();
-        admin
-            .execute(format!("DROP SCHEMA {} CASCADE", self.schema).as_str())
-            .await
-            .unwrap();
-    }
-}
+use serde_json::json;
 
 #[tokio::test]
 async fn login_session_and_logout() {
@@ -445,5 +313,62 @@ async fn overrides_are_applied_to_run_results() {
         .call("GET", "/api/v1/scans/999999/hosts", Some(&reader), None)
         .await;
     assert_eq!(status, StatusCode::NOT_FOUND);
+    app.stop().await;
+}
+
+/// Macierz uprawnień (A3): każda rola × każdy rodzaj operacji.
+#[tokio::test]
+async fn role_permission_matrix() {
+    let Some(app) = TestApp::start().await else {
+        return;
+    };
+    let roles = [
+        ("administracja", true, true, true),
+        ("dodawanie_usuwanie_modyfikacja", true, true, false),
+        ("modyfikacja_odczyt", false, true, false),
+        ("odczyt", false, false, false),
+    ];
+    for (index, (role, can_write_targets, can_write_results, can_admin)) in
+        roles.into_iter().enumerate()
+    {
+        let login = format!("u{index}");
+        app.add_user(&login, "haslo-testowe-123", role).await;
+        let token = app.login(&login, "haslo-testowe-123").await;
+
+        let (status, _, _) = app.call("GET", "/api/v1/targets", Some(&token), None).await;
+        assert_eq!(status, StatusCode::OK, "{role}: odczyt");
+
+        let target = json!({"target": format!("10.9.{index}.0/24")});
+        let (status, _, _) = app
+            .call("POST", "/api/v1/targets", Some(&token), Some(target))
+            .await;
+        let expected = if can_write_targets {
+            StatusCode::CREATED
+        } else {
+            StatusCode::FORBIDDEN
+        };
+        assert_eq!(status, expected, "{role}: zapis celu");
+
+        let edit = json!({"ip": "10.9.9.9", "field": "host_note", "value": "x"});
+        let (status, _, _) = app
+            .call("PUT", "/api/v1/overrides", Some(&token), Some(edit))
+            .await;
+        let expected = if can_write_results {
+            StatusCode::NO_CONTENT
+        } else {
+            StatusCode::FORBIDDEN
+        };
+        assert_eq!(status, expected, "{role}: poprawka wyniku");
+
+        let (status, _, _) = app.call("GET", "/api/v1/users", Some(&token), None).await;
+        let expected = if can_admin {
+            StatusCode::OK
+        } else {
+            StatusCode::FORBIDDEN
+        };
+        assert_eq!(status, expected, "{role}: administracja");
+    }
+    let (status, _, _) = app.call("GET", "/api/v1/targets", None, None).await;
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
     app.stop().await;
 }

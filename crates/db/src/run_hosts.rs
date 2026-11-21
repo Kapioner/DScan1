@@ -5,10 +5,14 @@ use std::net::IpAddr;
 
 use chrono::{DateTime, Utc};
 use dscan_core::models::{
-    Detection, Evidence, Host, HostStatus, HttpInfo, Protocol, Service, ServiceState,
+    CertificateInfo, Detection, Evidence, Host, HostStatus, HttpInfo, Protocol, Service,
+    ServiceState,
 };
 
-use crate::{DbError, PgPool};
+use dscan_crypto::Cipher;
+
+use crate::columns::HTTP_INFO_CERTIFICATE;
+use crate::{DbError, Encrypted, PgPool};
 
 type HostRow = (
     i64,
@@ -29,11 +33,36 @@ type ServiceRow = (
     Option<String>,
     Vec<String>,
 );
-type HttpRow = (i64, String, i32, Option<String>, Option<bool>);
+type HttpRow = (
+    i64,
+    String,
+    i32,
+    Option<String>,
+    Option<bool>,
+    Option<String>,
+    Option<Vec<u8>>,
+);
 type DetectionRow = (i64, String, Option<String>, i16, String);
 
 /// Hosty przebiegu (bez pól szyfrowanych — banerów, nagłówków, ciasteczek, certyfikatów).
 pub async fn load_run_hosts(pool: &PgPool, run_id: i64) -> Result<Vec<Host>, DbError> {
+    load_hosts(pool, None, run_id).await
+}
+
+/// Jak [`load_run_hosts`], ale z odszyfrowanym certyfikatem TLS (widok szczegółów hosta, F5).
+pub async fn load_run_hosts_with_certificates(
+    pool: &PgPool,
+    cipher: &Cipher,
+    run_id: i64,
+) -> Result<Vec<Host>, DbError> {
+    load_hosts(pool, Some(cipher), run_id).await
+}
+
+async fn load_hosts(
+    pool: &PgPool,
+    cipher: Option<&Cipher>,
+    run_id: i64,
+) -> Result<Vec<Host>, DbError> {
     let hosts: Vec<HostRow> = sqlx::query_as(
         "SELECT id, ip, hostnames, status, first_seen, last_seen FROM hosts WHERE scan_run_id = $1 ORDER BY ip",
     )
@@ -50,7 +79,7 @@ pub async fn load_run_hosts(pool: &PgPool, run_id: i64) -> Result<Vec<Host>, DbE
     .await
     .map_err(DbError::Query)?;
     let http: Vec<HttpRow> = sqlx::query_as(
-        "SELECT i.service_id, i.url, i.status_code, i.title, i.tls_verified FROM http_info i \
+        "SELECT i.service_id, i.url, i.status_code, i.title, i.tls_verified, i.favicon::text, i.certificate FROM http_info i \
          JOIN services s ON s.id = i.service_id JOIN hosts h ON h.id = s.host_id WHERE h.scan_run_id = $1",
     )
     .bind(run_id)
@@ -66,7 +95,7 @@ pub async fn load_run_hosts(pool: &PgPool, run_id: i64) -> Result<Vec<Host>, DbE
     .fetch_all(pool)
     .await
     .map_err(DbError::Query)?;
-    Ok(assemble(hosts, services, http, detections))
+    Ok(assemble(hosts, services, http, detections, cipher))
 }
 
 /// Składa wiersze z czterech zapytań w hosty z usługami.
@@ -75,23 +104,33 @@ fn assemble(
     services: Vec<ServiceRow>,
     http: Vec<HttpRow>,
     detections: Vec<DetectionRow>,
+    cipher: Option<&Cipher>,
 ) -> Vec<Host> {
     let mut http_by_service: HashMap<i64, HttpInfo> = http
         .into_iter()
-        .map(|(id, url, status, title, tls_verified)| {
-            let status_code = u16::try_from(status).unwrap_or(0);
-            let info = HttpInfo {
-                url,
-                status_code,
-                title,
-                headers: Vec::new(),
-                cookies: Vec::new(),
-                redirect_chain: Vec::new(),
-                tls_verified,
-                certificate: None,
-            };
-            (id, info)
-        })
+        .map(
+            |(id, url, status, title, tls_verified, favicon, certificate)| {
+                // Certyfikat odszyfrowujemy tylko na żądanie (z kluczem); uszkodzony pomijamy.
+                let certificate = cipher.zip(certificate).and_then(|(cipher, bytes)| {
+                    Encrypted::<CertificateInfo>::from_bytes(bytes)
+                        .open(cipher, &HTTP_INFO_CERTIFICATE)
+                        .ok()
+                });
+                let status_code = u16::try_from(status).unwrap_or(0);
+                let info = HttpInfo {
+                    url,
+                    status_code,
+                    title,
+                    headers: Vec::new(),
+                    cookies: Vec::new(),
+                    redirect_chain: Vec::new(),
+                    tls_verified,
+                    certificate,
+                    favicon: favicon.and_then(|json| serde_json::from_str(&json).ok()),
+                };
+                (id, info)
+            },
+        )
         .collect();
     let mut detections_by_service: HashMap<i64, Vec<Detection>> = HashMap::new();
     for (service_id, technology, version, confidence, evidence) in detections {

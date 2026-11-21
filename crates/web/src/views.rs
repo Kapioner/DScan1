@@ -26,12 +26,18 @@ pub struct LoginPage {
 pub struct DashboardPage {
     pub user: UserBar,
     pub menu: Vec<MenuItem>,
+    /// Formularz „Uruchom skan” tylko dla ról z `targets:write`.
+    pub can_scan: bool,
+    /// Nazwy profili z `[profiles]` w dscan.toml (C4).
+    pub profiles: Vec<String>,
 }
 
 #[derive(Template)]
 #[template(path = "scans_table.html")]
 pub struct ScansTable {
     pub scans: Vec<ScanRow>,
+    /// Przyciski „Wstrzymaj”/„Wznów” (S9) dla ról z `targets:write`.
+    pub can_control: bool,
 }
 
 /// Wiersz tabeli przebiegów (wartości już sformatowane).
@@ -41,6 +47,8 @@ pub struct ScanRow {
     pub status: String,
     pub started_at: String,
     pub progress: String,
+    /// Postęp jako liczba całkowita (do paska `<progress>`).
+    pub percent: u32,
     pub subgroups: String,
     pub elapsed: String,
     pub remaining: String,
@@ -54,6 +62,7 @@ impl ScanRow {
             status: run.status.as_str().to_string(),
             started_at: run.started_at.format("%Y-%m-%d %H:%M:%S UTC").to_string(),
             progress: format!("{:.0}%", run.progress_percent()),
+            percent: run.progress_percent().round().clamp(0.0, 100.0) as u32,
             subgroups: format!("{}/{}", run.completed_subgroups, run.total_subgroups),
             elapsed: format_duration(run.elapsed(now)),
             remaining: run
@@ -132,10 +141,23 @@ pub struct ProfilesPage {
     pub user: UserBar,
     pub menu: Vec<MenuItem>,
     pub profiles: Vec<ProfileRow>,
+    /// Formularze tylko dla ról z `targets:write` (F4).
+    pub can_edit: bool,
+    pub message: Option<String>,
+    /// Profile z `[profiles]` w dscan.toml: (nazwa, opis ustawień).
+    pub config_profiles: Vec<(String, String)>,
 }
 
 /// Wiersz tabeli profili.
 pub struct ProfileRow {
+    pub id: i64,
+    /// Wartości do pól formularza edycji.
+    pub group_raw: String,
+    pub ports_raw: String,
+    pub windows_raw: String,
+    pub frequency_raw: String,
+    pub rate_raw: String,
+    pub rate: String,
     pub name: String,
     pub mode: String,
     pub group: String,
@@ -153,7 +175,24 @@ impl ProfileRow {
             .iter()
             .map(|w| format!("{}–{}", w.start, w.end))
             .collect();
+        let windows_raw: Vec<String> = data
+            .windows
+            .iter()
+            .map(|w| format!("{}-{}", w.start, w.end))
+            .collect();
         ProfileRow {
+            id: profile.id,
+            group_raw: data.target_group.clone().unwrap_or_default(),
+            ports_raw: data.ports.join(", "),
+            windows_raw: windows_raw.join(", "),
+            frequency_raw: data
+                .frequency_minutes
+                .map(|m| m.to_string())
+                .unwrap_or_default(),
+            rate_raw: data.max_rate.map(|r| r.to_string()).unwrap_or_default(),
+            rate: data
+                .max_rate
+                .map_or("z konfiguracji".into(), |r| format!("{r} pakietów/s")),
             name: data.name.clone(),
             mode: data.mode.clone(),
             group: data

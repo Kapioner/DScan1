@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Porównanie skanów{% endblock %}
+{% block content %}
+<h1>Porównanie dwóch skanów</h1>
+<section class="card">
+  <form method="get" action="/compare" class="inline-form">
+    <label>Starszy przebieg
+      <select name="from">{% for o in from_options %}<option value="{{ o.value }}"{% if o.selected %} selected{% endif %}>{{ o.label }}</option>{% endfor %}</select>
+    </label>
+    <label>Nowszy przebieg
+      <select name="to">{% for o in to_options %}<option value="{{ o.value }}"{% if o.selected %} selected{% endif %}>{{ o.label }}</option>{% endfor %}</select>
+    </label>
+    <button type="submit">Porównaj</button>
+  </form>
+</section>
+{% if let (Some(a), Some(b)) = (from, to) %}
+<section class="card">
+  <h2>#{{ a }} → #{{ b }}</h2>
+  <p><span class="badge change-new">nowe: {{ counts.0 }}</span> <span class="badge change-gone">zniknęły: {{ counts.1 }}</span> <span class="badge change-mod">zmienione: {{ counts.2 }}</span></p>
+  {% if rows.is_empty() %}<p class="muted">Brak różnic.</p>{% else %}
+  <table>
+    <thead><tr><th>Usługa</th><th>Zmiana</th><th>Przed (#{{ a }})</th><th>Po (#{{ b }})</th></tr></thead>
+    <tbody>
+      {% for r in rows %}<tr class="{{ r.css }}"><td><code>{{ r.address }}</code></td><td>{{ r.label }}</td><td>{{ r.before }}</td><td>{{ r.after }}</td></tr>{% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+</section>
+{% endif %}
+{% endblock %}

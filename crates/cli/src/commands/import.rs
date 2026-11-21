@@ -4,9 +4,15 @@ use std::path::PathBuf;
 use clap::{Args, ValueEnum};
 use dscan_config::CliOverrides;
 use dscan_db::InsertSummary;
-use dscan_integrations::{ImportFormat, TargetImport, detect_format, import_targets};
+use dscan_engine::{ResultImport, import_results, split_by_scope};
+use dscan_integrations::{
+    ImportFormat, ResultFormat, TargetImport, detect_format, detect_result_format, import_targets,
+    parse_result_format, parse_results,
+};
 
+use super::scan_report::format_summary;
 use super::{Command, Context, cipher_from_config, connect_database};
+use crate::client::commands::import_via_api;
 use crate::error::CliError;
 
 /// Rodzaj importowanych danych.
@@ -18,16 +24,29 @@ pub enum ImportKind {
     Results,
 }
 
-/// Format pliku (domyślnie wg rozszerzenia).
+/// Format pliku (domyślnie wg rozszerzenia: .csv, .json, .xml).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
 pub enum FileFormat {
     Csv,
     Json,
+    /// Wynik nmap `-oX` (tylko `--kind results`).
+    NmapXml,
+}
+
+impl FileFormat {
+    fn api_name(self) -> &'static str {
+        match self {
+            FileFormat::Csv => "csv",
+            FileFormat::Json => "json",
+            FileFormat::NmapXml => "nmap-xml",
+        }
+    }
 }
 
 #[derive(Debug, Args)]
 pub struct ImportArgs {
-    /// Plik do zaimportowania (CSV z kolumną `target` albo tablica JSON).
+    /// Plik do zaimportowania: cele (CSV z kolumną `target`, tablica JSON) albo wyniki
+    /// (nmap XML, JSON z `dscan export hosts`, CSV z `dscan export services`).
     #[arg(value_name = "PLIK")]
     pub file: PathBuf,
     /// Co zawiera plik.
@@ -39,28 +58,56 @@ pub struct ImportArgs {
     /// Tylko sprawdza plik i pokazuje raport — nic nie zapisuje w bazie.
     #[arg(long)]
     pub dry_run: bool,
+    /// Zapis bezpośrednio do bazy (bez serwera i RBAC) — wymaga klucza szyfrowania.
+    #[arg(long)]
+    pub local: bool,
+}
+
+impl ImportArgs {
+    /// Format z flagi albo z rozszerzenia pliku.
+    pub fn format(&self) -> Result<FileFormat, CliError> {
+        if let Some(format) = self.format {
+            return Ok(format);
+        }
+        Ok(match self.kind {
+            ImportKind::Targets => match detect_format(&self.file)? {
+                ImportFormat::Csv => FileFormat::Csv,
+                ImportFormat::Json => FileFormat::Json,
+            },
+            ImportKind::Results => match detect_result_format(&self.file)? {
+                ResultFormat::NmapXml => FileFormat::NmapXml,
+                ResultFormat::Json => FileFormat::Json,
+                ResultFormat::Csv => FileFormat::Csv,
+            },
+        })
+    }
 }
 
 impl Command for ImportArgs {
     async fn execute(&self, context: &Context) -> Result<(), CliError> {
-        if self.kind == ImportKind::Results {
-            return Err(CliError::NotImplemented {
-                command: "import --kind results",
-                tasks: "I2",
-            });
-        }
-        let format = match self.format {
-            Some(FileFormat::Csv) => ImportFormat::Csv,
-            Some(FileFormat::Json) => ImportFormat::Json,
-            None => detect_format(&self.file)?,
-        };
+        let format = self.format()?;
         let content = std::fs::read_to_string(&self.file).map_err(|source| CliError::File {
             path: self.file.clone(),
             source,
         })?;
-        let import = import_targets(&content, format)?;
+        let results = self.kind == ImportKind::Results;
+        if !self.local {
+            return import_via_api(results, format.api_name(), content, self.dry_run).await;
+        }
+        if results {
+            return import_results_locally(context, format, &content, self.dry_run).await;
+        }
+        let import_format = match format {
+            FileFormat::Csv => ImportFormat::Csv,
+            FileFormat::Json => ImportFormat::Json,
+            FileFormat::NmapXml => {
+                return Err(CliError::Import(
+                    dscan_integrations::ImportError::UnknownFormat("nmap-xml".into()),
+                ));
+            }
+        };
+        let import = import_targets(&content, import_format)?;
         print!("{}", format_import_report(&import));
-
         if self.dry_run {
             println!("Tryb próbny — nic nie zapisano.");
             return Ok(());
@@ -72,6 +119,46 @@ impl Command for ImportArgs {
         print!("{}", format_insert_summary(&summary));
         Ok(())
     }
+}
+
+/// Import wyników bez serwera: to samo przetwarzanie co skan (I2).
+async fn import_results_locally(
+    context: &Context,
+    format: FileFormat,
+    content: &str,
+    dry_run: bool,
+) -> Result<(), CliError> {
+    let result_format = parse_result_format(format.api_name())
+        .ok_or_else(|| CliError::Http("nieznany format".into()))?;
+    let parsed = parse_results(content, result_format)?;
+    let config = context.load_config(CliOverrides::default())?;
+    if dry_run {
+        let (inside, outside) =
+            split_by_scope(parsed.hosts, &config.settings.scope.allowed_networks);
+        println!(
+            "Tryb próbny: {} hostów w zakresie, {} poza zakresem — nic nie zapisano.",
+            inside.len(),
+            outside.len()
+        );
+        return Ok(());
+    }
+    let cipher = cipher_from_config(&config)?;
+    let pool = connect_database(&config).await?;
+    let import = ResultImport {
+        hosts: parsed.hosts,
+        raw_xml: parsed.raw_xml,
+        profile: "import".into(),
+        requested_by: None,
+    };
+    let outcome = import_results(&pool, &cipher, &config.settings, import).await?;
+    if !outcome.out_of_scope.is_empty() {
+        eprintln!(
+            "Poza zakresem [scope] (pominięte): {}",
+            outcome.out_of_scope.join(", ")
+        );
+    }
+    eprint!("{}", format_summary(&outcome.summary));
+    Ok(())
 }
 
 /// Raport z walidacji pliku: liczby i lista odrzuconych wierszy z powodami.

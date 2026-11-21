@@ -1,0 +1,13 @@
+<label>Nazwa <input name="name" value="{{ p_name }}" required maxlength="100"></label>
+<label>Tryb
+  <select name="mode">
+    <option value="services"{% if p_mode == "services" %} selected{% endif %}>usługi</option>
+    <option value="discovery"{% if p_mode == "discovery" %} selected{% endif %}>wykrywanie hostów</option>
+  </select>
+</label>
+<label>Grupa celów <input name="target_group" value="{{ p_group }}" placeholder="(wszystkie)"></label>
+<label>Porty <input name="ports" value="{{ p_ports }}" placeholder="22, 80, 8000-8100"></label>
+<label>Okna czasowe <input name="windows" value="{{ p_windows }}" placeholder="22:00-06:00"></label>
+<label>Co ile minut <input name="frequency_minutes" value="{{ p_frequency }}" size="6" placeholder="ręcznie"></label>
+<label>Limit tempa (pakiety/s) <input name="max_rate" value="{{ p_rate }}" size="7" placeholder="z konfiguracji"></label>
+<label class="checkbox"><input type="checkbox" name="enabled" value="on"{% if p_enabled %} checked{% endif %}> włączony</label>

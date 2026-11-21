@@ -47,3 +47,23 @@ label.inline { display: flex; gap: 8px; align-items: center; }
 .report { margin-bottom: 16px; }
 tr.rejected td { color: var(--error); }
 button.danger { color: var(--error); }
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 20px; }
+.stat { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 14px; display: flex; flex-direction: column; }
+.stat-value { font-size: 1.8em; font-weight: 600; }
+.stat-label { color: var(--muted); font-size: 0.9em; }
+.inline-form { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
+.inline-form label { display: flex; flex-direction: column; gap: 4px; }
+progress { width: 100px; vertical-align: middle; }
+.badge { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 0.8em; border: 1px solid var(--border); }
+.badge.warn { color: var(--warn); }
+.badge.ok { color: var(--ok); }
+.change-new td, .badge.change-new { color: var(--ok); }
+.change-gone td, .badge.change-gone { color: var(--error); }
+.change-mod td, .badge.change-mod { color: var(--warn); }
+tr.change-new { background: color-mix(in srgb, var(--ok) 10%, transparent); }
+tr.change-gone { background: color-mix(in srgb, var(--error) 10%, transparent); }
+tr.change-mod { background: color-mix(in srgb, var(--warn) 10%, transparent); }
+table.fields th { text-align: left; width: 140px; color: var(--muted); font-weight: normal; }
+.inline-form.compact { gap: 6px; }
+.checkbox { flex-direction: row !important; align-items: center; }
+details summary { cursor: pointer; color: var(--accent); }

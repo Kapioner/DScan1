@@ -173,6 +173,7 @@ fn info(sample: &Sample) -> HttpInfo {
         redirect_chain: Vec::new(),
         tls_verified: None,
         certificate: None,
+        favicon: None,
     }
 }
 

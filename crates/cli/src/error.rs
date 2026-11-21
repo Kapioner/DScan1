@@ -37,6 +37,13 @@ pub enum CliError {
     NoTargetsInScope,
     MissingNewKey(&'static str),
     SameKey,
+    /// Brak zapisanego tokenu albo sesja wygasła — trzeba `dscan login`.
+    NotLoggedIn,
+    /// Serwer API odpowiedział błędem.
+    Api {
+        status: u16,
+        message: String,
+    },
     /// Polecenie jest zdefiniowane, ale jego implementacja jest zaplanowana na później.
     NotImplemented {
         command: &'static str,
@@ -71,6 +78,11 @@ impl fmt::Display for CliError {
                 "brak nowego klucza — ustaw zmienną {variable} (wygeneruj: dscan keys generate)"
             ),
             CliError::SameKey => write!(f, "nowy klucz jest taki sam jak obecny"),
+            CliError::NotLoggedIn => write!(
+                f,
+                "brak ważnej sesji — zaloguj się: dscan login --user NAZWA (albo użyj --local)"
+            ),
+            CliError::Api { status, message } => write!(f, "serwer API ({status}): {message}"),
             CliError::NotImplemented { command, tasks } => write!(
                 f,
                 "polecenie '{command}' nie jest jeszcze dostępne (zaplanowane w zadaniach: {tasks})"

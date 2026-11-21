@@ -186,6 +186,7 @@ mod tests {
             redirect_chain: Vec::new(),
             tls_verified: None,
             certificate: None,
+            favicon: None,
         }
     }
 

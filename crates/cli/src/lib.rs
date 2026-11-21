@@ -2,6 +2,7 @@
 
 pub mod app;
 pub mod cli;
+pub mod client;
 pub mod commands;
 pub mod error;
 mod logging;

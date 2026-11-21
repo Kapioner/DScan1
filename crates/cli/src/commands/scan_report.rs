@@ -53,6 +53,34 @@ pub fn format_summary(summary: &ScanJobSummary) -> String {
         format_duration(summary.duration),
         summary.subgroups
     );
+    if summary.status == dscan_core::models::ScanStatus::Paused {
+        text.push_str(&format!(
+            "Przebieg wstrzymany — wznowienie od niedokończonych podgrup: dscan resume {}\n",
+            summary.run_id
+        ));
+    }
+    if let Some(presence) = &summary.presence {
+        text.push_str(&format!(
+            "Obecność hostów: odpowiedziało {}, bez odpowiedzi {}",
+            presence.responded, presence.missed
+        ));
+        if !presence.became_inactive.is_empty() {
+            let ips: Vec<String> = presence
+                .became_inactive
+                .iter()
+                .map(ToString::to_string)
+                .collect();
+            text.push_str(&format!(", nieaktywne od teraz: {}", ips.join(", ")));
+        }
+        if !presence.unstable.is_empty() {
+            let ips: Vec<String> = presence.unstable.iter().map(ToString::to_string).collect();
+            text.push_str(&format!(
+                ", niestabilne (odpowiedziały przy powtórce): {}",
+                ips.join(", ")
+            ));
+        }
+        text.push('\n');
+    }
     if let Some(comparison) = &summary.comparison {
         text.push_str(&crate::commands::diff::format_changes(
             comparison.previous_run_id,
@@ -137,6 +165,9 @@ pub fn format_http(http: &HttpInfo) -> String {
     }
     if let Some(server) = http.header("server") {
         notes.push(format!("Server: {server}"));
+    }
+    if let Some(favicon) = &http.favicon {
+        notes.push(format!("favicon mmh3 {}", favicon.mmh3));
     }
     let notes = if notes.is_empty() {
         String::new()
@@ -275,6 +306,7 @@ mod tests {
             redirect_chain: Vec::new(),
             tls_verified: Some(false),
             certificate: None,
+            favicon: None,
         };
         assert_eq!(
             format_http(&http),
@@ -339,6 +371,7 @@ mod tests {
             failed_subgroups: 1,
             hosts: Vec::new(),
             comparison: None,
+            presence: None,
         };
         assert_eq!(
             format_summary(&summary),

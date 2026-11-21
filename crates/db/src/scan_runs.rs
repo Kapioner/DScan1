@@ -17,21 +17,49 @@ pub struct CreatedScanRun {
     pub subgroup_ids: Vec<i64>,
 }
 
-/// Tworzy przebieg w stanie `running` i jego podgrupy (każda jako lista sieci CIDR).
+/// Metadane nowego przebiegu.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct NewRun {
+    pub profile: String,
+    /// `discovery` albo `services`.
+    pub mode: String,
+    pub profile_id: Option<i64>,
+    pub requested_by: Option<i64>,
+}
+
+/// Tworzy przebieg (tryb `services`, bez profilu z bazy) — skrót dla testów i importu.
 pub async fn create_scan_run(
     pool: &PgPool,
     profile: &str,
     total_addresses: u64,
     subgroups: &[Vec<String>],
 ) -> Result<CreatedScanRun, DbError> {
+    let run = NewRun {
+        profile: profile.to_string(),
+        mode: "services".into(),
+        ..NewRun::default()
+    };
+    create_scan_run_with(pool, &run, total_addresses, subgroups).await
+}
+
+/// Tworzy przebieg w stanie `running` i jego podgrupy (każda jako lista sieci CIDR).
+pub async fn create_scan_run_with(
+    pool: &PgPool,
+    run: &NewRun,
+    total_addresses: u64,
+    subgroups: &[Vec<String>],
+) -> Result<CreatedScanRun, DbError> {
     let mut transaction = pool.begin().await.map_err(DbError::Query)?;
     let run_id: i64 = sqlx::query_scalar(
-        "INSERT INTO scan_runs (profile, status, total_addresses, total_subgroups) \
-         VALUES ($1, 'running', $2, $3) RETURNING id",
+        "INSERT INTO scan_runs (profile, status, total_addresses, total_subgroups, mode, profile_id, requested_by) \
+         VALUES ($1, 'running', $2, $3, $4, $5, $6) RETURNING id",
     )
-    .bind(profile)
+    .bind(&run.profile)
     .bind(to_db_count(total_addresses))
     .bind(i32::try_from(subgroups.len()).unwrap_or(i32::MAX))
+    .bind(&run.mode)
+    .bind(run.profile_id)
+    .bind(run.requested_by)
     .fetch_one(&mut *transaction)
     .await
     .map_err(DbError::Query)?;

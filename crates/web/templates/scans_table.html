@@ -2,7 +2,7 @@
 <p class="muted">Brak przebiegów.</p>
 {% else %}
 <table>
-  <thead><tr><th>#</th><th>Profil</th><th>Stan</th><th>Start</th><th>Postęp</th><th>Podgrupy</th><th>Czas</th><th>Pozostało</th></tr></thead>
+  <thead><tr><th>#</th><th>Profil</th><th>Stan</th><th>Start</th><th>Postęp</th><th>Podgrupy</th><th>Czas</th><th>Pozostało</th>{% if can_control %}<th></th>{% endif %}</tr></thead>
   <tbody>
     {% for scan in scans %}
     <tr>
@@ -10,6 +10,10 @@
       <td><span class="status status-{{ scan.status }}">{{ scan.status }}</span></td>
       <td>{{ scan.started_at }}</td><td>{{ scan.progress }}</td><td>{{ scan.subgroups }}</td>
       <td>{{ scan.elapsed }}</td><td>{{ scan.remaining }}</td>
+      {% if can_control %}<td>
+        {% if scan.status == "running" %}<button class="link" hx-post="/ui/scans/{{ scan.id }}/stop" hx-target="#control-notice">Wstrzymaj</button>{% endif %}
+        {% if scan.status == "paused" %}<button class="link" hx-post="/ui/scans/{{ scan.id }}/resume" hx-target="#control-notice">Wznów</button>{% endif %}
+      </td>{% endif %}
     </tr>
     {% endfor %}
   </tbody>

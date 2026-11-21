@@ -119,9 +119,15 @@ async fn drop_schema(url: &str, schema: &str) {
 fn settings(max_addresses: u64) -> ScanJobSettings {
     ScanJobSettings {
         profile: "test".into(),
+        mode: "services".into(),
+        profile_id: None,
+        requested_by: None,
         subgroup_size: 256,
         parallel: 3,
         max_addresses,
+        inactive_after_missed_runs: 2,
+        unstable_retries: 0,
+        retry_delay_seconds: 0,
     }
 }
 
@@ -349,6 +355,169 @@ async fn second_run_is_compared_with_previous_one() {
 
     let stored = dscan_db::list_changes(&pool, second.run_id).await.unwrap();
     assert_eq!(stored.len(), 3);
+
+    pool.close().await;
+    drop_schema(&url, &schema).await;
+}
+
+/// Atrapa liczy zeskanowane podgrupy i „skanuje” 200 ms — dość, by zdążyć zatrzymać przebieg.
+#[derive(Default)]
+struct SlowScanner {
+    scanned: std::sync::atomic::AtomicUsize,
+}
+
+impl SubgroupScanner for SlowScanner {
+    async fn scan(&self, targets: &[IpNet]) -> Result<ScanOutput, ScannerError> {
+        tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+        self.scanned
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        let host = Host::new(targets[0].network(), Utc::now());
+        Ok(ScanOutput {
+            hosts: vec![host],
+            raw_xml: "<nmaprun/>".into(),
+        })
+    }
+}
+
+#[tokio::test]
+async fn stopped_run_is_paused_and_resumes_where_it_left_off() {
+    use dscan_engine::{create_job, drive_job, load_job};
+
+    let Some((pool, schema, url)) = test_pool().await else {
+        return;
+    };
+    let cipher = Cipher::new(&[3; 32]);
+    let mut job_settings = settings(10_000);
+    job_settings.parallel = 1;
+    let networks: Vec<IpNet> = vec!["10.0.0.0/22".parse().unwrap()]; // 4 podgrupy
+
+    let plan = create_job(&pool, &networks, &job_settings).await.unwrap();
+    let run_id = plan.run_id;
+    let (stop_sender, stop) = tokio::sync::watch::channel(false);
+    let scanner = Arc::new(SlowScanner::default());
+    let stopper = tokio::spawn(async move {
+        tokio::time::sleep(std::time::Duration::from_millis(300)).await; // po 1. podgrupie, w trakcie 2.
+        stop_sender.send(true).unwrap();
+        stop_sender
+    });
+    let first = drive_job(
+        &pool,
+        &cipher,
+        plan,
+        Arc::clone(&scanner),
+        &job_settings,
+        &RecordingObserver::default(),
+        stop,
+    )
+    .await
+    .unwrap();
+    let _sender = stopper.await.unwrap();
+    assert_eq!(first.status, ScanStatus::Paused);
+    let paused = dscan_db::get_scan_run(&pool, run_id)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(paused.status, ScanStatus::Paused);
+    assert_eq!(paused.completed_subgroups, 1);
+
+    let (plan, _) = load_job(&pool, run_id).await.unwrap();
+    assert_eq!(
+        plan.subgroups.len(),
+        3,
+        "przerwana podgrupa wróciła do kolejki"
+    );
+    let resumed = drive_job(
+        &pool,
+        &cipher,
+        plan,
+        Arc::clone(&scanner),
+        &job_settings,
+        &RecordingObserver::default(),
+        dscan_scanner::pool::never_stop(),
+    )
+    .await
+    .unwrap();
+    assert_eq!(resumed.status, ScanStatus::Completed);
+    let done = dscan_db::get_scan_run(&pool, run_id)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        (done.completed_subgroups, done.completed_addresses),
+        (4, 1024)
+    );
+    // 1 przed zatrzymaniem + 3 po wznowieniu; przerwana nie została policzona podwójnie.
+    assert_eq!(scanner.scanned.load(std::sync::atomic::Ordering::SeqCst), 4);
+    assert!(load_job(&pool, run_id).await.is_err());
+
+    pool.close().await;
+    drop_schema(&url, &schema).await;
+}
+
+#[tokio::test]
+async fn host_becomes_inactive_after_k_runs_without_response() {
+    use dscan_core::models::HostStatus;
+
+    let Some((pool, schema, url)) = test_pool().await else {
+        return;
+    };
+    let cipher = Cipher::new(&[3; 32]);
+    let networks: Vec<IpNet> = vec!["10.0.0.0/32".parse().unwrap()];
+    let present = Arc::new(FixedScanner(vec![(22, "OpenSSH")]));
+    run_scan_job(
+        &pool,
+        &cipher,
+        &networks,
+        present,
+        &settings(10),
+        &RecordingObserver::default(),
+    )
+    .await
+    .unwrap();
+
+    struct Silent;
+    impl SubgroupScanner for Silent {
+        async fn scan(&self, _targets: &[IpNet]) -> Result<ScanOutput, ScannerError> {
+            Ok(ScanOutput {
+                hosts: Vec::new(),
+                raw_xml: "<nmaprun/>".into(),
+            })
+        }
+    }
+    let mut statuses = Vec::new();
+    for _ in 0..2 {
+        let summary = run_scan_job(
+            &pool,
+            &cipher,
+            &networks,
+            Arc::new(Silent),
+            &settings(10),
+            &RecordingObserver::default(),
+        )
+        .await
+        .unwrap();
+        let presence = dscan_db::load_presence(&pool).await.unwrap();
+        statuses.push((
+            presence[0].status,
+            presence[0].consecutive_misses,
+            summary.presence.unwrap().became_inactive.len(),
+        ));
+    }
+    // K = 2 (settings): po 1. braku nadal aktywny, po 2. nieaktywny.
+    assert_eq!(
+        statuses,
+        vec![(HostStatus::Active, 1, 0), (HostStatus::Inactive, 2, 1)]
+    );
+    let history = dscan_db::response_history(&pool, "10.0.0.0".parse().unwrap())
+        .await
+        .unwrap();
+    assert_eq!(
+        history
+            .iter()
+            .map(|(_, responded)| *responded)
+            .collect::<Vec<_>>(),
+        vec![false, false, true]
+    );
 
     pool.close().await;
     drop_schema(&url, &schema).await;

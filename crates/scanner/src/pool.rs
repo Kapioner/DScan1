@@ -7,7 +7,7 @@ use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
 use ipnet::IpNet;
-use tokio::sync::{Semaphore, mpsc};
+use tokio::sync::{Semaphore, mpsc, watch};
 
 use crate::ScannerError;
 use crate::nmap::{NmapCommand, NmapOptions, ScanOutput, run_scan};
@@ -46,8 +46,33 @@ pub struct SubgroupResult {
 /// Zdarzenia z puli w kolejności, w jakiej zachodzą.
 #[derive(Debug)]
 pub enum PoolEvent {
-    Started { index: usize, at: DateTime<Utc> },
+    Started {
+        index: usize,
+        at: DateTime<Utc>,
+    },
     Finished(SubgroupResult),
+    /// Podgrupa przerwana sygnałem zatrzymania (S9) — proces nmap zabity, do ponowienia.
+    Interrupted {
+        index: usize,
+    },
+}
+
+/// Sygnał zatrzymania, który nigdy nie nastąpi (dla skanów bez okna czasowego).
+pub fn never_stop() -> watch::Receiver<bool> {
+    let (_sender, receiver) = watch::channel(false);
+    receiver
+}
+
+/// Czeka na sygnał zatrzymania. Zamknięty kanał oznacza „nigdy”.
+pub async fn wait_for_stop(stop: &mut watch::Receiver<bool>) {
+    loop {
+        if *stop.borrow() {
+            return;
+        }
+        if stop.changed().await.is_err() {
+            std::future::pending::<()>().await;
+        }
+    }
 }
 
 /// Uruchamia skan podgrup i od razu zwraca odbiornik zdarzeń. Kanał zamyka się,
@@ -56,19 +81,28 @@ pub fn run_pool<S: SubgroupScanner>(
     scanner: Arc<S>,
     subgroups: Vec<Vec<IpNet>>,
     parallel: usize,
+    stop: watch::Receiver<bool>,
 ) -> mpsc::Receiver<PoolEvent> {
     let parallel = parallel.max(1);
     let (sender, receiver) = mpsc::channel(parallel * 2);
     let semaphore = Arc::new(Semaphore::new(parallel));
 
     tokio::spawn(async move {
+        let mut dispatcher_stop = stop.clone();
         for (index, targets) in subgroups.into_iter().enumerate() {
-            // Czekamy na wolne miejsce, zanim wystartuje kolejna podgrupa.
-            let Ok(permit) = Arc::clone(&semaphore).acquire_owned().await else {
-                break;
+            // Czekamy na wolne miejsce albo na sygnał zatrzymania (wtedy nie startujemy już nic).
+            // `biased`: gdy oba są gotowe, zatrzymanie wygrywa z wolnym miejscem.
+            let permit = tokio::select! {
+                biased;
+                () = wait_for_stop(&mut dispatcher_stop) => break,
+                permit = Arc::clone(&semaphore).acquire_owned() => permit,
             };
-            let scanner = Arc::clone(&scanner);
-            let sender = sender.clone();
+            let Ok(permit) = permit else { break };
+            if *dispatcher_stop.borrow() {
+                break;
+            }
+            let (scanner, sender, mut task_stop) =
+                (Arc::clone(&scanner), sender.clone(), stop.clone());
             tokio::spawn(async move {
                 let started_at = Utc::now();
                 if sender
@@ -81,14 +115,14 @@ pub fn run_pool<S: SubgroupScanner>(
                 {
                     return; // odbiorca już nie słucha
                 }
-                let outcome = scanner.scan(&targets).await;
-                let result = SubgroupResult {
-                    index,
-                    started_at,
-                    finished_at: Utc::now(),
-                    outcome,
+                // Zatrzymanie porzuca skan — proces nmap ginie razem z nim (kill_on_drop).
+                let event = tokio::select! {
+                    outcome = scanner.scan(&targets) => {
+                        PoolEvent::Finished(SubgroupResult { index, started_at, finished_at: Utc::now(), outcome })
+                    }
+                    () = wait_for_stop(&mut task_stop) => PoolEvent::Interrupted { index },
                 };
-                let _ = sender.send(PoolEvent::Finished(result)).await;
+                let _ = sender.send(event).await;
                 drop(permit);
             });
         }
@@ -140,6 +174,7 @@ mod tests {
             match event {
                 PoolEvent::Started { .. } => started += 1,
                 PoolEvent::Finished(result) => finished.push(result),
+                PoolEvent::Interrupted { .. } => {}
             }
         }
         (started, finished)
@@ -148,7 +183,13 @@ mod tests {
     #[tokio::test]
     async fn never_runs_more_than_parallel_scans() {
         let scanner = Arc::new(FakeScanner::default());
-        let (started, finished) = collect(run_pool(Arc::clone(&scanner), subgroups(12), 3)).await;
+        let (started, finished) = collect(run_pool(
+            Arc::clone(&scanner),
+            subgroups(12),
+            3,
+            never_stop(),
+        ))
+        .await;
 
         assert_eq!(started, 12);
         assert_eq!(finished.len(), 12);
@@ -158,15 +199,26 @@ mod tests {
     #[tokio::test]
     async fn parallel_scans_are_faster_than_sequential() {
         let begin = Instant::now();
-        collect(run_pool(Arc::new(FakeScanner::default()), subgroups(8), 8)).await;
+        collect(run_pool(
+            Arc::new(FakeScanner::default()),
+            subgroups(8),
+            8,
+            never_stop(),
+        ))
+        .await;
         // 8 × 50 ms szeregowo = 400 ms; równolegle ok. 50 ms.
         assert!(begin.elapsed() < Duration::from_millis(300));
     }
 
     #[tokio::test]
     async fn failure_of_one_subgroup_does_not_stop_others() {
-        let (_, finished) =
-            collect(run_pool(Arc::new(FakeScanner::default()), subgroups(70), 8)).await;
+        let (_, finished) = collect(run_pool(
+            Arc::new(FakeScanner::default()),
+            subgroups(70),
+            8,
+            never_stop(),
+        ))
+        .await;
 
         let failed: Vec<usize> = finished
             .iter()
@@ -177,10 +229,51 @@ mod tests {
         assert_eq!(finished.len(), 70);
     }
 
+    struct SlowScanner;
+
+    impl SubgroupScanner for SlowScanner {
+        async fn scan(&self, _targets: &[IpNet]) -> Result<ScanOutput, ScannerError> {
+            tokio::time::sleep(Duration::from_secs(3600)).await;
+            Err(ScannerError::NmapNotFound)
+        }
+    }
+
+    #[tokio::test]
+    async fn stop_interrupts_running_and_skips_remaining() {
+        let (stop_sender, stop) = watch::channel(false);
+        // Skan trwający „wiecznie” — wynik nie zależy od obciążenia maszyny testowej.
+        let mut events = run_pool(Arc::new(SlowScanner), subgroups(10), 2, stop);
+        // Po starcie dwóch pierwszych podgrup zatrzymujemy pulę.
+        let mut started = 0;
+        while started < 2 {
+            if let Some(PoolEvent::Started { .. }) = events.recv().await {
+                started += 1;
+            }
+        }
+        stop_sender.send(true).unwrap();
+
+        let (mut interrupted, mut finished) = (0, 0);
+        while let Some(event) = events.recv().await {
+            match event {
+                PoolEvent::Interrupted { .. } => interrupted += 1,
+                PoolEvent::Finished(_) => finished += 1,
+                PoolEvent::Started { .. } => started += 1,
+            }
+        }
+        assert_eq!(started, 2, "po zatrzymaniu nie startuje nic nowego");
+        assert_eq!(interrupted + finished, 2);
+        assert_eq!(interrupted, 2);
+    }
+
     #[tokio::test]
     async fn results_carry_timing() {
-        let (_, finished) =
-            collect(run_pool(Arc::new(FakeScanner::default()), subgroups(1), 1)).await;
+        let (_, finished) = collect(run_pool(
+            Arc::new(FakeScanner::default()),
+            subgroups(1),
+            1,
+            never_stop(),
+        ))
+        .await;
         let duration = finished[0].finished_at - finished[0].started_at;
         assert!(duration.num_milliseconds() >= 40);
     }

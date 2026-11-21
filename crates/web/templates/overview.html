@@ -1,0 +1,77 @@
+<div class="stats">
+  <div class="stat"><span class="stat-value">{{ data.hosts }}</span><span class="stat-label">hostów w ostatnim przebiegu</span></div>
+  <div class="stat"><span class="stat-value">{{ data.open_services }}</span><span class="stat-label">otwartych usług</span></div>
+  <div class="stat"><span class="stat-value">{{ data.findings.len() }}</span><span class="stat-label">ważnych znalezisk</span></div>
+  <div class="stat"><span class="stat-value">{{ data.active_hosts }} / {{ data.inactive_hosts }}</span><span class="stat-label">hosty aktywne / nieaktywne</span></div>
+</div>
+
+<section class="card">
+  <h2>Trwające skany</h2>
+  {% if active.is_empty() %}
+  <p class="muted">Żaden skan nie trwa.</p>
+  {% else %}
+  <table>
+    <thead><tr><th>#</th><th>Profil</th><th>Stan</th><th>Postęp</th><th>Podgrupy</th><th>Czas</th><th>Pozostało</th></tr></thead>
+    <tbody>
+      {% for run in active %}
+      <tr>
+        <td>{{ run.id }}</td><td>{{ run.profile }}</td><td><span class="status status-{{ run.status }}">{{ run.status }}</span></td>
+        <td><progress max="100" value="{{ run.percent }}"></progress> {{ run.progress }}</td>
+        <td>{{ run.subgroups }}</td><td>{{ run.elapsed }}</td><td>{{ run.remaining }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+</section>
+
+{% if let Some(run) = latest %}
+<section class="card">
+  <h2>Najważniejsze znaleziska — przebieg #{{ run.id }} ({{ run.profile }})</h2>
+  {% if data.findings.is_empty() %}
+  <p class="muted">Brak ważnych znalezisk.</p>
+  {% else %}
+  <table>
+    <thead><tr><th>Adres</th><th>Znalezisko</th><th>Kategoria</th></tr></thead>
+    <tbody>
+      {% for f in data.findings %}
+      <tr><td><code>{{ f.ip }}:{{ f.port }}/{{ f.protocol }}</code></td><td>{{ f.title }}</td><td>{{ f.category }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+</section>
+
+<section class="card">
+  <h2>Zmiany od poprzedniego skanu</h2>
+  <p>Nowe: <strong>{{ appeared }}</strong>, zniknęły: <strong>{{ disappeared }}</strong>, zmienione: <strong>{{ modified }}</strong></p>
+  {% if !changes.is_empty() %}
+  <table>
+    <thead><tr><th></th><th>Usługa</th><th>Zmiana</th></tr></thead>
+    <tbody>
+      {% for c in changes %}
+      <tr><td>{{ c.mark }}</td><td><code>{{ c.address }}</code></td><td>{{ c.label }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+</section>
+
+<section class="card">
+  <h2>Technologie</h2>
+  {% if data.technologies.is_empty() %}
+  <p class="muted">Nie rozpoznano technologii.</p>
+  {% else %}
+  <table>
+    <thead><tr><th>Technologia</th><th>Usługi</th></tr></thead>
+    <tbody>
+      {% for (name, count) in data.technologies %}
+      <tr><td>{{ name }}</td><td>{{ count }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+</section>
+{% else %}
+<section class="card"><p class="muted">Brak zakończonych przebiegów — uruchom pierwszy skan.</p></section>
+{% endif %}

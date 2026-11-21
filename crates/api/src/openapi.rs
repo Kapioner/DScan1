@@ -3,11 +3,22 @@ use utoipa::OpenApi;
 
 use crate::ErrorBody;
 use crate::auth::handlers::{LoginRequest, LoginResponse, UserView};
+use crate::routes::dashboard::{DashboardView, FindingView, RunState, TechnologyCount};
 use crate::routes::health::{DatabaseStatus, HealthResponse};
+use crate::routes::imports::{
+    ImportRequest, RejectedRow, ResultImportResponse, TargetImportResponse,
+};
 use crate::routes::profiles::{ProfileInput, ProfileView, WindowDto};
 use crate::routes::results::{OverrideInput, OverrideView};
+use crate::routes::scan_control::{
+    ChangeView, RejectedTarget, StartScanRequest, StartScanResponse,
+};
 use crate::routes::scans::ScanRunView;
+use crate::routes::signatures::{
+    DetectionView, EvidenceView, SignatureTestRequest, SignatureTestResponse, SignatureView,
+};
 use crate::routes::targets::{GroupView, NewTarget, TargetChanges, TargetView};
+use crate::routes::users::UserListItem;
 
 /// Opis API w formacie OpenAPI 3, generowany z adnotacji `#[utoipa::path]` przy handlerach.
 /// Endpointy poza `health` i `auth/login` wymagają sesji (ciasteczko `dscan_session`
@@ -36,11 +47,27 @@ use crate::routes::targets::{GroupView, NewTarget, TargetChanges, TargetView};
         crate::routes::results::run_hosts,
         crate::routes::results::list_overrides,
         crate::routes::results::set_override,
-        crate::routes::results::delete_override
+        crate::routes::results::delete_override,
+        crate::routes::users::list_users,
+        crate::routes::scan_control::start_scan,
+        crate::routes::scan_control::stop_scan,
+        crate::routes::scan_control::resume_scan,
+        crate::routes::scan_control::run_changes,
+        crate::routes::scan_control::diff,
+        crate::routes::scan_control::config_profiles,
+        crate::routes::imports::import_targets_handler,
+        crate::routes::imports::import_results_handler,
+        crate::routes::exports::export,
+        crate::routes::signatures::list_signatures,
+        crate::routes::signatures::test_signature,
+        crate::routes::dashboard::dashboard
     ),
     components(schemas(
         HealthResponse, DatabaseStatus, ErrorBody, ScanRunView, LoginRequest, LoginResponse, UserView,
-        TargetView, NewTarget, TargetChanges, GroupView, ProfileInput, ProfileView, WindowDto, OverrideInput, OverrideView
+        TargetView, NewTarget, TargetChanges, GroupView, ProfileInput, ProfileView, WindowDto, OverrideInput, OverrideView, UserListItem,
+        StartScanRequest, StartScanResponse, RejectedTarget, ChangeView, ImportRequest, TargetImportResponse,
+        RejectedRow, ResultImportResponse, SignatureView, SignatureTestRequest, SignatureTestResponse,
+        DetectionView, EvidenceView, DashboardView, RunState, FindingView, TechnologyCount
     )),
     tags(
         (name = "system", description = "Stan usługi"),
@@ -48,6 +75,11 @@ use crate::routes::targets::{GroupView, NewTarget, TargetChanges, TargetView};
         (name = "cele", description = "Cele i grupy celów"),
         (name = "profile", description = "Profile skanów: tryb, porty, okna czasowe, częstotliwość"),
         (name = "skany", description = "Przebiegi skanów: postęp, czas, prognoza"),
+        (name = "import", description = "Import celów i wyników skanów (nmap XML, JSON, CSV)"),
+        (name = "eksport", description = "Eksport hostów, usług i zmian (JSON, CSV)"),
+        (name = "sygnatury", description = "Sygnatury technologii i ich testowanie"),
+        (name = "dashboard", description = "Znaleziska, zmiany, technologie, stan skanów"),
+        (name = "użytkownicy", description = "Konta (tylko administracja)"),
         (name = "wyniki", description = "Hosty i usługi przebiegu, ręczne poprawki wyników")
     )
 )]

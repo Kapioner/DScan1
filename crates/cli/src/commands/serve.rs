@@ -3,6 +3,8 @@ use dscan_api::{AppState, AuthConfig, build_router_with};
 use dscan_auth::{hash_password, validate_password_strength, validate_username};
 use dscan_config::{AppConfig, collect_warnings};
 use dscan_db::PgPool;
+use dscan_engine::ScanService;
+use dscan_engine::scheduler::run_scheduler;
 use tokio::net::TcpListener;
 
 use super::{Command, Context, OverrideArgs, cipher_from_config, connect_database};
@@ -45,7 +47,17 @@ impl Command for ServeArgs {
             session_hours: server.session_hours,
             secure_cookies: server.secure_cookies,
         };
-        let state = AppState::new(pool, cipher, auth);
+        // Przebiegi przerwane np. restartem serwera nie trwają — wstrzymujemy je do wznowienia (S9).
+        let orphaned = dscan_db::pause_orphaned_runs(&pool).await?;
+        if orphaned > 0 {
+            tracing::warn!(
+                "wstrzymano przerwane przebiegi: {orphaned} (wznowienie: dscan resume ID)"
+            );
+        }
+        let scans = ScanService::new(pool.clone(), cipher.clone(), config.settings.clone());
+        // Harmonogram profili z bazy (S8): sprawdza co minutę okna i częstotliwość.
+        tokio::spawn(run_scheduler(scans.clone()));
+        let state = AppState::new(pool, cipher, auth).with_scans(scans);
         let router = build_router_with(state, server.max_body_bytes, dscan_web::web_routes());
         dscan_api::serve(listener, router)
             .await

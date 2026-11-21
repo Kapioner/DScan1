@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Hosty{% endblock %}
+{% block content %}
+<h1>Hosty</h1>
+<section class="card">
+  <form method="get" action="/hosts" class="inline-form">
+    <label>Przebieg
+      <select name="run">
+        {% for o in runs %}<option value="{{ o.value }}"{% if o.selected %} selected{% endif %}>{{ o.label }}</option>{% endfor %}
+      </select>
+    </label>
+    <label>Adres / nazwa <input name="q" value="{{ filter.q }}" placeholder="10.0.0. albo lab"></label>
+    <label>Port <input name="port" value="{{ filter.port }}" size="6"></label>
+    <label>Technologia <input name="technology" value="{{ filter.technology }}" placeholder="nginx"></label>
+    <label>Stan
+      <select name="status">
+        <option value="">(wszystkie)</option>
+        {% for o in statuses %}<option value="{{ o.value }}"{% if o.selected %} selected{% endif %}>{{ o.label }}</option>{% endfor %}
+      </select>
+    </label>
+    <label class="checkbox"><input type="checkbox" name="edited" value="1"{% if !filter.edited.is_empty() %} checked{% endif %}> tylko edytowane</label>
+    <button type="submit">Filtruj</button>
+  </form>
+</section>
+<section class="card">
+  {% if run.is_none() %}
+  <p class="muted">Brak zakończonych przebiegów.</p>
+  {% else if hosts.is_empty() %}
+  <p class="muted">Brak hostów spełniających filtry.</p>
+  {% else %}
+  <p class="muted">Hostów: {{ hosts.len() }}</p>
+  <table>
+    <thead><tr><th>Adres</th><th>Nazwa</th><th>Stan</th><th>Usługi</th><th>Technologie</th><th></th></tr></thead>
+    <tbody>
+      {% for h in hosts %}
+      <tr>
+        <td><a href="/hosts/{{ h.ip }}{% if let Some(r) = run %}?run={{ r }}{% endif %}"><code>{{ h.ip }}</code></a></td>
+        <td>{{ h.hostname }}</td><td>{{ h.status }}</td><td>{{ h.ports }}</td><td>{{ h.technologies }}</td>
+        <td>{% if h.edited %}<span class="badge">edytowane ręcznie</span>{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+</section>
+{% endblock %}

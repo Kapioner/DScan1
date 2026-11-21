@@ -92,3 +92,26 @@ max_probes_per_service = 12
 min_confidence = 30
 # Dodatkowe sygnatury (np. przykłady od organizatora) w tym samym formacie YAML co wbudowane:
 # signatures_file = "sygnatury-organizatora.yaml"
+
+# --- Nazwane profile skanów --------------------------------------------------
+# Wybór: ./run.sh scan CEL --profile NAZWA (oraz w interfejsie WWW przy uruchamianiu skanu).
+# Profil podaje tylko to, co zmienia; reszta pochodzi z sekcji powyżej.
+# Pola: mode (discovery|services), ports, max_rate, parallel, subgroup_size,
+#       host_timeout_seconds, max_retries, windows, probe_paths.
+
+[profiles.szybki]
+# Tylko wykrywanie aktywnych hostów, szybciej.
+mode = "discovery"
+max_rate = 200
+
+[profiles.pelny]
+# Usługi na wszystkich dozwolonych portach, ostrożnie: 2 procesy, ponowienia.
+mode = "services"
+parallel = 2
+max_retries = 2
+host_timeout_seconds = 300
+
+[profiles.nocny]
+# Pełny skan tylko w nocy (harmonogram uruchamia go w oknie).
+mode = "services"
+windows = [{ start = "22:00", end = "06:00" }]

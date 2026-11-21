@@ -11,6 +11,7 @@ mod client;
 pub mod environment;
 mod error;
 mod extract;
+mod favicon;
 mod hosts;
 mod probe;
 mod rate_limit;
@@ -23,6 +24,9 @@ mod web_service;
 pub use client::{HttpFetcher, HttpOptions, RawResponse};
 pub use error::FetchError;
 pub use extract::{extract_title, parse_set_cookie, to_http_info};
+pub use favicon::{
+    base64_lines, favicon_candidates, favicon_hashes, fetch_favicon, icon_link, mmh3_32,
+};
 pub use hosts::{WebAnalysis, fingerprint_hosts};
 pub use probe::{ProbeResult, is_safe_probe_path, merge_probe_paths, probe_paths};
 pub use rate_limit::{BudgetExceeded, HttpRateLimiter};
