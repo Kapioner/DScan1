@@ -6,6 +6,7 @@
 //! z wyborem profilu, wstrzymanie i wznowienie), lista przebiegów odświeżana co 5 s, formularz celów (F3: wpis ręczny, wgranie
 //! CSV/JSON z podglądem błędów, usuwanie) oraz listy profili i użytkowników.
 
+mod admin;
 mod assets;
 mod compare;
 mod dashboard;
@@ -50,7 +51,13 @@ pub fn web_routes() -> Router<AppState> {
             "/ui/profiles/{id}/delete",
             post(profiles_form::delete_profile),
         )
-        .route("/users", get(pages::users))
+        .route("/users", get(admin::users_page))
+        .route("/ui/users", post(admin::create_account))
+        .route("/ui/users/{id}", post(admin::update_account))
+        .route("/ui/roles", post(admin::save_role))
+        .route("/ui/roles/{id}", post(admin::save_role))
+        .route("/ui/roles/{id}/delete", post(admin::delete_role))
+        .route("/audit", get(admin::audit_page))
         .route("/ui/partials/scans", get(pages::scans_partial))
         .route("/ui/partials/overview", get(dashboard::overview_partial))
         .route("/ui/scans", post(dashboard::start_scan))

@@ -1,7 +1,6 @@
 use askama::Template;
 use axum::extract::State;
-use axum::http::StatusCode;
-use axum::response::{Html, IntoResponse, Response};
+use axum::response::Html;
 use chrono::Utc;
 use dscan_api::auth::{CurrentUser, permissions};
 use dscan_api::{ApiError, AppState};
@@ -10,8 +9,7 @@ use crate::menu_for;
 use crate::session::WebUser;
 use crate::views::TargetsSection;
 use crate::views::{
-    DashboardPage, ForbiddenPage, ProfileRow, ProfilesPage, ScanRow, ScansTable, TargetsPage,
-    UserBar, UsersPage,
+    DashboardPage, ProfileRow, ProfilesPage, ScanRow, ScansTable, TargetsPage, UserBar,
 };
 
 /// Ile ostatnich przebiegów pokazać na pulpicie.
@@ -140,25 +138,4 @@ pub fn describe_config_profile(profile: &dscan_config::ScanProfileSettings) -> S
     } else {
         parts.join(" · ")
     }
-}
-
-/// Lista użytkowników — tylko dla administratora.
-pub async fn users(
-    State(state): State<AppState>,
-    WebUser(user): WebUser,
-) -> Result<Response, ApiError> {
-    if !user.has(permissions::ADMIN) {
-        let page = render(&ForbiddenPage {
-            menu: menu_for(&user, ""),
-            user: user_bar(&user),
-        })?;
-        return Ok((StatusCode::FORBIDDEN, page).into_response());
-    }
-    let users = dscan_db::list_users(&state.db).await?;
-    Ok(render(&UsersPage {
-        menu: menu_for(&user, "/users"),
-        user: user_bar(&user),
-        users,
-    })?
-    .into_response())
 }

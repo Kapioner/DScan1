@@ -8,9 +8,11 @@ use dscan_engine::{
 };
 use tokio::sync::watch;
 
+use super::output::{OutputFormat, ScanOutput, exit_for_changes, render_scan};
 use super::scan_report::{format_hosts, format_progress_line, format_summary};
 use super::targets::format_plan;
 use super::{Command, Context, OverrideArgs, cipher_from_config, connect_database};
+use crate::client::types::ChangeView;
 use crate::error::CliError;
 
 /// Rodzaj skanu.
@@ -45,6 +47,10 @@ pub struct ScanArgs {
     /// Nie wypisuj listy hostów na końcu (tylko podsumowanie).
     #[arg(long)]
     pub quiet: bool,
+    /// Format wyniku na stdout (postęp idzie na stderr). Kod wyjścia: 0 — brak zmian,
+    /// 2 — wykryto zmiany, 1 — błąd.
+    #[arg(long, value_enum, default_value_t)]
+    pub output: OutputFormat,
     /// Tylko plan: liczba adresów, podgrupy i szacowany czas — bez wysyłania pakietów (C8).
     #[arg(long)]
     pub dry_run: bool,
@@ -139,10 +145,24 @@ async fn run_local(args: &ScanArgs, context: &Context) -> Result<(), CliError> {
     .await?;
 
     eprint!("{}", format_summary(&summary));
-    if !args.quiet {
-        print!("{}", format_hosts(&summary.hosts));
+    let changes: Vec<ChangeView> = summary
+        .comparison
+        .iter()
+        .flat_map(|c| &c.changes)
+        .map(ChangeView::from)
+        .collect();
+    let output = ScanOutput {
+        run_id: summary.run_id,
+        status: summary.status.as_str(),
+        changes: &changes,
+        hosts: &summary.hosts,
+    };
+    match render_scan(&output, args.output)? {
+        Some(text) => print!("{text}"),
+        None if !args.quiet => print!("{}", format_hosts(&summary.hosts)),
+        None => {}
     }
-    Ok(())
+    exit_for_changes(changes.len())
 }
 
 /// Wypisuje postęp skanu na stderr (wyniki idą na stdout, więc można je przekierować do pliku).

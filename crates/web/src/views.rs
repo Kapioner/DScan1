@@ -218,14 +218,6 @@ impl ProfileRow {
 }
 
 #[derive(Template)]
-#[template(path = "users.html")]
-pub struct UsersPage {
-    pub user: UserBar,
-    pub menu: Vec<MenuItem>,
-    pub users: Vec<dscan_db::UserSummary>,
-}
-
-#[derive(Template)]
 #[template(path = "forbidden.html")]
 pub struct ForbiddenPage {
     pub user: UserBar,

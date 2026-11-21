@@ -98,6 +98,15 @@ pub async fn create_target(
     let created = dscan_db::create_target(&state.db, &state.cipher, &target)
         .await?
         .ok_or_else(|| ApiError::Conflict(format!("cel {} już istnieje", target.kind)))?;
+    crate::audit::record(
+        &state,
+        &user,
+        "create",
+        "target",
+        created.id,
+        &created.value,
+    )
+    .await;
     Ok((StatusCode::CREATED, Json(created.into())))
 }
 
@@ -137,6 +146,7 @@ pub async fn update_target(
     )
     .await?
     .ok_or(ApiError::NotFound)?;
+    crate::audit::record(&state, &user, "update", "target", id, "grupa i notatka").await;
     Ok(Json(target.into()))
 }
 
@@ -150,6 +160,7 @@ pub async fn delete_target(
 ) -> Result<StatusCode, ApiError> {
     user.require(permissions::TARGETS_WRITE)?;
     if dscan_db::delete_target(&state.db, id).await? {
+        crate::audit::record(&state, &user, "delete", "target", id, "").await;
         Ok(StatusCode::NO_CONTENT)
     } else {
         Err(ApiError::NotFound)

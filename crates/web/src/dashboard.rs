@@ -130,10 +130,14 @@ pub async fn start_scan(
         ..ScanRequest::default()
     };
     let notice = match state.scan_service()?.start(request).await {
-        Ok(started) => Notice::ok(format!(
-            "Uruchomiono przebieg #{} ({} adresów). Postęp widać poniżej.",
-            started.run_id, started.plan.address_count
-        )),
+        Ok(started) => {
+            let count = started.plan.address_count.to_string();
+            dscan_api::audit::record(&state, &user, "start", "scan", started.run_id, &count).await;
+            Notice::ok(format!(
+                "Uruchomiono przebieg #{} ({} adresów). Postęp widać poniżej.",
+                started.run_id, started.plan.address_count
+            ))
+        }
         Err(EngineError::Database(error)) => return Err(ApiError::Internal(error.to_string())),
         Err(EngineError::NoTargetsInScope(_)) => {
             Notice::error("Brak celów w dozwolonym zakresie [scope].")

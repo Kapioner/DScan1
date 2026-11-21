@@ -19,13 +19,24 @@ const HEADER_LEN: usize = 1 + NONCE_LEN;
 #[derive(Clone)]
 pub struct Cipher {
     aead: Aes256Gcm,
+    /// Klucz ślepego indeksu (B3), wyprowadzony z klucza aplikacji — inny niż klucz AES.
+    index_key: [u8; 32],
 }
 
 impl Cipher {
     pub fn new(key: &[u8; KEY_LEN]) -> Self {
         Cipher {
             aead: Aes256Gcm::new(key.into()),
+            index_key: crate::hmac::hmac_sha256(key, b"dscan blind index v1"),
         }
+    }
+
+    /// Ślepy indeks (B3): HMAC-SHA256 wartości w danej domenie (np. `cookie`). Ta sama
+    /// wartość daje zawsze ten sam skrót, więc można po nim wyszukiwać, nie znając wartości.
+    /// Wartość jest normalizowana (małe litery, bez spacji na brzegach).
+    pub fn blind_index(&self, domain: &str, value: &str) -> Vec<u8> {
+        let message = format!("{domain}\0{}", value.trim().to_lowercase());
+        crate::hmac::hmac_sha256(&self.index_key, message.as_bytes()).to_vec()
     }
 
     /// Szyfruje `plaintext`; `context` (np. `"services.banner"`) musi być taki sam przy odszyfrowaniu.

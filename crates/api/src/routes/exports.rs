@@ -49,6 +49,8 @@ pub async fn export(
         }
     };
     let run_id = resolve_run(&state, params.run).await?;
+    let details = format!("{kind} ({})", if csv { "csv" } else { "json" });
+    crate::audit::record(&state, &user, "export", "scan", run_id, &details).await;
     match kind.as_str() {
         "changes" => {
             let rows = change_rows(&dscan_db::list_changes(&state.db, run_id).await?);

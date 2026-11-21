@@ -14,6 +14,9 @@ use super::types::{
     StartScanResponse, TargetImportResponse, TargetView,
 };
 use super::{ApiClient, encode_query};
+use crate::commands::output::{
+    OutputFormat, ScanOutput, exit_for_changes, render_changes, render_scan,
+};
 use crate::commands::scan::ScanArgs;
 use crate::commands::scan_report::format_hosts;
 use crate::error::CliError;
@@ -49,11 +52,23 @@ pub async fn scan_via_api(args: &ScanArgs) -> Result<(), CliError> {
         "{}",
         format_change_views("Zmiany względem poprzedniego przebiegu", &changes)
     );
-    if !args.quiet {
-        let hosts: Vec<Host> = client.get(&format!("/api/v1/scans/{id}/hosts")).await?;
-        print!("{}", format_hosts(&hosts));
+    let hosts: Vec<Host> = if args.quiet && args.output == OutputFormat::Table {
+        Vec::new()
+    } else {
+        client.get(&format!("/api/v1/scans/{id}/hosts")).await?
+    };
+    let output = ScanOutput {
+        run_id: id,
+        status: &run.status,
+        changes: &changes,
+        hosts: &hosts,
+    };
+    match render_scan(&output, args.output)? {
+        Some(text) => print!("{text}"),
+        None if !args.quiet => print!("{}", format_hosts(&hosts)),
+        None => {}
     }
-    Ok(())
+    exit_for_changes(changes.len())
 }
 
 /// Wysyła zawartość pliku do importu celów albo wyników.
@@ -113,15 +128,18 @@ pub async fn export_via_api(query: &ExportQuery) -> Result<String, CliError> {
     ApiClient::from_saved()?.get_text(&query.path()).await
 }
 
-pub async fn diff_via_api(from: i64, to: i64) -> Result<(), CliError> {
+pub async fn diff_via_api(from: i64, to: i64, format: OutputFormat) -> Result<(), CliError> {
     let changes: Vec<ChangeView> = ApiClient::from_saved()?
         .get(&format!("/api/v1/diff?from={from}&to={to}"))
         .await?;
-    print!(
-        "{}",
-        format_change_views(&format!("Zmiany #{from} → #{to}"), &changes)
-    );
-    Ok(())
+    match render_changes(&changes, format)? {
+        Some(text) => print!("{text}"),
+        None => print!(
+            "{}",
+            format_change_views(&format!("Zmiany #{from} → #{to}"), &changes)
+        ),
+    }
+    exit_for_changes(changes.len())
 }
 
 pub async fn signatures_via_api() -> Result<(), CliError> {

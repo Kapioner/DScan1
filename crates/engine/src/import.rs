@@ -49,7 +49,8 @@ pub async fn import_results(
     settings: &Settings,
     import: ResultImport,
 ) -> Result<ImportOutcome, EngineError> {
-    let (hosts, out_of_scope) = split_by_scope(import.hosts, &settings.scope.allowed_networks);
+    let (mut hosts, out_of_scope) = split_by_scope(import.hosts, &settings.scope.allowed_networks);
+    dscan_fingerprint::merge_nmap_evidence_hosts(&mut hosts);
     if hosts.is_empty() {
         return Err(EngineError::NoTargets);
     }

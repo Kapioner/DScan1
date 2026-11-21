@@ -60,14 +60,27 @@ use crate::routes::users::UserListItem;
         crate::routes::exports::export,
         crate::routes::signatures::list_signatures,
         crate::routes::signatures::test_signature,
-        crate::routes::dashboard::dashboard
+        crate::routes::dashboard::dashboard,
+        crate::routes::search::search,
+        crate::routes::accounts::list_accounts,
+        crate::routes::accounts::create_user,
+        crate::routes::accounts::update_user,
+        crate::routes::accounts::set_password,
+        crate::routes::accounts::list_roles,
+        crate::routes::accounts::create_role,
+        crate::routes::accounts::update_role,
+        crate::routes::accounts::delete_role,
+        crate::routes::audit_log::audit_log
     ),
     components(schemas(
         HealthResponse, DatabaseStatus, ErrorBody, ScanRunView, LoginRequest, LoginResponse, UserView,
         TargetView, NewTarget, TargetChanges, GroupView, ProfileInput, ProfileView, WindowDto, OverrideInput, OverrideView, UserListItem,
         StartScanRequest, StartScanResponse, RejectedTarget, ChangeView, ImportRequest, TargetImportResponse,
         RejectedRow, ResultImportResponse, SignatureView, SignatureTestRequest, SignatureTestResponse,
-        DetectionView, EvidenceView, DashboardView, RunState, FindingView, TechnologyCount
+        DetectionView, EvidenceView, DashboardView, RunState, FindingView, TechnologyCount, crate::routes::search::SearchHit,
+        crate::routes::accounts::UserDetailsView, crate::routes::accounts::RoleView, crate::routes::accounts::NewUser,
+        crate::routes::accounts::UserChanges, crate::routes::accounts::NewPassword, crate::routes::accounts::RoleInput,
+        crate::routes::accounts::Created, crate::routes::audit_log::AuditView
     )),
     tags(
         (name = "system", description = "Stan usługi"),

@@ -41,7 +41,7 @@ pub struct ScanRunView {
     pub estimated_remaining_seconds: Option<i64>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize, serde::Serialize)]
 pub struct ChangeView {
     pub ip: String,
     pub port: u16,

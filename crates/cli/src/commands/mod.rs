@@ -8,6 +8,7 @@ pub mod evaluate;
 pub mod export;
 pub mod import;
 pub mod keys;
+pub mod output;
 pub mod run_control;
 pub mod scan;
 pub mod scan_plan;

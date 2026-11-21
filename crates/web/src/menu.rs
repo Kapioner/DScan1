@@ -9,13 +9,14 @@ pub struct MenuItem {
 }
 
 /// (etykieta, adres, wymagane uprawnienie)
-const MENU: [(&str, &str, &str); 6] = [
+const MENU: [(&str, &str, &str); 7] = [
     ("Pulpit", "/", permissions::READ),
     ("Hosty", "/hosts", permissions::READ),
     ("Porównanie", "/compare", permissions::READ),
     ("Cele", "/targets", permissions::READ),
     ("Profile skanów", "/profiles", permissions::READ),
     ("Użytkownicy", "/users", permissions::ADMIN),
+    ("Audyt", "/audit", permissions::ADMIN),
 ];
 
 /// Menu dla użytkownika: tylko pozycje, do których ma uprawnienia; `active_href` jest wyróżniona.
@@ -58,7 +59,7 @@ mod tests {
 
     #[test]
     fn admin_sees_everything() {
-        assert_eq!(menu_for(&user(&["admin"]), "/").len(), 6);
+        assert_eq!(menu_for(&user(&["admin"]), "/").len(), 7);
     }
 
     #[test]

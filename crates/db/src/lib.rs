@@ -3,6 +3,9 @@
 //! Łączenie z bazą, migracje, szyfrowane kolumny ([`Encrypted`]), rotacja klucza,
 //! użytkownicy i sesje, cele, profile skanów, przebiegi skanów i wsadowy zapis wyników. Zapytania do kolejnych tabel dochodzą razem z funkcjami, które ich potrzebują.
 
+mod accounts;
+mod audit;
+mod blind_index;
 mod changes;
 pub mod columns;
 mod encrypted;
@@ -24,6 +27,12 @@ mod target_crud;
 mod targets;
 mod users;
 
+pub use accounts::{
+    ALL_PERMISSIONS, AccountChange, Role, UserDetails, create_role, create_user, delete_role,
+    list_roles, list_user_details, set_password, update_role, update_user, validate_role,
+};
+pub use audit::{AuditEntry, AuditFilter, AuditRecord, insert_audit, list_audit};
+pub use blind_index::{BlindKind, BlindMatch, blind_entries, header_value_key, search_blind_index};
 pub use changes::{
     changes_for_ip, list_changes, previous_completed_run, run_fingerprints, save_changes,
 };

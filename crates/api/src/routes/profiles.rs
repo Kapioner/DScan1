@@ -117,6 +117,7 @@ pub async fn create_profile(
     user.require(permissions::TARGETS_WRITE)?;
     let data = validate_profile(input)?;
     let view = saved(dscan_db::create_profile(&state.db, &data).await?)?;
+    crate::audit::record(&state, &user, "create", "profile", view.id, &view.name).await;
     Ok((StatusCode::CREATED, Json(view)))
 }
 
@@ -146,9 +147,9 @@ pub async fn update_profile(
 ) -> Result<Json<ProfileView>, ApiError> {
     user.require(permissions::TARGETS_WRITE)?;
     let data = validate_profile(input)?;
-    Ok(Json(saved(
-        dscan_db::update_profile(&state.db, id, &data).await?,
-    )?))
+    let view = saved(dscan_db::update_profile(&state.db, id, &data).await?)?;
+    crate::audit::record(&state, &user, "update", "profile", id, &view.name).await;
+    Ok(Json(view))
 }
 
 /// Usuwa profil.
@@ -161,6 +162,7 @@ pub async fn delete_profile(
 ) -> Result<StatusCode, ApiError> {
     user.require(permissions::TARGETS_WRITE)?;
     if dscan_db::delete_profile(&state.db, id).await? {
+        crate::audit::record(&state, &user, "delete", "profile", id, "").await;
         Ok(StatusCode::NO_CONTENT)
     } else {
         Err(ApiError::NotFound)

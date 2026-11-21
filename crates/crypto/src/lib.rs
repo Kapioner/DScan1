@@ -9,9 +9,11 @@
 mod cipher;
 mod error;
 mod hex;
+mod hmac;
 mod token;
 
 pub use cipher::{Cipher, FORMAT_VERSION, KEY_LEN, NONCE_LEN, generate_key_hex};
 pub use error::CryptoError;
 pub use hex::encode_hex;
+pub use hmac::hmac_sha256;
 pub use token::{TOKEN_LEN, generate_token, hash_token};

@@ -76,8 +76,8 @@ pub(crate) async fn insert_http_info(
         .build()
         .execute(&mut *connection)
         .await
-        .map(|_| ())
-        .map_err(DbError::Query)
+        .map_err(DbError::Query)?;
+    crate::blind_index::insert_blind_index(connection, cipher, rows).await
 }
 
 /// Detekcje technologii (dowody jako JSON) dla paczki usług.

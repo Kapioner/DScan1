@@ -27,6 +27,11 @@ pub async fn rotate_encryption_key(
             values,
         });
     }
+    let rebuilt = rebuild_blind_index(&mut transaction, new).await?;
+    report.push(RotatedColumn {
+        context: "http_blind_index (przebudowa)".into(),
+        values: rebuilt,
+    });
     transaction.commit().await.map_err(DbError::Query)?;
     Ok(report)
 }
@@ -80,6 +85,47 @@ pub fn reencrypt(
         .map_err(|source| column.crypto_error(source))?;
     new.encrypt(&plaintext, context.as_bytes())
         .map_err(|source| column.crypto_error(source))
+}
+
+/// Ślepy indeks zależy od klucza (B3), więc po rotacji liczymy go od nowa
+/// z odszyfrowanych (już nowym kluczem) nagłówków i ciasteczek.
+async fn rebuild_blind_index(
+    transaction: &mut Transaction<'_, Postgres>,
+    new: &Cipher,
+) -> Result<u64, DbError> {
+    use dscan_core::models::{Cookie, HttpHeader, HttpInfo};
+
+    use crate::Encrypted;
+    use crate::columns::{HTTP_INFO_COOKIES, HTTP_INFO_HEADERS};
+
+    sqlx::query("DELETE FROM http_blind_index")
+        .execute(&mut **transaction)
+        .await
+        .map_err(DbError::Query)?;
+    let rows: Vec<(i64, Vec<u8>, Vec<u8>)> =
+        sqlx::query_as("SELECT service_id, headers, cookies FROM http_info")
+            .fetch_all(&mut **transaction)
+            .await
+            .map_err(DbError::Query)?;
+    let mut infos = Vec::with_capacity(rows.len());
+    for (service_id, headers, cookies) in rows {
+        let info = HttpInfo {
+            url: String::new(),
+            status_code: 0,
+            title: None,
+            headers: Encrypted::<Vec<HttpHeader>>::from_bytes(headers)
+                .open(new, &HTTP_INFO_HEADERS)?,
+            cookies: Encrypted::<Vec<Cookie>>::from_bytes(cookies).open(new, &HTTP_INFO_COOKIES)?,
+            redirect_chain: Vec::new(),
+            tls_verified: None,
+            certificate: None,
+            favicon: None,
+        };
+        infos.push((service_id, info));
+    }
+    let refs: Vec<(i64, &HttpInfo)> = infos.iter().map(|(id, info)| (*id, info)).collect();
+    crate::blind_index::insert_blind_index(transaction, new, &refs).await?;
+    Ok(refs.len() as u64)
 }
 
 #[cfg(test)]

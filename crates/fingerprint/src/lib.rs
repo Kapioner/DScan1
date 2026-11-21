@@ -13,6 +13,7 @@ mod error;
 mod extract;
 mod favicon;
 mod hosts;
+mod nmap_evidence;
 mod probe;
 mod rate_limit;
 mod redirect;
@@ -28,6 +29,9 @@ pub use favicon::{
     base64_lines, favicon_candidates, favicon_hashes, fetch_favicon, icon_link, mmh3_32,
 };
 pub use hosts::{WebAnalysis, fingerprint_hosts};
+pub use nmap_evidence::{
+    merge_nmap_evidence, merge_nmap_evidence_hosts, same_technology, technology_name,
+};
 pub use probe::{ProbeResult, is_safe_probe_path, merge_probe_paths, probe_paths};
 pub use rate_limit::{BudgetExceeded, HttpRateLimiter};
 pub use redirect::{is_same_host, resolve_location};

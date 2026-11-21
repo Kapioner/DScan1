@@ -3,8 +3,9 @@
 //! Routing, warstwy tower-http (logowanie żądań, limit rozmiaru, nagłówki bezpieczeństwa),
 //! wspólna obsługa błędów, uwierzytelnianie (A2), cele, grupy i profile skanów (A5),
 //! przebiegi skanów z prognozą czasu (S6) i opis OpenAPI.
-//! Zapis wymaga uprawnienia `targets:write`; pełne RBAC z testami ról dojdzie w A3.
+//! Uprawnienia sprawdza middleware RBAC (A3); zmiany trafiają do dziennika audytu (A7).
 
+pub mod audit;
 pub mod auth;
 mod error;
 mod openapi;

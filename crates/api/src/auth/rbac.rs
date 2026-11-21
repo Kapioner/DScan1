@@ -38,7 +38,7 @@ const PUBLIC_ROUTES: [(&str, &str); 4] = [
 ];
 
 /// Zapis: (prefiks wzorca ścieżki, wymagane uprawnienie). Pierwsze dopasowanie wygrywa.
-const WRITE_RULES: [(&str, &str); 7] = [
+const WRITE_RULES: [(&str, &str); 8] = [
     ("/api/v1/targets", permissions::TARGETS_WRITE),
     ("/api/v1/profiles", permissions::TARGETS_WRITE),
     ("/api/v1/scans", permissions::TARGETS_WRITE),
@@ -46,6 +46,7 @@ const WRITE_RULES: [(&str, &str); 7] = [
     ("/api/v1/signatures", permissions::TARGETS_WRITE),
     ("/api/v1/overrides", permissions::RESULTS_WRITE),
     ("/api/v1/users", permissions::ADMIN),
+    ("/api/v1/roles", permissions::ADMIN),
 ];
 
 /// Wymóg dostępu dla metody i wzorca trasy (np. `/api/v1/targets/{id}`).
@@ -57,11 +58,19 @@ pub fn required_access(method: &Method, route: &str) -> Access {
         return Access::Public;
     }
     if method == Method::GET || method == Method::HEAD {
-        return Access::Permission(if route.starts_with("/api/v1/users") {
-            permissions::ADMIN
-        } else {
-            permissions::READ
-        });
+        let admin_only = [
+            "/api/v1/users",
+            "/api/v1/accounts",
+            "/api/v1/roles",
+            "/api/v1/audit",
+        ];
+        return Access::Permission(
+            if admin_only.iter().any(|prefix| route.starts_with(prefix)) {
+                permissions::ADMIN
+            } else {
+                permissions::READ
+            },
+        );
     }
     let rule = WRITE_RULES
         .iter()

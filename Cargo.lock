@@ -886,6 +886,7 @@ dependencies = [
  "axum",
  "chrono",
  "dscan-api",
+ "dscan-auth",
  "dscan-config",
  "dscan-core",
  "dscan-crypto",

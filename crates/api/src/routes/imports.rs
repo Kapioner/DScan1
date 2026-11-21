@@ -44,6 +44,7 @@ pub struct TargetImportResponse {
     responses((status = 200, body = TargetImportResponse), (status = 400, body = crate::ErrorBody)))]
 pub async fn import_targets_handler(
     State(state): State<AppState>,
+    user: CurrentUser,
     Json(input): Json<ImportRequest>,
 ) -> Result<Json<TargetImportResponse>, ApiError> {
     let format = match input.format.as_str() {
@@ -76,6 +77,11 @@ pub async fn import_targets_handler(
         let summary = dscan_db::insert_targets(&state.db, &state.cipher, &import.accepted).await?;
         response.inserted = summary.inserted;
         response.duplicates = summary.already_present;
+        let details = format!(
+            "cele ({}): {} nowych, {} istniało",
+            input.format, summary.inserted, summary.already_present
+        );
+        crate::audit::record(&state, &user, "import", "target", "", &details).await;
     }
     Ok(Json(response))
 }
@@ -132,6 +138,20 @@ pub async fn import_results_handler(
         requested_by: Some(user.0.id),
     };
     let outcome = import_results(&state.db, &state.cipher, &settings, import).await?;
+    let details = format!(
+        "wyniki ({}): {} hostów",
+        input.format,
+        outcome.summary.hosts.len()
+    );
+    crate::audit::record(
+        &state,
+        &user,
+        "import",
+        "scan",
+        outcome.summary.run_id,
+        &details,
+    )
+    .await;
     let summary = &outcome.summary;
     Ok(Json(ResultImportResponse {
         run_id: Some(summary.run_id),

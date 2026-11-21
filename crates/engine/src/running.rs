@@ -99,7 +99,9 @@ impl RunningJob<'_> {
             error: None,
         };
         match result.outcome {
-            Ok(output) => {
+            Ok(mut output) => {
+                // H9: wyniki -sV jako dowody obok detekcji HTTP.
+                dscan_fingerprint::merge_nmap_evidence_hosts(&mut output.hosts);
                 let completion = SubgroupCompletion {
                     run_id,
                     subgroup_id,
