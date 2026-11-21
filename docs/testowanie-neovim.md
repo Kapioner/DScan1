@@ -1,4 +1,4 @@
-# Testowanie DScan w Neovimie (zadania 1–20 planu)
+# Testowanie DScan w Neovimie (zadania 1–25 planu)
 
 Aplikacja: **DScan** (*Defect Scan*), binarka `dscan`.
 
@@ -20,6 +20,7 @@ Polecenia `./target/release/dscan …` **nie** wczytują `.env` (sekretów), a `
 1. `:!cargo metadata --no-deps --format-version 1 | grep -o '"name":"dscan[a-z-]*"'`
    → 12 crate'ów: `dscan`, `dscan-core`, `dscan-config`, `dscan-db`, `dscan-api`, `dscan-crypto`,
    `dscan-auth`, `dscan-scanner`, `dscan-engine`, `dscan-integrations`, `dscan-fingerprint`, `dscan-web`.
+   (Serwer `./run.sh` wymaga teraz zalogowania do API — patrz sekcje 22–24.)
 2. `:!cargo fmt --all -- --check` → brak wyjścia.
 3. `:!cargo clippy --workspace --all-targets -- -D warnings` → bez ostrzeżeń.
 4. `:!cargo test --workspace 2>&1 | grep "test result"` → wszystkie wiersze `ok`, 0 failed.
@@ -274,6 +275,79 @@ Wymaga nmap na hoście (`:!nmap --version`).
 4. Czasy podgrup w bazie:
    `:!docker compose exec -T postgres psql -U dscan -d dscan -c "SELECT sequence_no, round(EXTRACT(EPOCH FROM finished_at - started_at)::numeric, 1) AS sekundy FROM subgroups ORDER BY id DESC LIMIT 4"`.
 5. Nieistniejący przebieg: `:!curl -s localhost:8080/api/v1/scans/999999` → `{"error":"nie znaleziono zasobu"}`.
+
+## 20. Klient HTTP/HTTPS (H1)
+
+1. Testy na lokalnych serwerach (przekierowania, przekierowanie na obcy host, pętla, limit treści,
+   budżet zapytań, certyfikat self-signed):
+   `:!cargo test -q -p dscan-fingerprint --test fetch_live 2>&1 | grep "test result"` → `6 passed`.
+2. Na żywo: w terminalu (`:tabnew | terminal`) uruchom serwer `./run.sh` (port 8080) oraz w drugim terminalu
+   serwer HTTPS z certyfikatem self-signed:
+   ```
+   openssl req -x509 -newkey rsa:2048 -nodes -days 1 -subj /CN=test -keyout /tmp/k.pem -out /tmp/c.pem
+   openssl s_server -www -accept 8443 -cert /tmp/c.pem -key /tmp/k.pem
+   ```
+3. Z pierwszej karty: `:!./run.sh scan 127.0.0.1` (trwa ok. 45 s) →
+   ```
+   8080/tcp  open  http-proxy
+       HTTP 200 „Logowanie · DScan” (przekierowania: 1)
+   8443/tcp  open  ssl/http   OpenSSL s_server -www httpd
+       HTTP 200 (TLS niezweryfikowany)
+   ```
+4. Wyłączenie fingerprintingu: `:!DSCAN_HTTP__ENABLED=false ./run.sh scan 127.0.0.1 --quiet` — bez wierszy `HTTP …`.
+
+## 21. Ekstrakcja informacji HTTP (H2)
+
+1. Testy (tytuł, ciasteczka z atrybutami, odporność na złe dane): `:!cargo test -q -p dscan-fingerprint --lib 2>&1 | grep "test result"` → `ok`.
+2. Dane w bazie po skanie z sekcji 20:
+   `:!docker compose exec -T postgres psql -U dscan -d dscan -c "SELECT s.port, i.status_code, i.title, i.tls_verified, jsonb_array_length(i.redirect_chain) AS przekierowania FROM http_info i JOIN services s ON s.id = i.service_id ORDER BY i.id DESC LIMIT 2"`
+   → wiersz 8080 z tytułem i 1 przekierowaniem, wiersz 8443 z `tls_verified = f`.
+3. Nagłówki i ciasteczka są zaszyfrowane:
+   `:!docker compose exec -T postgres psql -U dscan -d dscan -c "SELECT encode(substr(headers,1,8), 'hex') FROM http_info LIMIT 1"` → szyfrogram od `01`.
+
+## 22. Uwierzytelnianie (A2)
+
+1. Przy pierwszym `./run.sh` (pusta baza użytkowników) w logu: `utworzono administratora 'admin' ze zmiennych środowiskowych`.
+   Login i hasło: `:e .env` → `DSCAN_ADMIN_USERNAME`, `DSCAN_ADMIN_PASSWORD`.
+2. Bez sesji: `:!curl -s localhost:8080/api/v1/targets` → `{"error":"wymagane zalogowanie"}`.
+3. Logowanie API i token (w terminalu, bo zmienne muszą przetrwać):
+   ```
+   set -a; . ./.env; set +a
+   TOKEN=$(curl -s -H 'content-type: application/json' -d "{\"username\":\"$DSCAN_ADMIN_USERNAME\",\"password\":\"$DSCAN_ADMIN_PASSWORD\"}" localhost:8080/api/v1/auth/login | python3 -c "import sys,json; print(json.load(sys.stdin)['token'])")
+   curl -s -H "authorization: Bearer $TOKEN" localhost:8080/api/v1/auth/me
+   curl -s -X POST -H "authorization: Bearer $TOKEN" localhost:8080/api/v1/auth/logout -w '%{http_code}\n'
+   curl -s -H "authorization: Bearer $TOKEN" localhost:8080/api/v1/auth/me
+   ```
+   → dane admina, potem `204`, potem `wymagane zalogowanie`.
+4. Złe hasło i nieistniejący login dają tę samą odpowiedź `401`.
+5. W bazie tylko skrót tokenu: `:!docker compose exec -T postgres psql -U dscan -d dscan -c "SELECT encode(token_hash, 'hex'), expires_at FROM sessions"`.
+6. Testy: `:!cargo test -q -p dscan-api 2>&1 | grep "test result"` (z `DSCAN_TEST_DATABASE_URL` także testy logowania na bazie).
+
+## 23. CRUD celów i profili (A5)
+
+W terminalu z `TOKEN` z sekcji 22 (zaloguj się ponownie, jeśli się wylogowałeś):
+```
+curl -s -H "authorization: Bearer $TOKEN" -H 'content-type: application/json' -d '{"target":"10.10.0.7/24","group":"lab","note":"sieć testowa"}' localhost:8080/api/v1/targets
+curl -s -H "authorization: Bearer $TOKEN" 'localhost:8080/api/v1/targets?group=lab'
+curl -s -H "authorization: Bearer $TOKEN" localhost:8080/api/v1/groups
+curl -s -H "authorization: Bearer $TOKEN" -H 'content-type: application/json' -d '{"name":"nocny","mode":"services","target_group":"lab","windows":[{"start":"22:00","end":"06:00"}],"frequency_minutes":1440}' localhost:8080/api/v1/profiles
+curl -s -H "authorization: Bearer $TOKEN" -H 'content-type: application/json' -d '{"name":"zly","mode":"services","frequency_minutes":1}' localhost:8080/api/v1/profiles
+```
+→ cel zapisany jako `10.10.0.0/24` (normalizacja), lista i grupy z liczbą celów, profil `201`,
+błędny profil `częstotliwość musi wynosić co najmniej 5 minut`. Ponowne dodanie celu → `409`.
+Zmiana i usunięcie: `curl -X PUT … /api/v1/targets/<id> -d '{"group":"prod","note":null}'`, `curl -X DELETE … /api/v1/targets/<id>` → `204`.
+
+## 24. Interfejs WWW (F1)
+
+1. Otwórz w przeglądarce <http://127.0.0.1:8080/> → przekierowanie na stronę logowania.
+2. Złe hasło → „Nieprawidłowy login lub hasło.”; poprawne (z `.env`) → pulpit.
+3. Menu: Pulpit, Cele, Profile skanów, Użytkownicy (ostatnia pozycja tylko dla roli administracja).
+4. Pulpit: tabela przebiegów odświeża się co 5 s — uruchom w terminalu `./run.sh scan 127.0.0.0/28 --parallel 1`
+   i obserwuj postęp i „Pozostało” bez przeładowania strony.
+5. „Cele” i „Profile skanów” pokazują dane dodane w sekcji 23; „Wyloguj” wraca do logowania.
+6. Bez przeglądarki: `:!curl -sI localhost:8080/ | grep -iE "^HTTP|^location"` → `HTTP/1.1 303 See Other`, `location: /login`;
+   nagłówki: `:!curl -sI localhost:8080/login | grep -iE "content-security|x-frame"`.
+7. Testy: `:!cargo test -q -p dscan-web 2>&1 | grep "test result"` → `ok`.
 
 ## Na koniec
 

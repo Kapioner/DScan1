@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # Uruchamia DScan jedną komendą:  ./run.sh [podkomenda dscan i argumenty]
 #
-#   ./run.sh                  → dscan serve (API na http://127.0.0.1:8080)
+#   ./run.sh                  → dscan serve (interfejs WWW i API na http://127.0.0.1:8080)
 #   ./run.sh config show      → dowolna inna podkomenda
 #
 # Przy pierwszym uruchomieniu (lub gdy czegoś brakuje):
 #   - tworzy dscan.toml z dscan.example.toml,
-#   - uzupełnia .env: klucz szyfrowania, hasło i adres bazy (uprawnienia 600).
+#   - uzupełnia .env: klucz szyfrowania, hasło i adres bazy, konto administratora (uprawnienia 600).
 # Za każdym razem: wczytuje .env, w razie potrzeby uruchamia PostgreSQL w Dockerze,
 # buduje wersję release (przyrostowo) i startuje natywną binarkę.
 #
@@ -65,6 +65,12 @@ prepare_env_file() {
     ensure_env_var POSTGRES_DB dscan
     ensure_env_var POSTGRES_PORT 5433
     ensure_env_var USE_DOCKER_POSTGRES 1
+    # Konto tworzone przez `dscan serve` przy pierwszym starcie (gdy w bazie nie ma użytkowników).
+    if ! grep -q "^DSCAN_ADMIN_PASSWORD=" "$ENV_FILE"; then
+        ensure_env_var DSCAN_ADMIN_USERNAME admin
+        ensure_env_var DSCAN_ADMIN_PASSWORD "$(random_hex 12)"
+        log "Logowanie do interfejsu WWW: login i hasło w $ENV_FILE (DSCAN_ADMIN_USERNAME, DSCAN_ADMIN_PASSWORD)."
+    fi
     load_env
     ensure_env_var DSCAN_DATABASE_URL \
         "postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@127.0.0.1:${POSTGRES_PORT}/${POSTGRES_DB}"

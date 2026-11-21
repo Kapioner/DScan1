@@ -44,6 +44,41 @@ pub async fn create_admin(
     })
 }
 
+/// Dane potrzebne do sprawdzenia hasła przy logowaniu.
+#[derive(Debug, Clone, PartialEq, Eq, sqlx::FromRow)]
+pub struct LoginUser {
+    pub id: i64,
+    pub password_hash: String,
+    pub is_blocked: bool,
+}
+
+/// Użytkownik o podanym loginie (do logowania).
+pub async fn find_login_user(pool: &PgPool, username: &str) -> Result<Option<LoginUser>, DbError> {
+    sqlx::query_as("SELECT id, password_hash, is_blocked FROM users WHERE username = $1")
+        .bind(username)
+        .fetch_optional(pool)
+        .await
+        .map_err(DbError::Query)
+}
+
+/// Zapamiętuje czas ostatniego logowania.
+pub async fn record_login(pool: &PgPool, user_id: i64) -> Result<(), DbError> {
+    sqlx::query("UPDATE users SET last_login_at = now() WHERE id = $1")
+        .bind(user_id)
+        .execute(pool)
+        .await
+        .map(|_| ())
+        .map_err(DbError::Query)
+}
+
+/// Liczba kont (0 = pierwszy start — można utworzyć administratora ze zmiennych środowiskowych).
+pub async fn count_users(pool: &PgPool) -> Result<i64, DbError> {
+    sqlx::query_scalar("SELECT count(*) FROM users")
+        .fetch_one(pool)
+        .await
+        .map_err(DbError::Query)
+}
+
 /// Wszyscy użytkownicy z nazwami ról, w kolejności utworzenia.
 pub async fn list_users(pool: &PgPool) -> Result<Vec<UserSummary>, DbError> {
     sqlx::query_as(

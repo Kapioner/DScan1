@@ -1,10 +1,11 @@
 //! REST API DScan (axum).
 //!
-//! Na tym etapie: routing, warstwy tower-http (logowanie żądań, limit rozmiaru),
-//! wspólna obsługa błędów, endpoint stanu usługi, przebiegi skanów z prognozą czasu
-//! do końca (S6) i opis OpenAPI.
-//! Uwierzytelnianie i RBAC dojdą w zadaniach A2/A3.
+//! Routing, warstwy tower-http (logowanie żądań, limit rozmiaru, nagłówki bezpieczeństwa),
+//! wspólna obsługa błędów, uwierzytelnianie (A2), cele, grupy i profile skanów (A5),
+//! przebiegi skanów z prognozą czasu (S6) i opis OpenAPI.
+//! Zapis wymaga uprawnienia `targets:write`; pełne RBAC z testami ról dojdzie w A3.
 
+pub mod auth;
 mod error;
 mod openapi;
 mod router;
@@ -14,8 +15,8 @@ mod state;
 
 pub use error::{ApiError, ErrorBody};
 pub use openapi::ApiDoc;
-pub use router::build_router;
+pub use router::{build_router, build_router_with};
 pub use routes::health::{DatabaseStatus, HealthResponse};
 pub use routes::scans::ScanRunView;
 pub use server::serve;
-pub use state::AppState;
+pub use state::{AppState, AuthConfig};

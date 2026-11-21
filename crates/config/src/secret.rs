@@ -5,6 +5,10 @@ use crate::ConfigError;
 /// Zmienna środowiskowa z kluczem szyfrowania (64 znaki hex = 32 bajty, AES-256).
 pub const ENCRYPTION_KEY_ENV: &str = "DSCAN_ENCRYPTION_KEY";
 
+/// Login i hasło administratora tworzonego przy pierwszym starcie serwera.
+pub const ADMIN_USERNAME_ENV: &str = "DSCAN_ADMIN_USERNAME";
+pub const ADMIN_PASSWORD_ENV: &str = "DSCAN_ADMIN_PASSWORD";
+
 /// Nowy klucz używany tylko przez `dscan keys rotate`.
 pub const NEW_ENCRYPTION_KEY_ENV: &str = "DSCAN_NEW_ENCRYPTION_KEY";
 
@@ -59,6 +63,36 @@ impl DatabaseUrl {
 impl fmt::Debug for DatabaseUrl {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "DatabaseUrl({})", self.masked())
+    }
+}
+
+/// Pierwszy administrator ze zmiennych środowiskowych. `Debug` ukrywa hasło.
+#[derive(Clone, PartialEq, Eq)]
+pub struct InitialAdmin {
+    pub username: String,
+    password: String,
+}
+
+impl InitialAdmin {
+    /// `None`, gdy brakuje loginu albo hasła (puste wartości też oznaczają brak).
+    pub fn from_values(username: Option<&str>, password: Option<&str>) -> Option<Self> {
+        let username = username.map(str::trim).filter(|value| !value.is_empty())?;
+        let password = password.filter(|value| !value.is_empty())?;
+        Some(InitialAdmin {
+            username: username.to_string(),
+            password: password.to_string(),
+        })
+    }
+
+    /// Hasło — tylko do zahaszowania, nigdy do wypisywania.
+    pub fn expose_password(&self) -> &str {
+        &self.password
+    }
+}
+
+impl fmt::Debug for InitialAdmin {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "InitialAdmin({}, ***)", self.username)
     }
 }
 
@@ -146,6 +180,21 @@ mod tests {
         // 63 znaki ASCII + "ą" (2 bajty) = 64 bajty, ale nie hex.
         let tricky = format!("{}ą", &VALID_KEY[..62]);
         assert!(decode_hex_key(&tricky).is_err());
+    }
+
+    #[test]
+    fn initial_admin_needs_both_values() {
+        assert!(InitialAdmin::from_values(Some("admin"), Some("hasło")).is_some());
+        assert!(InitialAdmin::from_values(Some("admin"), None).is_none());
+        assert!(InitialAdmin::from_values(Some(" "), Some("hasło")).is_none());
+        assert!(InitialAdmin::from_values(None, Some("hasło")).is_none());
+    }
+
+    #[test]
+    fn initial_admin_debug_hides_password() {
+        let admin = InitialAdmin::from_values(Some("admin"), Some("tajne-haslo")).unwrap();
+        assert_eq!(format!("{admin:?}"), "InitialAdmin(admin, ***)");
+        assert_eq!(admin.expose_password(), "tajne-haslo");
     }
 
     #[test]

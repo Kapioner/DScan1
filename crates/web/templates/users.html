@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Użytkownicy{% endblock %}
+{% block content %}
+<h1>Użytkownicy</h1>
+<section class="card">
+  <table>
+    <thead><tr><th>#</th><th>Login</th><th>Rola</th><th>Stan</th></tr></thead>
+    <tbody>
+      {% for account in users %}
+      <tr>
+        <td>{{ account.id }}</td><td>{{ account.username }}</td><td>{{ account.role }}</td>
+        <td>{% if account.is_blocked %}zablokowany{% else %}aktywny{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}

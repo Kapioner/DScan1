@@ -31,6 +31,8 @@ pub enum CliError {
     /// Błąd odczytu z terminala (np. hasła).
     Input(std::io::Error),
     PasswordMismatch,
+    /// Nie udało się przygotować klienta HTTP.
+    Http(String),
     NoTargetsInScope,
     MissingNewKey(&'static str),
     SameKey,
@@ -57,6 +59,7 @@ impl fmt::Display for CliError {
             CliError::File { path, source } => write!(f, "plik {}: {source}", path.display()),
             CliError::Input(error) => write!(f, "błąd odczytu z terminala: {error}"),
             CliError::PasswordMismatch => write!(f, "podane hasła różnią się"),
+            CliError::Http(reason) => write!(f, "klient HTTP: {reason}"),
             CliError::NoTargetsInScope => write!(
                 f,
                 "brak celów do skanowania w dozwolonym zakresie — dodaj sieci do [scope] allowed_networks w dscan.toml"

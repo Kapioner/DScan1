@@ -9,7 +9,8 @@ use std::time::Duration;
 use axum::Router;
 use axum::body::Body;
 use axum::http::{Request, StatusCode, header};
-use dscan_api::{AppState, build_router};
+use dscan_api::{AppState, AuthConfig, build_router};
+use dscan_crypto::Cipher;
 use dscan_db::{PoolOptions, connect_lazy};
 use http_body_util::BodyExt;
 use serde_json::Value;
@@ -23,7 +24,14 @@ fn test_router() -> Router {
         connect_timeout: Duration::from_millis(300),
     };
     let pool = connect_lazy("postgres://nikt:nic@127.0.0.1:1/brak", options).unwrap();
-    build_router(AppState::new(pool), MAX_BODY_BYTES)
+    let auth = AuthConfig {
+        session_hours: 1,
+        secure_cookies: false,
+    };
+    build_router(
+        AppState::new(pool, Cipher::new(&[1; 32]), auth),
+        MAX_BODY_BYTES,
+    )
 }
 
 async fn send(router: Router, request: Request<Body>) -> (StatusCode, Value) {
@@ -65,10 +73,25 @@ async fn openapi_describes_scan_endpoints() {
 }
 
 #[tokio::test]
-async fn scans_without_database_give_internal_error() {
-    let (status, body) = send(test_router(), get("/api/v1/scans")).await;
-    assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR);
-    assert_eq!(body["error"], "wewnętrzny błąd serwera");
+async fn protected_endpoints_require_session() {
+    for path in [
+        "/api/v1/scans",
+        "/api/v1/targets",
+        "/api/v1/profiles",
+        "/api/v1/groups",
+        "/api/v1/auth/me",
+    ] {
+        let (status, body) = send(test_router(), get(path)).await;
+        assert_eq!(status, StatusCode::UNAUTHORIZED, "{path}");
+        assert_eq!(body["error"], "wymagane zalogowanie");
+    }
+}
+
+#[tokio::test]
+async fn responses_have_security_headers() {
+    let response = test_router().oneshot(get("/api/v1/health")).await.unwrap();
+    assert_eq!(response.headers()["x-content-type-options"], "nosniff");
+    assert_eq!(response.headers()["x-frame-options"], "DENY");
 }
 
 #[tokio::test]

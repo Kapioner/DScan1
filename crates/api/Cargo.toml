@@ -10,6 +10,10 @@ repository.workspace = true
 [dependencies]
 dscan-db.workspace = true
 dscan-core.workspace = true
+dscan-config.workspace = true
+dscan-crypto.workspace = true
+dscan-auth.workspace = true
+dscan-scanner.workspace = true
 chrono.workspace = true
 axum.workspace = true
 tokio.workspace = true
@@ -19,6 +23,8 @@ utoipa.workspace = true
 serde.workspace = true
 
 [dev-dependencies]
+sqlx.workspace = true
+chrono.workspace = true
 tower.workspace = true
 http-body-util.workspace = true
 serde_json.workspace = true

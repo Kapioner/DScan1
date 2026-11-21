@@ -3,7 +3,8 @@
 use std::fmt::Write;
 
 use chrono::TimeDelta;
-use dscan_core::models::{Host, Service};
+use dscan_core::format::format_duration;
+use dscan_core::models::{Host, HttpInfo, Service};
 use dscan_engine::{ScanJobSummary, ScanProgress, SubgroupReport};
 
 /// Np. `[2/4] podgrupa 3: 256 adresów, 2 hosty, 12.3 s | 50% | pozostało ok. 0:24`.
@@ -37,17 +38,6 @@ pub fn format_progress_line(
     )
 }
 
-/// Czas w formacie `m:ss` albo `h:mm:ss`.
-pub fn format_duration(duration: TimeDelta) -> String {
-    let total = duration.num_seconds().max(0);
-    let (hours, minutes, seconds) = (total / 3600, total / 60 % 60, total % 60);
-    if hours > 0 {
-        format!("{hours}:{minutes:02}:{seconds:02}")
-    } else {
-        format!("{minutes}:{seconds:02}")
-    }
-}
-
 /// Podsumowanie przebiegu.
 pub fn format_summary(summary: &ScanJobSummary) -> String {
     let failed = if summary.failed_subgroups > 0 {
@@ -77,6 +67,9 @@ pub fn format_hosts(hosts: &[Host]) -> String {
         let _ = writeln!(text, "{}{names}", host.ip);
         for service in &host.services {
             let _ = writeln!(text, "  {}", format_service(service));
+            if let Some(http) = &service.http {
+                let _ = writeln!(text, "      {}", format_http(http));
+            }
         }
     }
     let open_ports: usize = hosts.iter().map(Host::open_port_count).sum();
@@ -103,6 +96,31 @@ pub fn format_service(service: &Service) -> String {
     )
     .trim_end()
     .to_string()
+}
+
+/// Wynik HTTP pod usługą, np. `HTTP 200 „Panel logowania” (2 przekierowania, TLS niezweryfikowany)`.
+pub fn format_http(http: &HttpInfo) -> String {
+    let title = http
+        .title
+        .as_deref()
+        .map(|title| format!(" „{title}”"))
+        .unwrap_or_default();
+    let mut notes = Vec::new();
+    if !http.redirect_chain.is_empty() {
+        notes.push(format!("przekierowania: {}", http.redirect_chain.len()));
+    }
+    if http.tls_verified == Some(false) {
+        notes.push("TLS niezweryfikowany".to_string());
+    }
+    if let Some(server) = http.header("server") {
+        notes.push(format!("Server: {server}"));
+    }
+    let notes = if notes.is_empty() {
+        String::new()
+    } else {
+        format!(" ({})", notes.join(", "))
+    };
+    format!("HTTP {}{title}{notes}", http.status_code)
 }
 
 #[cfg(test)]
@@ -163,14 +181,6 @@ mod tests {
     }
 
     #[test]
-    fn durations_are_formatted() {
-        assert_eq!(format_duration(TimeDelta::seconds(5)), "0:05");
-        assert_eq!(format_duration(TimeDelta::seconds(125)), "2:05");
-        assert_eq!(format_duration(TimeDelta::seconds(3725)), "1:02:05");
-        assert_eq!(format_duration(TimeDelta::seconds(-3)), "0:00");
-    }
-
-    #[test]
     fn progress_line_has_counts_percent_and_eta() {
         let line = format_progress_line(
             &report(None),
@@ -180,6 +190,26 @@ mod tests {
         assert_eq!(
             line,
             "[1/4] podgrupa 1: 256 adresów, 2 hostów, 3 otwartych portów, 12.3 s | 25% | pozostało ok. 1:00"
+        );
+    }
+
+    #[test]
+    fn http_line_shows_title_and_notes() {
+        let http = HttpInfo {
+            url: "https://10.0.0.5/".into(),
+            status_code: 200,
+            title: Some("Panel".into()),
+            headers: vec![dscan_core::models::HttpHeader {
+                name: "Server".into(),
+                value: "nginx".into(),
+            }],
+            cookies: Vec::new(),
+            redirect_chain: Vec::new(),
+            tls_verified: Some(false),
+        };
+        assert_eq!(
+            format_http(&http),
+            "HTTP 200 „Panel” (TLS niezweryfikowany, Server: nginx)"
         );
     }
 

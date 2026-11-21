@@ -7,7 +7,7 @@ version = "0.1.0"
 edition = "2024"
 rust-version = "1.85"
 license = "MIT"
-repository = "https://github.com/Kapioner/DScan"
+repository = "https://github.com/Kapioner/DScan1"
 
 [workspace.dependencies]
 # Crate'y wewnętrzne
@@ -21,6 +21,7 @@ dscan-scanner = { path = "crates/scanner" }
 dscan-integrations = { path = "crates/integrations" }
 dscan-engine = { path = "crates/engine" }
 dscan-fingerprint = { path = "crates/fingerprint" }
+dscan-web = { path = "crates/web" }
 
 # Zależności zewnętrzne (wersje w jednym miejscu dla całego workspace)
 serde = { version = "1", features = ["derive"] }
@@ -33,7 +34,7 @@ clap = { version = "4", features = ["derive", "env"] }
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "signal", "time", "process", "io-util", "sync"] }
 axum = "0.8"
 tower = { version = "0.5", features = ["util"] }
-tower-http = { version = "0.6", features = ["trace", "limit"] }
+tower-http = { version = "0.6", features = ["trace", "limit", "set-header"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 utoipa = { version = "5", features = ["chrono"] }
@@ -48,6 +49,10 @@ csv = "1"
 hickory-resolver = "0.24"
 rpassword = "7"
 governor = "0.6"
+sha2 = "0.10"
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"] }
+scraper = "0.20"
+askama = "0.12"
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

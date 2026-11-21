@@ -1,6 +1,6 @@
 [package]
 name = "dscan-fingerprint"
-description = "Fingerprinting usług DScan: ograniczanie tempa HTTP (dalej: klient HTTP/TLS, sygnatury)."
+description = "Fingerprinting usług DScan: klient HTTP/HTTPS, ekstrakcja informacji HTTP, limiter zapytań."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -8,10 +8,15 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
+dscan-core.workspace = true
 governor.workspace = true
+reqwest.workspace = true
+scraper.workspace = true
 
 [dev-dependencies]
 tokio.workspace = true
+axum.workspace = true
+chrono.workspace = true
 
 [lints]
 workspace = true

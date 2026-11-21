@@ -4,8 +4,8 @@ use figment::Figment;
 use figment::providers::{Env, Format, Serialized, Toml};
 
 use crate::{
-    CliOverrides, ConfigError, DATABASE_URL_ENV, DatabaseUrl, ENCRYPTION_KEY_ENV, EncryptionKey,
-    Settings, validate_settings,
+    ADMIN_PASSWORD_ENV, ADMIN_USERNAME_ENV, CliOverrides, ConfigError, DATABASE_URL_ENV,
+    DatabaseUrl, ENCRYPTION_KEY_ENV, EncryptionKey, InitialAdmin, Settings, validate_settings,
 };
 
 /// Prefiks zmiennych środowiskowych, np. `DSCAN_LIMITS__NMAP_MAX_RATE`.
@@ -17,13 +17,14 @@ const ENV_SECTION_SEPARATOR: &str = "__";
 /// Sekcje [`Settings`]. Z env czytamy tylko zmienne `DSCAN_<SEKCJA>__<POLE>`,
 /// więc inne zmienne z prefiksem (sekrety, `DSCAN_CONFIG`, `DSCAN_TEST_…`) nie psują
 /// konfiguracji, a literówka w nazwie pola znanej sekcji nadal daje błąd.
-const SETTINGS_SECTIONS: [&str; 6] = [
+const SETTINGS_SECTIONS: [&str; 7] = [
     "scope",
     "limits",
     "schedule",
     "stability",
     "server",
     "database",
+    "http",
 ];
 
 /// Gotowa, zwalidowana konfiguracja.
@@ -34,6 +35,8 @@ pub struct AppConfig {
     pub encryption_key: Option<EncryptionKey>,
     /// `None`, gdy zmienna z adresem bazy nie jest ustawiona.
     pub database_url: Option<DatabaseUrl>,
+    /// Konto administratora tworzone przy pierwszym starcie (gdy w bazie nie ma użytkowników).
+    pub initial_admin: Option<InitialAdmin>,
 }
 
 impl AppConfig {
@@ -126,21 +129,26 @@ impl ConfigLoader {
         let settings: Settings = self.build_figment()?.extract()?;
         validate_settings(&settings)?;
 
-        let (encryption_key, database_url) = if self.use_env {
-            let key = std::env::var(ENCRYPTION_KEY_ENV).ok();
-            let url = std::env::var(DATABASE_URL_ENV).ok();
-            (
-                encryption_key_from_value(key.as_deref())?,
-                database_url_from_value(url.as_deref()),
-            )
-        } else {
-            (None, None)
-        };
-
+        if !self.use_env {
+            return Ok(AppConfig {
+                settings,
+                encryption_key: None,
+                database_url: None,
+                initial_admin: None,
+            });
+        }
+        let key = std::env::var(ENCRYPTION_KEY_ENV).ok();
+        let url = std::env::var(DATABASE_URL_ENV).ok();
+        let admin_name = std::env::var(ADMIN_USERNAME_ENV).ok();
+        let admin_password = std::env::var(ADMIN_PASSWORD_ENV).ok();
         Ok(AppConfig {
             settings,
-            encryption_key,
-            database_url,
+            encryption_key: encryption_key_from_value(key.as_deref())?,
+            database_url: database_url_from_value(url.as_deref()),
+            initial_admin: InitialAdmin::from_values(
+                admin_name.as_deref(),
+                admin_password.as_deref(),
+            ),
         })
     }
 

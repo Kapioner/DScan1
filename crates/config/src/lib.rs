@@ -23,12 +23,13 @@ pub use loader::{AppConfig, ConfigLoader, ENV_PREFIX};
 pub use overrides::CliOverrides;
 pub use schedule::{parse_clock_time, window_length_minutes};
 pub use secret::{
-    DATABASE_URL_ENV, DatabaseUrl, ENCRYPTION_KEY_ENV, ENCRYPTION_KEY_LEN, EncryptionKey,
-    NEW_ENCRYPTION_KEY_ENV, decode_hex_key, mask_url_password,
+    ADMIN_PASSWORD_ENV, ADMIN_USERNAME_ENV, DATABASE_URL_ENV, DatabaseUrl, ENCRYPTION_KEY_ENV,
+    ENCRYPTION_KEY_LEN, EncryptionKey, InitialAdmin, NEW_ENCRYPTION_KEY_ENV, decode_hex_key,
+    mask_url_password,
 };
 pub use settings::{
-    DatabaseSettings, RateLimitSettings, ScheduleSettings, ScopeSettings, ServerSettings, Settings,
-    StabilitySettings, TimeWindow,
+    DatabaseSettings, HttpSettings, RateLimitSettings, ScheduleSettings, ScopeSettings,
+    ServerSettings, Settings, StabilitySettings, TimeWindow,
 };
 pub use show::render_effective_config;
 pub use validation::{collect_warnings, validate_settings};

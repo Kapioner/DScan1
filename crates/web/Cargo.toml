@@ -1,6 +1,6 @@
 [package]
 name = "dscan-web"
-description = "Interfejs WWW renderowany po stronie serwera (askama + htmx)."
+description = "Interfejs WWW DScan renderowany po stronie serwera (askama + htmx)."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -8,6 +8,20 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
+dscan-api.workspace = true
+dscan-core.workspace = true
+dscan-db.workspace = true
+askama.workspace = true
+axum.workspace = true
+chrono.workspace = true
+serde.workspace = true
+tower-http.workspace = true
+
+[dev-dependencies]
+dscan-crypto.workspace = true
+tokio.workspace = true
+tower.workspace = true
+http-body-util.workspace = true
 
 [lints]
 workspace = true

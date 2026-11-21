@@ -7,11 +7,12 @@
 use std::collections::HashMap;
 use std::net::IpAddr;
 
-use dscan_core::models::{Host, Service};
+use dscan_core::models::{Host, HttpInfo, Protocol, Service};
 use dscan_crypto::Cipher;
 use sqlx::{PgConnection, Postgres, QueryBuilder};
 
 use crate::columns::SERVICES_BANNER;
+use crate::http_results::insert_http_info;
 use crate::{DbError, Encrypted, PgPool};
 
 /// Hostów w jednym INSERT (6 parametrów na wiersz).
@@ -20,7 +21,7 @@ pub const HOSTS_PER_INSERT: usize = 1000;
 pub const SERVICES_PER_INSERT: usize = 1000;
 
 // Sprawdzenie w czasie kompilacji: paczki mieszczą się w limicie parametrów PostgreSQL.
-const POSTGRES_MAX_PARAMETERS: usize = 65_535;
+pub(crate) const POSTGRES_MAX_PARAMETERS: usize = 65_535;
 const _: () = assert!(HOSTS_PER_INSERT * 6 <= POSTGRES_MAX_PARAMETERS);
 const _: () = assert!(SERVICES_PER_INSERT * 9 <= POSTGRES_MAX_PARAMETERS);
 
@@ -29,6 +30,7 @@ const _: () = assert!(SERVICES_PER_INSERT * 9 <= POSTGRES_MAX_PARAMETERS);
 pub struct SaveSummary {
     pub hosts: u64,
     pub services: u64,
+    pub http: u64,
 }
 
 /// Zapisuje hosty z usługami w osobnej transakcji (np. przy imporcie wyników).
@@ -61,13 +63,28 @@ pub async fn insert_hosts_with_services(
         .filter_map(|host| host_ids.get(&host.ip).map(|id| (*id, host)))
         .flat_map(|(id, host)| host.services.iter().map(move |service| (id, service)))
         .collect();
+    let mut service_ids: HashMap<(i64, u16, Protocol), i64> =
+        HashMap::with_capacity(services.len());
     for chunk in services.chunks(SERVICES_PER_INSERT) {
-        insert_services(connection, cipher, chunk).await?;
+        service_ids.extend(insert_services(connection, cipher, chunk).await?);
+    }
+
+    let http_rows: Vec<(i64, &HttpInfo)> = services
+        .iter()
+        .filter_map(|(host_id, service)| {
+            let http = service.http.as_ref()?;
+            let id = service_ids.get(&(*host_id, service.port, service.protocol))?;
+            Some((*id, http))
+        })
+        .collect();
+    for chunk in http_rows.chunks(crate::http_results::HTTP_INFO_PER_INSERT) {
+        insert_http_info(connection, cipher, chunk).await?;
     }
 
     Ok(SaveSummary {
         hosts: host_ids.len() as u64,
         services: services.len() as u64,
+        http: http_rows.len() as u64,
     })
 }
 
@@ -98,11 +115,12 @@ async fn insert_hosts(
 }
 
 /// Jeden INSERT dla paczki usług. Banery są szyfrowane przed zapisem.
+/// Zwraca id usług według klucza (host, port, protokół).
 async fn insert_services(
     connection: &mut PgConnection,
     cipher: &Cipher,
     services: &[(i64, &Service)],
-) -> Result<(), DbError> {
+) -> Result<Vec<((i64, u16, Protocol), i64)>, DbError> {
     let banners = services
         .iter()
         .map(|(_, service)| match &service.banner {
@@ -128,11 +146,23 @@ async fn insert_services(
                 .push_bind(banner);
         },
     );
+    query.push(" RETURNING host_id, port, protocol, id");
 
-    query
-        .build()
-        .execute(&mut *connection)
+    let rows: Vec<(i64, i32, String, i64)> = query
+        .build_query_as()
+        .fetch_all(&mut *connection)
         .await
-        .map(|_| ())
-        .map_err(DbError::Query)
+        .map_err(DbError::Query)?;
+    Ok(rows
+        .into_iter()
+        .filter_map(|(host_id, port, protocol, id)| {
+            let port = u16::try_from(port).ok()?;
+            let protocol = if protocol == "udp" {
+                Protocol::Udp
+            } else {
+                Protocol::Tcp
+            };
+            Some(((host_id, port, protocol), id))
+        })
+        .collect())
 }

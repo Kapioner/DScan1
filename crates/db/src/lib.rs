@@ -1,28 +1,37 @@
 //! Warstwa bazy danych DScan (PostgreSQL + sqlx).
 //!
 //! Łączenie z bazą, migracje, szyfrowane kolumny ([`Encrypted`]), rotacja klucza,
-//! użytkownicy, cele, przebiegi skanów i wsadowy zapis wyników. Zapytania do kolejnych tabel dochodzą razem z funkcjami, które ich potrzebują.
+//! użytkownicy i sesje, cele, profile skanów, przebiegi skanów i wsadowy zapis wyników. Zapytania do kolejnych tabel dochodzą razem z funkcjami, które ich potrzebują.
 
 pub mod columns;
 mod encrypted;
 mod error;
+mod http_results;
 mod keys;
 mod migrations;
 mod pool;
+mod profiles;
 mod results;
 mod scan_runs;
+mod sessions;
 mod subgroups;
+mod target_crud;
 mod targets;
 mod users;
 
 pub use columns::{ENCRYPTED_COLUMNS, EncryptedColumn};
 pub use encrypted::Encrypted;
 pub use error::DbError;
+pub use http_results::HTTP_INFO_PER_INSERT;
 pub use keys::{RotatedColumn, reencrypt, rotate_encryption_key};
 pub use migrations::{
     MigrationInfo, available_migrations, compute_migration_status, migration_status, run_migrations,
 };
 pub use pool::{PgPool, PoolOptions, check_connection, connect, connect_lazy};
+pub use profiles::{
+    ProfileData, ProfileSaved, ProfileWindow, ScanProfile, create_profile, delete_profile,
+    get_profile, list_profiles, update_profile,
+};
 pub use results::{
     HOSTS_PER_INSERT, SERVICES_PER_INSERT, SaveSummary, insert_hosts_with_services,
     save_scan_results,
@@ -30,6 +39,15 @@ pub use results::{
 pub use scan_runs::{
     CreatedScanRun, create_scan_run, finish_scan_run, get_scan_run, list_scan_runs,
 };
+pub use sessions::{
+    SessionUser, create_session, delete_expired_sessions, delete_session, find_session_user,
+};
 pub use subgroups::{SubgroupCompletion, complete_subgroup, fail_subgroup, mark_subgroup_running};
+pub use target_crud::{
+    TargetGroup, create_target, delete_target, get_target, list_target_groups, update_target,
+};
 pub use targets::{InsertSummary, StoredTarget, insert_targets, list_targets, target_kind_name};
-pub use users::{ADMIN_ROLE, UserSummary, create_admin, list_users};
+pub use users::{
+    ADMIN_ROLE, LoginUser, UserSummary, count_users, create_admin, find_login_user, list_users,
+    record_login,
+};

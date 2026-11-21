@@ -1,7 +1,10 @@
 //! Handlery endpointów, po jednym pliku na obszar.
 
 pub mod health;
+pub mod profiles;
 pub mod scans;
+pub mod targets;
+pub mod validation;
 
 use crate::ApiError;
 

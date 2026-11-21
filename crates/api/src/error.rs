@@ -15,6 +15,11 @@ pub struct ErrorBody {
 pub enum ApiError {
     NotFound,
     BadRequest(String),
+    /// Brak ważnej sesji albo złe dane logowania.
+    Unauthorized,
+    /// Zalogowany, ale bez wymaganego uprawnienia.
+    Forbidden,
+    Conflict(String),
     /// Szczegóły trafiają tylko do logów — klient dostaje ogólny komunikat.
     Internal(String),
 }
@@ -24,6 +29,9 @@ impl ApiError {
         match self {
             ApiError::NotFound => StatusCode::NOT_FOUND,
             ApiError::BadRequest(_) => StatusCode::BAD_REQUEST,
+            ApiError::Unauthorized => StatusCode::UNAUTHORIZED,
+            ApiError::Forbidden => StatusCode::FORBIDDEN,
+            ApiError::Conflict(_) => StatusCode::CONFLICT,
             ApiError::Internal(_) => StatusCode::INTERNAL_SERVER_ERROR,
         }
     }
@@ -31,7 +39,9 @@ impl ApiError {
     fn public_message(&self) -> String {
         match self {
             ApiError::NotFound => "nie znaleziono zasobu".to_string(),
-            ApiError::BadRequest(reason) => reason.clone(),
+            ApiError::BadRequest(reason) | ApiError::Conflict(reason) => reason.clone(),
+            ApiError::Unauthorized => "wymagane zalogowanie".to_string(),
+            ApiError::Forbidden => "brak uprawnień do tej operacji".to_string(),
             ApiError::Internal(_) => "wewnętrzny błąd serwera".to_string(),
         }
     }
@@ -49,6 +59,13 @@ impl IntoResponse for ApiError {
     }
 }
 
+/// Błąd bazy danych zamieniany na błąd wewnętrzny (szczegóły tylko w logach).
+impl From<dscan_db::DbError> for ApiError {
+    fn from(error: dscan_db::DbError) -> Self {
+        ApiError::Internal(error.to_string())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -57,8 +74,13 @@ mod tests {
     fn status_codes_match_error_kinds() {
         assert_eq!(ApiError::NotFound.status_code(), StatusCode::NOT_FOUND);
         assert_eq!(
-            ApiError::BadRequest("x".into()).status_code(),
-            StatusCode::BAD_REQUEST
+            ApiError::Unauthorized.status_code(),
+            StatusCode::UNAUTHORIZED
+        );
+        assert_eq!(ApiError::Forbidden.status_code(), StatusCode::FORBIDDEN);
+        assert_eq!(
+            ApiError::Conflict("x".into()).status_code(),
+            StatusCode::CONFLICT
         );
         assert_eq!(
             ApiError::Internal("x".into()).status_code(),

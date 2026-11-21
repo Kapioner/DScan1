@@ -19,6 +19,7 @@ wymieniał każdą z nich.
 |---|---|
 | `DSCAN_ENCRYPTION_KEY` | Klucz AES-256 do pól poufnych. Kto go ma, odczyta wszystkie dane poufne, więc nie może trafić do bazy ani do repozytorium. |
 | `DSCAN_DATABASE_URL` / `POSTGRES_PASSWORD` | Hasło do bazy daje dostęp do wszystkich danych wewnętrznych. |
+| `DSCAN_ADMIN_PASSWORD` | Hasło pierwszego administratora; w bazie zostaje tylko jego skrót argon2id. |
 
 ## Dane poufne (szyfrowane)
 
@@ -53,7 +54,10 @@ wymieniał każdą z nich.
 | `targets.kind/value/target_group` | Zakres skanowania musi dać się wyszukiwać i porównywać z `[scope]`. |
 | `scan_runs.*`, `subgroups.addresses/status/czasy/error` | Metadane przebiegu: postęp, czasy, prognoza, wznawianie. |
 | `changes.*` | Wynik porównania przebiegów: adres, port i skróty odcisków. |
-| `users.username`, `roles.*` | Potrzebne do logowania i sprawdzania uprawnień. |
+| `users.username`, `users.last_login_at`, `roles.*` | Potrzebne do logowania i sprawdzania uprawnień. |
+| `sessions.token_hash` | Tylko skrót SHA-256 tokenu sesji — z niego nie da się odtworzyć tokenu z ciasteczka, więc wyciek bazy nie pozwala przejąć sesji. |
+| `scan_profiles.*` | Konfiguracja skanów (grupa celów, porty, okna, częstotliwość); potrzebna harmonogramowi i UI. |
+| `http_info.tls_verified` | Czy certyfikat przeszedł weryfikację — cecha znaleziska, nie dana poufna. |
 | `users.password_hash` | Nie jest szyfrowane, tylko **haszowane** argon2id (jednokierunkowo, z solą); odszyfrowanie nie jest potrzebne ani możliwe. |
 | `audit_log.*` | Kto, co i kiedy zmienił. Zasada: w `details` nie zapisujemy wartości pól poufnych, tylko nazwy pól. |
 

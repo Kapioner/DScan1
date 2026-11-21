@@ -61,12 +61,22 @@ fn to_service(port: &XmlPort) -> Option<Service> {
     let protocol = map_protocol(&port.protocol)?;
     let mut service = Service::new(port.port, protocol, map_port_state(&port.state.state));
     if let Some(details) = &port.service {
-        service.name = details.name.clone();
+        service.name = service_name(details.name.as_deref(), details.tunnel.as_deref());
         service.product = details.product.clone();
         service.version = details.version.clone();
         service.cpe = details.cpe.clone();
     }
     Some(service)
+}
+
+/// Nazwa usługi jak w zwykłym wyjściu nmap: usługa w tunelu TLS dostaje prefiks `ssl/`
+/// (np. `ssl/http`), dzięki czemu wiadomo, że trzeba łączyć się przez HTTPS.
+pub fn service_name(name: Option<&str>, tunnel: Option<&str>) -> Option<String> {
+    let name = name?;
+    match tunnel {
+        Some("ssl") => Some(format!("ssl/{name}")),
+        _ => Some(name.to_string()),
+    }
 }
 
 #[cfg(test)]
@@ -82,6 +92,16 @@ mod tests {
         assert_eq!(map_port_state("closed"), ServiceState::Closed);
         assert_eq!(map_port_state("filtered"), ServiceState::Filtered);
         assert_eq!(map_port_state("open|filtered"), ServiceState::Filtered);
+    }
+
+    #[test]
+    fn ssl_tunnel_is_part_of_service_name() {
+        assert_eq!(
+            service_name(Some("http"), Some("ssl")).as_deref(),
+            Some("ssl/http")
+        );
+        assert_eq!(service_name(Some("http"), None).as_deref(), Some("http"));
+        assert_eq!(service_name(None, Some("ssl")), None);
     }
 
     #[test]

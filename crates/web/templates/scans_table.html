@@ -1,0 +1,17 @@
+{% if scans.is_empty() %}
+<p class="muted">Brak przebiegów.</p>
+{% else %}
+<table>
+  <thead><tr><th>#</th><th>Profil</th><th>Stan</th><th>Start</th><th>Postęp</th><th>Podgrupy</th><th>Czas</th><th>Pozostało</th></tr></thead>
+  <tbody>
+    {% for scan in scans %}
+    <tr>
+      <td>{{ scan.id }}</td><td>{{ scan.profile }}</td>
+      <td><span class="status status-{{ scan.status }}">{{ scan.status }}</span></td>
+      <td>{{ scan.started_at }}</td><td>{{ scan.progress }}</td><td>{{ scan.subgroups }}</td>
+      <td>{{ scan.elapsed }}</td><td>{{ scan.remaining }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endif %}

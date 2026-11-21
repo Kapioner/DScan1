@@ -38,7 +38,7 @@ async fn note_is_stored_encrypted_and_read_back() {
         .unwrap();
     assert!(!String::from_utf8_lossy(&raw).contains("notatce"));
 
-    let targets = list_targets(&db.pool, &cipher).await.unwrap();
+    let targets = list_targets(&db.pool, &cipher, None).await.unwrap();
     assert_eq!(targets[0].note.as_deref(), Some("hasło w notatce"));
     assert_eq!(targets[0].group.as_deref(), Some("lab"));
     db.drop().await;
@@ -88,12 +88,12 @@ async fn key_rotation_reencrypts_all_values() {
         .unwrap();
     assert_eq!(notes.values, 2);
     assert_eq!(
-        list_targets(&db.pool, &new).await.unwrap()[1]
+        list_targets(&db.pool, &new, None).await.unwrap()[1]
             .note
             .as_deref(),
         Some("b")
     );
-    assert!(list_targets(&db.pool, &old).await.is_err());
+    assert!(list_targets(&db.pool, &old, None).await.is_err());
     db.drop().await;
 }
 
@@ -115,6 +115,6 @@ async fn rotation_with_wrong_old_key_changes_nothing() {
     );
 
     // Transakcja wycofana: dane nadal otwiera prawdziwy klucz.
-    assert!(list_targets(&db.pool, &real).await.is_ok());
+    assert!(list_targets(&db.pool, &real, None).await.is_ok());
     db.drop().await;
 }
