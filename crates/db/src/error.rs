@@ -24,7 +24,17 @@ pub enum DbError {
 impl fmt::Display for DbError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            DbError::Connect(error) => write!(f, "nie można połączyć się z bazą danych: {error}"),
+            DbError::Connect(error) => {
+                write!(f, "nie można połączyć się z bazą danych: {error}")?;
+                if error.to_string().contains("password authentication failed") {
+                    write!(
+                        f,
+                        " — hasło w DSCAN_DATABASE_URL nie pasuje do bazy; uruchom przez ./run.sh \
+                         (synchronizuje hasło bazy z Dockera z .env) albo popraw adres w .env"
+                    )?;
+                }
+                Ok(())
+            }
             DbError::Migrate(error) => write!(f, "błąd migracji bazy danych: {error}"),
             DbError::Query(error) => write!(f, "błąd zapytania do bazy danych: {error}"),
             DbError::Crypto { context, source } => write!(f, "pole {context}: {source}"),

@@ -72,9 +72,20 @@ prepare_env_file() {
         log "Logowanie do interfejsu WWW: login i hasło w $ENV_FILE (DSCAN_ADMIN_USERNAME, DSCAN_ADMIN_PASSWORD)."
     fi
     load_env
-    ensure_env_var DSCAN_DATABASE_URL \
-        "postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@127.0.0.1:${POSTGRES_PORT}/${POSTGRES_DB}"
+    local expected_url="postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@127.0.0.1:${POSTGRES_PORT}/${POSTGRES_DB}"
+    ensure_env_var DSCAN_DATABASE_URL "$expected_url"
     load_env
+    # Baza z Dockera: adres musi zgadzać się z POSTGRES_* (np. po ręcznej zmianie hasła w .env).
+    if [ "${USE_DOCKER_POSTGRES}" = "1" ] && [ "${DSCAN_DATABASE_URL}" != "$expected_url" ]; then
+        local tmp
+        tmp="$(mktemp "${ENV_FILE}.XXXXXX")"
+        grep -v "^DSCAN_DATABASE_URL=" "$ENV_FILE" > "$tmp" || true
+        echo "DSCAN_DATABASE_URL=${expected_url}" >> "$tmp"
+        chmod 600 "$tmp"
+        mv "$tmp" "$ENV_FILE"
+        export DSCAN_DATABASE_URL="$expected_url"
+        log "Poprawiono DSCAN_DATABASE_URL w $ENV_FILE (zgodnie z POSTGRES_*)."
+    fi
 }
 
 # Polecenia korzystające z bazy (serve jest domyślne).
@@ -101,11 +112,29 @@ start_database() {
         log "(Zainstaluj Dockera albo ustaw w $ENV_FILE USE_DOCKER_POSTGRES=0 i własny adres bazy.)"
         return
     fi
-    if [ -n "$(docker compose ps --status running --quiet postgres 2> /dev/null)" ]; then
+    if [ -z "$(docker compose ps --status running --quiet postgres 2> /dev/null)" ]; then
+        log "Uruchamiam PostgreSQL (docker compose)…"
+        docker compose --progress quiet up -d --wait postgres
+    fi
+    sync_database_credentials
+}
+
+# POSTGRES_PASSWORD działa tylko przy pierwszym utworzeniu wolumenu. Jeśli .env ma inne hasło
+# (np. odtworzony plik albo nowy klon repozytorium przy starym wolumenie), logowanie się nie uda —
+# dlatego ustawiamy hasło roli zgodnie z .env. Wewnątrz kontenera psql łączy się przez gniazdo
+# lokalne, które nie wymaga hasła.
+sync_database_credentials() {
+    local psql=(docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -qtA -U "$POSTGRES_USER" -d postgres)
+    if ! "${psql[@]}" -c "ALTER ROLE \"${POSTGRES_USER}\" WITH PASSWORD '${POSTGRES_PASSWORD}'" > /dev/null 2>&1; then
+        log "Nie można ustawić hasła roli ${POSTGRES_USER} w kontenerze bazy — wolumen utworzono"
+        log "prawdopodobnie z inną nazwą użytkownika. Jeśli dane w bazie nie są potrzebne:"
+        log "  docker compose down -v && ./run.sh"
         return
     fi
-    log "Uruchamiam PostgreSQL (docker compose)…"
-    docker compose --progress quiet up -d --wait postgres
+    if [ "$("${psql[@]}" -c "SELECT 1 FROM pg_database WHERE datname = '${POSTGRES_DB}'")" != "1" ]; then
+        "${psql[@]}" -c "CREATE DATABASE \"${POSTGRES_DB}\" OWNER \"${POSTGRES_USER}\"" > /dev/null
+        log "Utworzono bazę ${POSTGRES_DB}."
+    fi
 }
 
 create_config_if_missing
