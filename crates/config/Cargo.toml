@@ -1,0 +1,21 @@
+[package]
+name = "sztygar-config"
+description = "Konfiguracja Sztygara: plik TOML + zmienne środowiskowe SZTYGAR_* (figment)."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+sztygar-core.workspace = true
+serde.workspace = true
+chrono.workspace = true
+ipnet.workspace = true
+figment.workspace = true
+
+[dev-dependencies]
+figment = { workspace = true, features = ["test"] }
+
+[lints]
+workspace = true

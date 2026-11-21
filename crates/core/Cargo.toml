@@ -1,0 +1,19 @@
+[package]
+name = "sztygar-core"
+description = "Wspólny model domeny Sztygara (Target, Host, Service, HttpInfo, Detection, ScanRun, Change)."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+serde.workspace = true
+chrono.workspace = true
+ipnet.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true
+
+[lints]
+workspace = true

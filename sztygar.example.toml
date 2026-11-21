@@ -1,0 +1,46 @@
+# Przykładowa konfiguracja Sztygara.
+# Skopiuj do `sztygar.toml` (plik lokalny, ignorowany przez git) i uzupełnij.
+#
+# Kolejność ważności: wartości domyślne < ten plik < zmienne SZTYGAR_<SEKCJA>__<POLE>
+# np. SZTYGAR_LIMITS__NMAP_MAX_RATE=50
+#
+# Klucz szyfrowania NIE należy do tego pliku — tylko zmienna SZTYGAR_ENCRYPTION_KEY
+# (64 znaki hex; wygeneruj: openssl rand -hex 32).
+
+# --- Środowisko testowe od organizatora (D3) --------------------------------
+# UWAGA: poniższe wartości są przykładowe. Zastąp je danymi z regulaminu
+# laboratorium: adresacją kontenerów, listą dozwolonych portów i limitem ruchu.
+[scope]
+# Sieci, które wolno skanować. Cele spoza listy będą odrzucane.
+allowed_networks = ["172.20.0.0/24"]
+# Dozwolone porty: pojedyncze ("443") lub zakresy ("8000-8100").
+allowed_ports = ["21-23", "25", "53", "80", "110", "143", "443", "445", "3306", "5432", "8000-8100", "8443"]
+# Łączny limit ruchu generowanego przez skaner (kbit/s).
+max_bandwidth_kbps = 512
+
+# --- Limity tempa -----------------------------------------------------------
+[limits]
+# nmap --max-rate (pakiety/s).
+nmap_max_rate = 100
+# Liczba równoległych procesów nmap.
+max_parallel_nmap = 4
+# Globalny limit zapytań HTTP na sekundę.
+http_requests_per_second = 10
+# Maksymalna liczba zapytań HTTP do jednego hosta w przebiegu.
+http_requests_per_host = 20
+
+# --- Okna czasowe -----------------------------------------------------------
+# Skanowanie tylko w podanych oknach (HH:MM). Okno może przechodzić przez północ.
+# Brak okien = skanowanie dozwolone przez całą dobę.
+[[schedule.windows]]
+start = "22:00"
+end = "06:00"
+
+# --- Progi niestabilności ---------------------------------------------------
+[stability]
+# K: host nieaktywny po tylu kolejnych przebiegach bez odpowiedzi.
+inactive_after_missed_runs = 3
+# N: ile razy ponowić skan hosta, który nie odpowiedział.
+unstable_retries = 2
+# Odstęp między ponownymi próbami (sekundy).
+retry_delay_seconds = 30

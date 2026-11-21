@@ -1,0 +1,13 @@
+[package]
+name = "sztygar-web"
+description = "Interfejs WWW renderowany po stronie serwera (askama + htmx)."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+
+[lints]
+workspace = true
