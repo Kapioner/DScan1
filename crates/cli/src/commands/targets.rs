@@ -50,7 +50,7 @@ impl Command for TargetsArgs {
                 let pool = connect_database(&config).await?;
                 print!(
                     "{}",
-                    format_targets_table(&dscan_db::list_targets(&pool, &cipher).await?)
+                    format_targets_table(&dscan_db::list_targets(&pool, &cipher, None).await?)
                 );
             }
             TargetsAction::Check { targets, show } => {

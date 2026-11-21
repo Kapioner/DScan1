@@ -5,6 +5,7 @@ use dscan_core::models::ScanRun;
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 
+use crate::auth::{CurrentUser, permissions};
 use crate::{ApiError, AppState};
 
 const DEFAULT_LIMIT: i64 = 20;
@@ -67,12 +68,12 @@ pub struct ListParams {
 )]
 pub async fn list_scans(
     State(state): State<AppState>,
+    user: CurrentUser,
     Query(params): Query<ListParams>,
 ) -> Result<Json<Vec<ScanRunView>>, ApiError> {
+    user.require(permissions::READ)?;
     let limit = clamp_limit(params.limit);
-    let runs = dscan_db::list_scan_runs(&state.db, limit)
-        .await
-        .map_err(|error| ApiError::Internal(error.to_string()))?;
+    let runs = dscan_db::list_scan_runs(&state.db, limit).await?;
     let now = Utc::now();
     Ok(Json(
         runs.iter()
@@ -94,11 +95,12 @@ pub async fn list_scans(
 )]
 pub async fn get_scan(
     State(state): State<AppState>,
+    user: CurrentUser,
     Path(id): Path<i64>,
 ) -> Result<Json<ScanRunView>, ApiError> {
+    user.require(permissions::READ)?;
     let run = dscan_db::get_scan_run(&state.db, id)
-        .await
-        .map_err(|error| ApiError::Internal(error.to_string()))?
+        .await?
         .ok_or(ApiError::NotFound)?;
     Ok(Json(ScanRunView::from_run(&run, Utc::now())))
 }

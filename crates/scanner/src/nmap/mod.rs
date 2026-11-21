@@ -13,6 +13,6 @@ mod runner;
 mod xml;
 
 pub use args::{NmapOptions, NmapProfile, build_nmap_args, ports_argument};
-pub use convert::{map_port_state, map_protocol, to_hosts};
+pub use convert::{map_port_state, map_protocol, service_name, to_hosts};
 pub use runner::{NmapCommand, ScanOutput, run_scan};
 pub use xml::{NmapRun, parse_nmap_xml};

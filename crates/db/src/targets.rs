@@ -70,7 +70,7 @@ pub async fn insert_targets(
     Ok(summary)
 }
 
-type TargetRow = (
+pub(crate) type TargetRow = (
     i64,
     String,
     String,
@@ -79,31 +79,43 @@ type TargetRow = (
     DateTime<Utc>,
 );
 
-/// Wszystkie cele z odszyfrowanymi notatkami.
-pub async fn list_targets(pool: &PgPool, cipher: &Cipher) -> Result<Vec<StoredTarget>, DbError> {
+/// Cele z odszyfrowanymi notatkami; `group = Some(..)` zawęża do jednej grupy.
+pub async fn list_targets(
+    pool: &PgPool,
+    cipher: &Cipher,
+    group: Option<&str>,
+) -> Result<Vec<StoredTarget>, DbError> {
     let rows: Vec<TargetRow> = sqlx::query_as(
-        "SELECT id, kind, value, target_group, note, created_at FROM targets ORDER BY id",
+        "SELECT id, kind, value, target_group, note, created_at FROM targets \
+         WHERE $1::text IS NULL OR target_group = $1 ORDER BY id",
     )
+    .bind(group)
     .fetch_all(pool)
     .await
     .map_err(DbError::Query)?;
 
     rows.into_iter()
-        .map(|(id, kind, value, group, note, created_at)| {
-            let note = match note {
-                Some(encrypted) => Some(encrypted.open(cipher, &TARGETS_NOTE)?),
-                None => None,
-            };
-            Ok(StoredTarget {
-                id,
-                kind,
-                value,
-                group,
-                note,
-                created_at,
-            })
-        })
+        .map(|row| stored_target_from_row(row, cipher))
         .collect()
+}
+
+/// Wiersz z bazy → cel z odszyfrowaną notatką.
+pub(crate) fn stored_target_from_row(
+    row: TargetRow,
+    cipher: &Cipher,
+) -> Result<StoredTarget, DbError> {
+    let (id, kind, value, group, note, created_at) = row;
+    let note = note
+        .map(|encrypted| encrypted.open(cipher, &TARGETS_NOTE))
+        .transpose()?;
+    Ok(StoredTarget {
+        id,
+        kind,
+        value,
+        group,
+        note,
+        created_at,
+    })
 }
 
 #[cfg(test)]

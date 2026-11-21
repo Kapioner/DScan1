@@ -64,6 +64,9 @@ fn validate_limits(settings: &Settings) -> Result<(), ConfigError> {
             settings.stability.inactive_after_missed_runs == 0,
         ),
         ("server.max_body_bytes", settings.server.max_body_bytes == 0),
+        ("server.session_hours", settings.server.session_hours == 0),
+        ("http.timeout_seconds", settings.http.timeout_seconds == 0),
+        ("http.max_body_bytes", settings.http.max_body_bytes == 0),
         (
             "limits.max_addresses_per_scan",
             limits.max_addresses_per_scan == 0,

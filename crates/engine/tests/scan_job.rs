@@ -215,3 +215,52 @@ async fn too_many_addresses_are_refused_before_scanning() {
     pool.close().await;
     drop_schema(&url, &schema).await;
 }
+
+/// Atrapa skanera, która „znajduje” serwer WWW pod podanym adresem lokalnym.
+struct LocalWebScanner(std::net::SocketAddr);
+
+impl SubgroupScanner for LocalWebScanner {
+    async fn scan(&self, _targets: &[IpNet]) -> Result<ScanOutput, ScannerError> {
+        let mut host = Host::new(self.0.ip(), Utc::now());
+        let mut web = Service::new(self.0.port(), Protocol::Tcp, ServiceState::Open);
+        web.name = Some("http".into());
+        host.services.push(web);
+        Ok(ScanOutput {
+            hosts: vec![host],
+            raw_xml: "<nmaprun/>".into(),
+        })
+    }
+}
+
+#[tokio::test]
+async fn web_fingerprint_decorator_adds_http_info() {
+    use dscan_engine::WebFingerprintScanner;
+    use dscan_fingerprint::{HttpFetcher, HttpOptions};
+
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+    tokio::spawn(async move {
+        let app = axum::Router::new().route(
+            "/",
+            axum::routing::get(|| async { axum::response::Html("<title>Strona testowa</title>") }),
+        );
+        axum::serve(listener, app).await.unwrap();
+    });
+    let options = HttpOptions {
+        timeout: std::time::Duration::from_secs(5),
+        max_redirects: 3,
+        max_body_bytes: 10_000,
+        user_agent: "test".into(),
+    };
+    let fetcher = Arc::new(HttpFetcher::new(options, None).unwrap());
+    let scanner = WebFingerprintScanner::new(LocalWebScanner(address), fetcher);
+
+    let output = scanner
+        .scan(&["127.0.0.1/32".parse().unwrap()])
+        .await
+        .unwrap();
+
+    let http = output.hosts[0].services[0].http.as_ref().unwrap();
+    assert_eq!(http.title.as_deref(), Some("Strona testowa"));
+    assert_eq!(http.status_code, 200);
+}

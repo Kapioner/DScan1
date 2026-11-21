@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- htmx nie wstawia własnych stylów (Content-Security-Policy blokuje style w HTML). -->
+  <meta name="htmx-config" content='{"includeIndicatorStyles": false}'>
+  <title>{% block title %}DScan{% endblock %} · DScan</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="/static/htmx.min.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/">DScan <span>Defect Scan</span></a>
+    <nav class="menu">
+      {% for item in menu %}
+      <a href="{{ item.href }}"{% if item.active %} class="active" aria-current="page"{% endif %}>{{ item.label }}</a>
+      {% endfor %}
+    </nav>
+    <div class="userbar">
+      <span>{{ user.username }} <small>({{ user.role }})</small></span>
+      <form method="post" action="/logout"><button type="submit" class="link">Wyloguj</button></form>
+    </div>
+  </header>
+  <main>
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

@@ -16,6 +16,7 @@ pub struct Settings {
     pub stability: StabilitySettings,
     pub server: ServerSettings,
     pub database: DatabaseSettings,
+    pub http: HttpSettings,
 }
 
 /// Zakres dozwolonego skanowania — wartości od organizatora środowiska testowego.
@@ -118,6 +119,10 @@ pub struct ServerSettings {
     pub listen: SocketAddr,
     /// Maksymalny rozmiar treści żądania w bajtach (np. wgrywany plik CSV).
     pub max_body_bytes: usize,
+    /// Ważność sesji po zalogowaniu (godziny).
+    pub session_hours: u32,
+    /// Flaga `Secure` ciasteczka sesji — włącz, gdy DScan działa za HTTPS.
+    pub secure_cookies: bool,
 }
 
 impl Default for ServerSettings {
@@ -125,6 +130,8 @@ impl Default for ServerSettings {
         ServerSettings {
             listen: SocketAddr::from((Ipv4Addr::LOCALHOST, 8080)),
             max_body_bytes: 2 * 1024 * 1024,
+            session_hours: 12,
+            secure_cookies: false,
         }
     }
 }
@@ -143,6 +150,36 @@ impl Default for DatabaseSettings {
         DatabaseSettings {
             max_connections: 10,
             connect_timeout_seconds: 5,
+        }
+    }
+}
+
+/// Klient HTTP do fingerprintingu usług WWW.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct HttpSettings {
+    /// Czy po skanie usług odpytywać serwery WWW (tytuł, nagłówki, ciasteczka).
+    pub enabled: bool,
+    /// Limit czasu całego zapytania (sekundy).
+    pub timeout_seconds: u64,
+    /// Ile przekierowań maksymalnie śledzić.
+    pub max_redirects: u32,
+    /// Ile bajtów treści odpowiedzi czytać (wystarczy na tytuł strony).
+    pub max_body_bytes: usize,
+    pub user_agent: String,
+}
+
+impl Default for HttpSettings {
+    fn default() -> Self {
+        HttpSettings {
+            enabled: true,
+            timeout_seconds: 10,
+            max_redirects: 5,
+            max_body_bytes: 256 * 1024,
+            user_agent: format!(
+                "DScan/{} (skaner bezpieczeństwa)",
+                env!("CARGO_PKG_VERSION")
+            ),
         }
     }
 }

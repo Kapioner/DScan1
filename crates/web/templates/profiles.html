@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Profile skanów{% endblock %}
+{% block content %}
+<h1>Profile skanów</h1>
+<section class="card">
+  {% if profiles.is_empty() %}
+  <p class="muted">Brak profili. Utwórz je przez API: <code>POST /api/v1/profiles</code>.</p>
+  {% else %}
+  <table>
+    <thead><tr><th>Nazwa</th><th>Tryb</th><th>Grupa celów</th><th>Porty</th><th>Okna</th><th>Częstotliwość</th><th>Włączony</th></tr></thead>
+    <tbody>
+      {% for profile in profiles %}
+      <tr>
+        <td>{{ profile.name }}</td><td>{{ profile.mode }}</td><td>{{ profile.group }}</td><td>{{ profile.ports }}</td>
+        <td>{{ profile.windows }}</td><td>{{ profile.frequency }}</td><td>{% if profile.enabled %}tak{% else %}nie{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+</section>
+{% endblock %}

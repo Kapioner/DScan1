@@ -8,6 +8,8 @@
 #   DSCAN_ENCRYPTION_KEY  klucz szyfrowania
 #                         (64 znaki hex; wygeneruj: openssl rand -hex 32)
 #   DSCAN_DATABASE_URL    adres bazy, np. postgres://dscan:haslo@127.0.0.1:5433/dscan
+#   DSCAN_ADMIN_USERNAME, DSCAN_ADMIN_PASSWORD
+#                         konto administratora tworzone przy pierwszym starcie serwera
 
 # --- Środowisko testowe od organizatora (D3) --------------------------------
 # UWAGA: poniższe wartości są przykładowe. Zastąp je danymi z regulaminu
@@ -58,6 +60,10 @@ retry_delay_seconds = 30
 listen = "127.0.0.1:8080"
 # Maksymalny rozmiar żądania w bajtach (np. wgrywany plik CSV).
 max_body_bytes = 2097152
+# Ważność sesji po zalogowaniu (godziny).
+session_hours = 12
+# Flaga Secure ciasteczka sesji — ustaw true, gdy DScan działa za HTTPS (np. reverse proxy).
+secure_cookies = false
 
 # --- Baza danych PostgreSQL ---------------------------------------------------
 # Adres bazy (z hasłem) podaje się WYŁĄCZNIE w zmiennej DSCAN_DATABASE_URL
@@ -65,3 +71,15 @@ max_body_bytes = 2097152
 [database]
 max_connections = 10
 connect_timeout_seconds = 5
+
+# --- Klient HTTP (fingerprinting usług WWW) ---------------------------------
+# Po skanie usług DScan odpytuje serwery WWW (tylko GET, bez logowania):
+# tytuł strony, kod odpowiedzi, nagłówki, ciasteczka, łańcuch przekierowań.
+[http]
+enabled = true
+timeout_seconds = 10
+# Przekierowania są śledzone tylko w obrębie tego samego hosta.
+max_redirects = 5
+# Ile bajtów treści odpowiedzi czytać (wystarczy na tytuł strony).
+max_body_bytes = 262144
+user_agent = "DScan/0.1.0 (skaner bezpieczeństwa)"

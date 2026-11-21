@@ -13,12 +13,14 @@ napisane w Rust i uruchamiane natywnie na hoście. Binarka: `dscan`.
 ./run.sh
 ```
 
-Po chwili API działa pod <http://127.0.0.1:8080/api/v1/health>. `Ctrl+C` zatrzymuje serwer.
+Po chwili interfejs WWW działa pod <http://127.0.0.1:8080/> (API: `/api/v1`). `Ctrl+C` zatrzymuje serwer.
+Login i hasło administratora są w pliku `.env` (`DSCAN_ADMIN_USERNAME`, `DSCAN_ADMIN_PASSWORD`) —
+konto zakłada `dscan serve` przy pierwszym starcie, gdy w bazie nie ma jeszcze użytkowników.
 
 Co robi skrypt:
 
 1. Przy pierwszym uruchomieniu tworzy `dscan.toml` (kopię `dscan.example.toml`) i `.env`
-   z wygenerowanym kluczem szyfrowania, hasłem i adresem bazy (uprawnienia 600).
+   z wygenerowanym kluczem szyfrowania, hasłem i adresem bazy oraz kontem administratora (uprawnienia 600).
    Brakujące wpisy dopisuje też do istniejącego `.env`.
 2. Uruchamia PostgreSQL w Dockerze (`docker compose up -d postgres`, port `127.0.0.1:5433`).
 3. Buduje wersję release (przyrostowo, więc kolejne starty są szybkie).
@@ -49,8 +51,8 @@ nmap ma CAP_NET_RAW do skanów SYN (`nmap --privileged -sS …`).
 
 | Polecenie | Stan | Opis |
 |---|---|---|
-| `serve` | działa | Serwer API; łączy się z bazą i wykonuje migracje |
-| `scan CEL… [--mode discovery\|services] [--parallel N] [--quiet]` | działa | Skan nmap celów z `[scope]` w podgrupach, równolegle; postęp z prognozą, wyniki w bazie |
+| `serve` | działa | Interfejs WWW i API; migracje bazy, konto administratora przy pierwszym starcie |
+| `scan CEL… [--mode discovery\|services] [--parallel N] [--quiet]` | działa | Skan nmap celów z `[scope]` w podgrupach, równolegle, z fingerprintingiem HTTP; postęp z prognozą, wyniki w bazie |
 | `targets check CEL…` | działa | Sprawdza cele bez skanowania: poprawność, DNS, duplikaty, zakres |
 | `targets list` | działa | Cele zapisane w bazie (z odszyfrowanymi notatkami) |
 | `import PLIK [--dry-run]` | działa | Import celów z CSV/JSON z raportem odrzuconych wierszy |
@@ -89,6 +91,11 @@ Polecenia administracyjne działające bezpośrednio na bazie (`db migrate`, `us
 - Bezpiecznik: skan większy niż `limits.max_addresses_per_scan` (domyślnie 1 048 576 adresów) jest odrzucany.
 - `--mode discovery` = `nmap -sn` (tylko aktywne hosty); `--mode services` (domyślnie) = `nmap -sV`
   na portach z `[scope] allowed_ports`. Surowy XML każdej podgrupy jest zapisywany w bazie (zaszyfrowany).
+- **Fingerprinting HTTP (H1, H2):** po skanie usług każda usługa WWW (`http`, `http-proxy`, `ssl/http`…)
+  jest odpytywana: tytuł strony, kod odpowiedzi, nagłówki, ciasteczka z atrybutami, łańcuch przekierowań.
+  Tylko GET, bez wysyłania ciasteczek i haseł, bez systemowego proxy; przekierowania tylko w obrębie hosta.
+  Certyfikat HTTPS, który nie przechodzi weryfikacji (np. self-signed), nie blokuje odczytu — wynik jest
+  oznaczany „TLS niezweryfikowany”. Nagłówki i ciasteczka trafiają do bazy zaszyfrowane. Wyłączenie: `[http] enabled = false`.
 - Wymaga zainstalowanego nmap (`sudo apt install nmap`). Po wdrożeniu RBAC (C5) skan będzie zlecany przez API.
 
 ### Import celów
@@ -122,16 +129,37 @@ Zmienne podane w linii poleceń mają pierwszeństwo przed wartościami z `.env`
 > Nie usuwaj `.env`: oprócz klucza zawiera hasło bazy w wolumenie Dockera. Nowo wygenerowane hasło
 > nie pasowałoby do istniejącej bazy.
 
+## Interfejs WWW
+
+Strony renderowane w Ruście (askama), interakcje przez htmx (wkompilowany w binarkę — działa bez internetu).
+Logowanie formularzem, menu zależne od roli (np. „Użytkownicy” tylko dla administracji), pulpit z listą
+przebiegów odświeżaną co 5 s (postęp, czas, prognoza), listy celów i profili skanów.
+Nagłówki bezpieczeństwa: `Content-Security-Policy` (tylko zasoby z własnego serwera), `X-Frame-Options: DENY`.
+
 ## API
+
+Wszystko poza `health`, `auth/login` i `openapi.json` wymaga sesji: ciasteczka `dscan_session`
+(przeglądarka) albo nagłówka `Authorization: Bearer <token>` (token zwraca logowanie). Zapis celów
+i profili wymaga uprawnienia `targets:write` (role: administracja, dodawanie/usuwanie/modyfikacja).
 
 | Endpoint | Opis |
 |---|---|
 | `GET /api/v1/health` | Stan usługi i połączenia z bazą |
-| `GET /api/v1/scans?limit=N` | Ostatnie przebiegi: stan, postęp, czas trwania, prognoza do końca |
-| `GET /api/v1/scans/{id}` | Jeden przebieg |
+| `POST /api/v1/auth/login`, `POST /api/v1/auth/logout`, `GET /api/v1/auth/me` | Logowanie (`{"username","password"}`), wylogowanie, bieżący użytkownik |
+| `GET/POST /api/v1/targets`, `GET/PUT/DELETE /api/v1/targets/{id}` | Cele (filtr `?group=`); PUT zmienia grupę i notatkę |
+| `GET /api/v1/groups` | Grupy celów z liczbą celów |
+| `GET/POST /api/v1/profiles`, `GET/PUT/DELETE /api/v1/profiles/{id}` | Profile skanów: tryb, grupa celów, porty, okna czasowe, częstotliwość |
+| `GET /api/v1/scans?limit=N`, `GET /api/v1/scans/{id}` | Przebiegi: stan, postęp, czas trwania, prognoza do końca |
 | `GET /api/openapi.json` | Opis API (OpenAPI 3.1), np. do Swagger Editor lub Postmana |
 
-Błędy zwracane są jako JSON `{"error": "..."}`. Żądania większe niż `server.max_body_bytes` dostają 413.
+Błędy zwracane są jako JSON `{"error": "..."}` (400, 401, 403, 404, 409, 413).
+
+### Bezpieczeństwo logowania
+
+- Hasła: argon2id. Przy nieznanym loginie też liczony jest skrót, żeby czas odpowiedzi nie zdradzał, które loginy istnieją.
+- Sesje w PostgreSQL (przetrwają restart, można je unieważnić); w bazie tylko skrót SHA-256 tokenu.
+- Ciasteczko `HttpOnly; SameSite=Strict` (ochrona przed CSRF), `Secure` po ustawieniu `server.secure_cookies = true`.
+- Zablokowane konto traci dostęp natychmiast; wygasłe sesje są usuwane przy starcie serwera.
 
 ## Konfiguracja
 
@@ -140,8 +168,8 @@ Kolejność ważności: **wartości domyślne < plik TOML < zmienne `DSCAN_*` < 
 - Plik: `dscan.toml` w bieżącym katalogu albo `--config PLIK`. Wszystkie pola opisuje [`dscan.example.toml`](dscan.example.toml).
 - Zmienne: `DSCAN_<SEKCJA>__<POLE>`, np. `DSCAN_LIMITS__NMAP_MAX_RATE=50`, `DSCAN_SCOPE__ALLOWED_PORTS='["22","80"]'`.
 - Flagi: `--listen ADRES:PORT`, `--max-rate N`, `--parallel N` (w `serve`, `scan`, `config show/validate`).
-- **Sekrety tylko ze zmiennych środowiskowych:** `DSCAN_ENCRYPTION_KEY` (64 znaki hex) i
-  `DSCAN_DATABASE_URL`. Wpis w TOML jest odrzucany, a `config show` i logi pokazują je zamaskowane.
+- **Sekrety tylko ze zmiennych środowiskowych:** `DSCAN_ENCRYPTION_KEY` (64 znaki hex),
+  `DSCAN_DATABASE_URL` oraz `DSCAN_ADMIN_USERNAME` / `DSCAN_ADMIN_PASSWORD` (pierwszy administrator). Wpis w TOML jest odrzucany, a `config show` i logi pokazują je zamaskowane.
 - Nieznane pola (literówki) kończą się błędem, także w zmiennych `DSCAN_<SEKCJA>__…`.
 
 | Sekcja | Zawartość |
@@ -150,8 +178,9 @@ Kolejność ważności: **wartości domyślne < plik TOML < zmienne `DSCAN_*` < 
 | `[limits]` | łączne tempo nmap, równoległe procesy, rozmiar podgrupy, limit adresów, limity zapytań HTTP |
 | `[[schedule.windows]]` | okna czasowe skanowania (`HH:MM`, mogą przechodzić przez północ) |
 | `[stability]` | K przebiegów do statusu „nieaktywny”, N ponowień, odstęp ponowień |
-| `[server]` | adres nasłuchiwania API, limit rozmiaru żądania |
+| `[server]` | adres nasłuchiwania, limit rozmiaru żądania, ważność sesji, flaga `Secure` ciasteczka |
 | `[database]` | rozmiar puli połączeń, timeout połączenia |
+| `[http]` | fingerprinting HTTP: włączony, limit czasu, przekierowania, limit treści, User-Agent |
 
 ### Środowisko testowe (D3)
 
@@ -168,15 +197,15 @@ i limity ruchu z regulaminu organizatora.
 | `dscan-db` | `crates/db` | PostgreSQL (sqlx): migracje, `Encrypted<T>`, rotacja klucza, użytkownicy, cele |
 | `dscan-crypto` | `crates/crypto` | AES-256-GCM dla pól wrażliwych |
 | `dscan-auth` | `crates/auth` | Hasła argon2id, walidacja loginów |
-| `dscan-api` | `crates/api` | REST API (axum, tower-http, utoipa) |
+| `dscan-api` | `crates/api` | REST API (axum, tower-http, utoipa): logowanie i sesje, cele, profile, przebiegi |
+| `dscan-web` | `crates/web` | Interfejs WWW (askama + htmx): logowanie, menu zależne od roli, pulpit, listy |
 | `dscan-scanner` | `crates/scanner` | Cele (parsowanie, DNS, scalanie, zakres), wrapper nmap, podgrupy, pula workerów, tempo |
 | `dscan-engine` | `crates/engine` | Przebieg skanu: podgrupy → pula → zapis w bazie, postęp i prognoza (Observer) |
 | `dscan-integrations` | `crates/integrations` | Import celów z CSV/JSON |
-| `dscan-fingerprint` | `crates/fingerprint` | Limiter zapytań HTTP (governor); klient HTTP/TLS i sygnatury *w przygotowaniu* |
-| `dscan-web` | `crates/web` | UI (askama + htmx), *w przygotowaniu* |
+| `dscan-fingerprint` | `crates/fingerprint` | Klient HTTP/HTTPS (reqwest + rustls), ekstrakcja informacji (scraper), limiter zapytań (governor) |
 | `dscan` | `crates/cli` | Binarka `dscan` (clap) |
 
-Schemat bazy (migracje `0001`, `0002`): `targets`, `scan_runs`, `subgroups`, `hosts`, `services`,
+Schemat bazy (migracje `0001`–`0003`): `targets`, `scan_profiles`, `sessions`,, `scan_runs`, `subgroups`, `hosts`, `services`,
 `http_info`, `detections`, `signatures`, `changes`, `overrides`, `users`, `roles`, `audit_log`.
 Kolumny z danymi wrażliwymi to `BYTEA` z szyfrogramem AES-256-GCM. Wyniki są zapisywane wsadowo
 (INSERT z wieloma wierszami, po 1000): 10 000 hostów z 20 000 usług zapisuje się w ok. 0,6 s.

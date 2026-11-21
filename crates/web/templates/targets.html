@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Cele{% endblock %}
+{% block content %}
+<h1>Cele</h1>
+<section class="card">
+  {% if targets.is_empty() %}
+  <p class="muted">Brak celów. Zaimportuj je: <code>./run.sh import cele.csv</code> albo dodaj przez API.</p>
+  {% else %}
+  <table>
+    <thead><tr><th>#</th><th>Rodzaj</th><th>Cel</th><th>Grupa</th><th>Notatka</th></tr></thead>
+    <tbody>
+      {% for target in targets %}
+      <tr>
+        <td>{{ target.id }}</td><td>{{ target.kind }}</td><td><code>{{ target.value }}</code></td>
+        <td>{% if let Some(group) = target.group %}{{ group }}{% else %}—{% endif %}</td>
+        <td>{% if let Some(note) = target.note %}{{ note }}{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+</section>
+{% endblock %}

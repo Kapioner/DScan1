@@ -37,6 +37,10 @@ pub struct HttpInfo {
     pub headers: Vec<HttpHeader>,
     pub cookies: Vec<Cookie>,
     pub redirect_chain: Vec<Redirect>,
+    /// HTTPS: czy certyfikat przeszedł weryfikację (`Some(false)` = np. self-signed lub
+    /// niepasująca nazwa — dane odczytano mimo to). `None` dla zwykłego HTTP.
+    #[serde(default)]
+    pub tls_verified: Option<bool>,
 }
 
 impl HttpInfo {
@@ -69,6 +73,7 @@ mod tests {
             }],
             cookies: Vec::new(),
             redirect_chain: Vec::new(),
+            tls_verified: None,
         }
     }
 

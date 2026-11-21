@@ -1,0 +1,55 @@
+//! Zapis wyników HTTP (zadania H1, H2) w paczkach, z szyfrowaniem nagłówków i ciasteczek.
+
+use dscan_core::models::HttpInfo;
+use dscan_crypto::Cipher;
+use sqlx::{PgConnection, Postgres, QueryBuilder};
+
+use crate::columns::{HTTP_INFO_COOKIES, HTTP_INFO_HEADERS};
+use crate::results::POSTGRES_MAX_PARAMETERS;
+use crate::{DbError, Encrypted};
+
+/// Wpisów HTTP w jednym INSERT (8 parametrów na wiersz).
+pub const HTTP_INFO_PER_INSERT: usize = 1000;
+const _: () = assert!(HTTP_INFO_PER_INSERT * 8 <= POSTGRES_MAX_PARAMETERS);
+
+/// Jeden INSERT dla paczki wyników HTTP. Nagłówki i ciasteczka są szyfrowane,
+/// łańcuch przekierowań zapisujemy jako JSON.
+pub(crate) async fn insert_http_info(
+    connection: &mut PgConnection,
+    cipher: &Cipher,
+    rows: &[(i64, &HttpInfo)],
+) -> Result<(), DbError> {
+    let mut prepared = Vec::with_capacity(rows.len());
+    for (service_id, http) in rows {
+        let headers = Encrypted::seal(cipher, &HTTP_INFO_HEADERS, &http.headers)?;
+        let cookies = Encrypted::seal(cipher, &HTTP_INFO_COOKIES, &http.cookies)?;
+        let chain = serde_json::to_string(&http.redirect_chain)
+            .map_err(|error| DbError::Serialization(error.to_string()))?;
+        prepared.push((*service_id, *http, headers, cookies, chain));
+    }
+
+    let mut query: QueryBuilder<Postgres> = QueryBuilder::new(
+        "INSERT INTO http_info (service_id, url, status_code, title, headers, cookies, redirect_chain, tls_verified) ",
+    );
+    query.push_values(
+        prepared,
+        |mut row, (service_id, http, headers, cookies, chain)| {
+            row.push_bind(service_id)
+                .push_bind(http.url.clone())
+                .push_bind(i32::from(http.status_code))
+                .push_bind(http.title.clone())
+                .push_bind(headers)
+                .push_bind(cookies)
+                .push_bind(chain)
+                .push_unseparated("::jsonb")
+                .push_bind(http.tls_verified);
+        },
+    );
+
+    query
+        .build()
+        .execute(&mut *connection)
+        .await
+        .map(|_| ())
+        .map_err(DbError::Query)
+}

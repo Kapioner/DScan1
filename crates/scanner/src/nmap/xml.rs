@@ -78,6 +78,9 @@ pub struct XmlService {
     pub product: Option<String>,
     #[serde(rename = "@version")]
     pub version: Option<String>,
+    /// `ssl`, gdy usługa działa wewnątrz TLS (np. HTTPS rozpoznany jako `http`).
+    #[serde(rename = "@tunnel")]
+    pub tunnel: Option<String>,
     #[serde(rename = "cpe", default)]
     pub cpe: Vec<String>,
 }
