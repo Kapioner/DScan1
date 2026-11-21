@@ -74,7 +74,7 @@ prepare_env_file() {
 # Polecenia korzystające z bazy (serve jest domyślne).
 command_needs_database() {
     case "${1:-serve}" in
-        serve | db | user | targets | import | keys) return 0 ;;
+        serve | db | user | targets | import | keys | scan) return 0 ;;
         *) return 1 ;;
     esac
 }

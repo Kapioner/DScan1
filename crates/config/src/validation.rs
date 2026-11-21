@@ -10,7 +10,20 @@ pub fn validate_settings(settings: &Settings) -> Result<(), ConfigError> {
     validate_ports(&settings.scope.allowed_ports)?;
     validate_windows(settings)?;
     validate_limits(settings)?;
+    validate_subgroup_size(settings.limits.subgroup_size)?;
     Ok(())
+}
+
+/// Największa dozwolona podgrupa — /16 dla IPv4.
+const MAX_SUBGROUP_SIZE: u32 = 65_536;
+
+/// Podgrupa musi być potęgą dwójki, żeby dało się ją wyrazić jako sieć CIDR (np. 256 = /24).
+fn validate_subgroup_size(size: u32) -> Result<(), ConfigError> {
+    if size.is_power_of_two() && size <= MAX_SUBGROUP_SIZE {
+        Ok(())
+    } else {
+        Err(ConfigError::InvalidSubgroupSize(size))
+    }
 }
 
 fn validate_ports(ports: &[String]) -> Result<(), ConfigError> {
@@ -51,6 +64,10 @@ fn validate_limits(settings: &Settings) -> Result<(), ConfigError> {
             settings.stability.inactive_after_missed_runs == 0,
         ),
         ("server.max_body_bytes", settings.server.max_body_bytes == 0),
+        (
+            "limits.max_addresses_per_scan",
+            limits.max_addresses_per_scan == 0,
+        ),
         (
             "database.max_connections",
             settings.database.max_connections == 0,
@@ -145,6 +162,26 @@ mod tests {
         let warnings = collect_warnings(&config);
 
         assert!(warnings.iter().any(|w| w.contains("0.0.0.0:8080")));
+    }
+
+    #[test]
+    fn subgroup_size_must_be_power_of_two() {
+        let mut settings = Settings::default();
+        for (size, valid) in [
+            (1, true),
+            (256, true),
+            (65_536, true),
+            (0, false),
+            (100, false),
+            (131_072, false),
+        ] {
+            settings.limits.subgroup_size = size;
+            assert_eq!(
+                validate_settings(&settings).is_ok(),
+                valid,
+                "rozmiar {size}"
+            );
+        }
     }
 
     #[test]

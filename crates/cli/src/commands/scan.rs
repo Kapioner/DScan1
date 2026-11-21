@@ -1,12 +1,16 @@
-use std::fmt::Write;
-use std::path::PathBuf;
+use std::sync::Arc;
 
+use chrono::Utc;
 use clap::{Args, ValueEnum};
-use dscan_core::models::{Host, Service};
-use dscan_scanner::nmap::{NmapCommand, NmapOptions, NmapProfile, ports_argument, run_scan};
+use dscan_engine::{
+    RateSettings, ScanJobSettings, ScanObserver, ScanProgress, SubgroupReport, nmap_scanner,
+    rate_per_process, run_scan_job,
+};
+use dscan_scanner::nmap::{NmapProfile, ports_argument};
 
+use super::scan_report::{format_hosts, format_progress_line, format_summary};
 use super::targets::{build_plan, format_plan};
-use super::{Command, Context, OverrideArgs};
+use super::{Command, Context, OverrideArgs, cipher_from_config, connect_database};
 use crate::error::CliError;
 
 /// Rodzaj skanu.
@@ -18,6 +22,22 @@ pub enum ScanMode {
     Services,
 }
 
+impl ScanMode {
+    fn profile(self) -> NmapProfile {
+        match self {
+            ScanMode::Discovery => NmapProfile::Discovery,
+            ScanMode::Services => NmapProfile::Services,
+        }
+    }
+
+    fn name(self) -> &'static str {
+        match self {
+            ScanMode::Discovery => "discovery",
+            ScanMode::Services => "services",
+        }
+    }
+}
+
 #[derive(Debug, Args)]
 pub struct ScanArgs {
     /// Cele: adresy IP, sieci CIDR lub domeny. Skanowane są tylko cele z [scope] allowed_networks.
@@ -26,132 +46,81 @@ pub struct ScanArgs {
     /// Rodzaj skanu.
     #[arg(long, value_enum, default_value_t = ScanMode::Services)]
     pub mode: ScanMode,
-    /// Zapisuje surowy wynik XML nmap do pliku (np. do importu w DefectDojo).
-    #[arg(long, value_name = "PLIK")]
-    pub xml: Option<PathBuf>,
+    /// Nie wypisuj listy hostów na końcu (tylko podsumowanie).
+    #[arg(long)]
+    pub quiet: bool,
     #[command(flatten)]
     pub overrides: OverrideArgs,
 }
 
 impl Command for ScanArgs {
-    /// Skan lokalny: nmap uruchamiany bezpośrednio z tej binarki. Po wdrożeniu RBAC (C5)
-    /// polecenie będzie zlecać skan przez API, a wyniki trafią do bazy (S4, B5).
+    /// Skan uruchamiany z tej binarki: podgrupy skanowane równolegle przez nmap, wyniki
+    /// zapisywane w bazie na bieżąco. Po wdrożeniu RBAC (C5) skan będzie zlecany przez API.
     async fn execute(&self, context: &Context) -> Result<(), CliError> {
         let config = context.load_config(self.overrides.to_overrides())?;
+        let cipher = cipher_from_config(&config)?;
         let plan = build_plan(&config, &self.targets).await?;
         eprint!("{}", format_plan(&plan));
         if plan.networks.is_empty() {
             return Err(CliError::NoTargetsInScope);
         }
 
-        let options = NmapOptions {
-            profile: match self.mode {
-                ScanMode::Discovery => NmapProfile::Discovery,
-                ScanMode::Services => NmapProfile::Services,
-            },
-            ports: ports_argument(&config.settings.scope.allowed_ports),
-            max_rate: config.settings.limits.nmap_max_rate,
+        let limits = &config.settings.limits;
+        let rate = RateSettings {
+            max_rate: limits.nmap_max_rate,
+            bandwidth_kbps: config.settings.scope.max_bandwidth_kbps,
+            parallel: limits.max_parallel_nmap,
         };
-        eprintln!("Uruchamiam nmap (--max-rate {})…", options.max_rate);
-        let output = run_scan(&NmapCommand::default(), &options, &plan.networks).await?;
+        let ports = ports_argument(&config.settings.scope.allowed_ports);
+        let scanner = Arc::new(nmap_scanner(self.mode.profile(), ports, rate));
+        let settings = ScanJobSettings {
+            profile: self.mode.name().to_string(),
+            subgroup_size: limits.subgroup_size,
+            parallel: limits.max_parallel_nmap,
+            max_addresses: limits.max_addresses_per_scan,
+        };
 
-        if let Some(path) = &self.xml {
-            std::fs::write(path, &output.raw_xml).map_err(|source| CliError::File {
-                path: path.clone(),
-                source,
-            })?;
-            eprintln!("Surowy XML zapisano w {}", path.display());
+        let pool = connect_database(&config).await?;
+        let observer = TerminalObserver { rate };
+        let summary = run_scan_job(
+            &pool,
+            &cipher,
+            &plan.networks,
+            scanner,
+            &settings,
+            &observer,
+        )
+        .await?;
+
+        eprint!("{}", format_summary(&summary));
+        if !self.quiet {
+            print!("{}", format_hosts(&summary.hosts));
         }
-        print!("{}", format_hosts(&output.hosts));
         Ok(())
     }
 }
 
-/// Wynik skanu: hosty z usługami i podsumowanie.
-pub fn format_hosts(hosts: &[Host]) -> String {
-    let mut text = String::new();
-    // Zapis do String nie może się nie udać, więc wyniki writeln! są pomijane.
-    for host in hosts {
-        let names = if host.hostnames.is_empty() {
-            String::new()
-        } else {
-            format!(" ({})", host.hostnames.join(", "))
-        };
-        let _ = writeln!(text, "{}{names}", host.ip);
-        for service in &host.services {
-            let _ = writeln!(text, "  {}", format_service(service));
-        }
-    }
-    let open_ports: usize = hosts.iter().map(Host::open_port_count).sum();
-    let _ = writeln!(
-        text,
-        "Aktywne hosty: {}, otwarte porty: {open_ports}",
-        hosts.len()
-    );
-    text
+/// Wypisuje postęp skanu na stderr (wyniki idą na stdout, więc można je przekierować do pliku).
+struct TerminalObserver {
+    rate: RateSettings,
 }
 
-/// Jedna usługa, np. `22/tcp    open      ssh        OpenSSH 9.6p1`.
-pub fn format_service(service: &Service) -> String {
-    let port = format!("{}/{}", service.port, protocol_name(service));
-    let state = format!("{:?}", service.state).to_lowercase();
-    let product = [service.product.as_deref(), service.version.as_deref()]
-        .into_iter()
-        .flatten()
-        .collect::<Vec<_>>()
-        .join(" ");
-    format!(
-        "{port:<9} {state:<9} {:<10} {product}",
-        service.name.as_deref().unwrap_or("?")
-    )
-    .trim_end()
-    .to_string()
-}
-
-fn protocol_name(service: &Service) -> &'static str {
-    match service.protocol {
-        dscan_core::models::Protocol::Tcp => "tcp",
-        dscan_core::models::Protocol::Udp => "udp",
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use chrono::Utc;
-    use dscan_core::models::{Protocol, ServiceState};
-
-    fn ssh() -> Service {
-        let mut service = Service::new(22, Protocol::Tcp, ServiceState::Open);
-        service.name = Some("ssh".into());
-        service.product = Some("OpenSSH".into());
-        service.version = Some("9.6p1".into());
-        service
-    }
-
-    #[test]
-    fn service_line_shows_port_state_and_product() {
-        assert_eq!(
-            format_service(&ssh()),
-            "22/tcp    open      ssh        OpenSSH 9.6p1"
+impl ScanObserver for TerminalObserver {
+    fn scan_started(&self, progress: &ScanProgress) {
+        eprintln!(
+            "Przebieg #{}: {} adresów w {} podgrupach; do {} procesów nmap naraz po {} pakietów/s",
+            progress.run_id,
+            progress.total_addresses,
+            progress.total_subgroups,
+            self.rate.parallel,
+            rate_per_process(self.rate)
         );
     }
 
-    #[test]
-    fn service_without_details_has_question_mark() {
-        let service = Service::new(53, Protocol::Udp, ServiceState::Filtered);
-        assert_eq!(format_service(&service), "53/udp    filtered  ?");
-    }
-
-    #[test]
-    fn hosts_report_has_summary() {
-        let mut host = Host::new("10.0.0.5".parse().unwrap(), Utc::now());
-        host.hostnames = vec!["app.lab.local".into()];
-        host.services = vec![ssh()];
-
-        let report = format_hosts(&[host]);
-
-        assert!(report.starts_with("10.0.0.5 (app.lab.local)\n"));
-        assert!(report.ends_with("Aktywne hosty: 1, otwarte porty: 1\n"));
+    fn subgroup_finished(&self, report: &SubgroupReport, progress: &ScanProgress) {
+        eprintln!(
+            "{}",
+            format_progress_line(report, progress, progress.elapsed(Utc::now()))
+        );
     }
 }

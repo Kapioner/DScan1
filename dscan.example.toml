@@ -22,7 +22,8 @@ max_bandwidth_kbps = 512
 
 # --- Limity tempa -----------------------------------------------------------
 [limits]
-# nmap --max-rate (pakiety/s).
+# Łączny limit pakietów/s dla wszystkich procesów nmap razem (dzielony między nie;
+# dodatkowo ograniczany przez scope.max_bandwidth_kbps).
 nmap_max_rate = 100
 # Liczba równoległych procesów nmap.
 max_parallel_nmap = 4
@@ -30,6 +31,10 @@ max_parallel_nmap = 4
 http_requests_per_second = 10
 # Maksymalna liczba zapytań HTTP do jednego hosta w przebiegu.
 http_requests_per_host = 20
+# Adresów w jednej podgrupie (= jeden proces nmap); potęga dwójki, np. 256 = jedna sieć /24.
+subgroup_size = 256
+# Bezpiecznik: skan większej liczby adresów zostanie odrzucony.
+max_addresses_per_scan = 1048576
 
 # --- Okna czasowe -----------------------------------------------------------
 # Skanowanie tylko w podanych oknach (HH:MM). Okno może przechodzić przez północ.

@@ -19,6 +19,8 @@ dscan-crypto = { path = "crates/crypto" }
 dscan-auth = { path = "crates/auth" }
 dscan-scanner = { path = "crates/scanner" }
 dscan-integrations = { path = "crates/integrations" }
+dscan-engine = { path = "crates/engine" }
+dscan-fingerprint = { path = "crates/fingerprint" }
 
 # Zależności zewnętrzne (wersje w jednym miejscu dla całego workspace)
 serde = { version = "1", features = ["derive"] }
@@ -28,14 +30,14 @@ figment = { version = "0.10", features = ["toml", "env"] }
 serde_json = "1"
 toml = "0.8"
 clap = { version = "4", features = ["derive", "env"] }
-tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "signal", "time", "process", "io-util"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "signal", "time", "process", "io-util", "sync"] }
 axum = "0.8"
 tower = { version = "0.5", features = ["util"] }
 tower-http = { version = "0.6", features = ["trace", "limit"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-utoipa = "5"
-sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "tls-rustls", "postgres", "migrate", "macros", "chrono"] }
+utoipa = { version = "5", features = ["chrono"] }
+sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "tls-rustls", "postgres", "migrate", "macros", "chrono", "ipnet"] }
 http-body-util = "0.1"
 aes-gcm = "0.10"
 argon2 = "0.5"
@@ -45,6 +47,7 @@ quick-xml = { version = "0.37", features = ["serialize", "overlapped-lists"] }
 csv = "1"
 hickory-resolver = "0.24"
 rpassword = "7"
+governor = "0.6"
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

@@ -1,0 +1,23 @@
+[package]
+name = "dscan-engine"
+description = "Silnik skanów DScan: łączy skaner (podgrupy, pula workerów) z bazą i raportuje postęp."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+dscan-core.workspace = true
+dscan-crypto.workspace = true
+dscan-db.workspace = true
+dscan-scanner.workspace = true
+chrono.workspace = true
+ipnet.workspace = true
+tokio.workspace = true
+
+[dev-dependencies]
+sqlx.workspace = true
+
+[lints]
+workspace = true

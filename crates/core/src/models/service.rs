@@ -12,6 +12,16 @@ pub enum Protocol {
     Udp,
 }
 
+impl Protocol {
+    /// Nazwa zapisywana w bazie i pokazywana użytkownikowi (`tcp`, `udp`).
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Protocol::Tcp => "tcp",
+            Protocol::Udp => "udp",
+        }
+    }
+}
+
 /// Stan portu zgłoszony przez nmap.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -19,6 +29,17 @@ pub enum ServiceState {
     Open,
     Closed,
     Filtered,
+}
+
+impl ServiceState {
+    /// Nazwa zapisywana w bazie i pokazywana użytkownikowi.
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            ServiceState::Open => "open",
+            ServiceState::Closed => "closed",
+            ServiceState::Filtered => "filtered",
+        }
+    }
 }
 
 /// Unikalny klucz usługi: (IP, port, protokół). Na nim opiera się porównywanie przebiegów.
@@ -88,6 +109,16 @@ mod tests {
                 port: 443,
                 protocol: Protocol::Tcp
             }
+        );
+    }
+
+    #[test]
+    fn names_match_serde_and_database() {
+        assert_eq!(Protocol::Udp.as_str(), "udp");
+        assert_eq!(ServiceState::Filtered.as_str(), "filtered");
+        assert_eq!(
+            serde_json::to_string(&ServiceState::Open).unwrap(),
+            "\"open\""
         );
     }
 

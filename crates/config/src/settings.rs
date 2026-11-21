@@ -52,6 +52,10 @@ pub struct RateLimitSettings {
     pub http_requests_per_second: u32,
     /// Maksymalna liczba zapytań HTTP do jednego hosta w przebiegu.
     pub http_requests_per_host: u32,
+    /// Liczba adresów w jednej podgrupie (jeden proces nmap). Musi być potęgą dwójki.
+    pub subgroup_size: u32,
+    /// Bezpiecznik: skan większej liczby adresów jest odrzucany.
+    pub max_addresses_per_scan: u64,
 }
 
 impl Default for RateLimitSettings {
@@ -61,6 +65,8 @@ impl Default for RateLimitSettings {
             max_parallel_nmap: 4,
             http_requests_per_second: 10,
             http_requests_per_host: 20,
+            subgroup_size: 256,
+            max_addresses_per_scan: 1_048_576,
         }
     }
 }

@@ -14,6 +14,6 @@ pub use detection::{Detection, Evidence, EvidenceKind, MAX_CONFIDENCE, cap_confi
 pub use host::{Host, HostStatus};
 pub use http::{Cookie, HttpHeader, HttpInfo, Redirect};
 pub use port_range::{PortRange, PortRangeError, parse_port_range};
-pub use scan_run::{ScanRun, ScanStatus};
+pub use scan_run::{ScanRun, ScanStatus, calculate_progress_percent, estimate_remaining};
 pub use service::{Protocol, Service, ServiceKey, ServiceState};
 pub use target::{Target, TargetKind};

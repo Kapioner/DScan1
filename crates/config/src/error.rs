@@ -18,6 +18,7 @@ pub enum ConfigError {
     InvalidEncryptionKey(String),
     MissingEncryptionKey,
     MissingDatabaseUrl,
+    InvalidSubgroupSize(u32),
     /// Nie udało się zamienić konfiguracji na tekst TOML (`config show`).
     Render(String),
 }
@@ -51,6 +52,10 @@ impl fmt::Display for ConfigError {
                 f,
                 "brak adresu bazy danych — ustaw zmienną {} (zrobi to ./run.sh)",
                 crate::DATABASE_URL_ENV
+            ),
+            ConfigError::InvalidSubgroupSize(size) => write!(
+                f,
+                "limits.subgroup_size = {size}: wymagana potęga dwójki od 1 do 65536 (np. 256)"
             ),
             ConfigError::Render(reason) => {
                 write!(f, "nie można wypisać konfiguracji: {reason}")
