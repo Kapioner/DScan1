@@ -1,4 +1,4 @@
-# Testowanie DScan w Neovimie (zadania 1–35 planu)
+# Testowanie DScan w Neovimie (zadania 1–45 planu)
 
 Aplikacja: **DScan** (*Defect Scan*), binarka `dscan`.
 
@@ -14,6 +14,14 @@ cd DScan && nvim .
 
 Na początek zbuduj binarkę: `:!cargo build -q --release`.
 Polecenia `./target/release/dscan …` **nie** wczytują `.env` (sekretów), a `./run.sh …` wczytuje.
+
+> **Od etapu 36–45 (C5)** polecenia `scan`, `import`, `export`, `diff`, `sig`, `targets add/remove`,
+> `stop` i `resume` działają **przez API**. Przed ich użyciem (także w sekcjach 12–34):
+> 1. w osobnej karcie `:tabnew | terminal` uruchom serwer: `./run.sh`,
+> 2. zaloguj się raz: `:terminal ./run.sh login --user admin` (hasło: `DSCAN_ADMIN_PASSWORD` z `.env`).
+>
+> Token trafia do `~/.config/dscan/credentials.json` (uprawnienia 600). Skan i import bez serwera:
+> dopisz `--local` (np. `./run.sh scan 127.0.0.1 --local`).
 
 ## 1. Workspace i CI (D1)
 
@@ -469,6 +477,104 @@ curl -s -H "authorization: Bearer $TOKEN" localhost:8080/api/v1/scans/$RUN/hosts
 2. W bazie zostaje obserwacja skanera: `:!docker compose exec -T postgres psql -U dscan -d dscan -c "SELECT product FROM services WHERE port = 8001 ORDER BY id DESC LIMIT 1"`.
 3. Usunięcie: `curl -s -X DELETE -H "authorization: Bearer $TOKEN" 'localhost:8080/api/v1/overrides?ip=127.0.0.1&port=8001&protocol=tcp&field=product'` → `204`, wartość wraca do zaobserwowanej.
 4. Pole usługi bez portu → `400`; rola „odczyt” → `403`.
+
+## Przygotowanie do sekcji 36–45
+
+1. `:!cargo build -q --release` i w osobnej karcie `:tabnew | terminal` → `./run.sh` (serwer z harmonogramem).
+   W logu serwera: `DScan działa: http://127.0.0.1:8080/`.
+2. Konta testowe ról (w terminalu, raz):
+   ```
+   ./run.sh user list
+   ```
+   Do testów ról przyda się drugie konto z rolą `odczyt` — utwórz je w psql (jak w sekcji 22) albo pomiń punkty o roli „odczyt”.
+3. Zaloguj się: `:terminal ./run.sh login --user admin` → `Zalogowano jako admin (sesja ważna do …)`.
+4. Token do `curl` (w terminalu): `TOKEN=$(python3 -c "import json,os;print(json.load(open(os.path.expanduser('~/.config/dscan/credentials.json')))['token'])")`.
+
+## 36. RBAC na każdym endpoincie (A3)
+
+1. Bez logowania (w `:terminal`, bo polecenie zawiera `%`): `curl -s -o /dev/null -w '%{http_code}\n' localhost:8080/api/v1/targets` → `401`.
+2. Z tokenem administratora: `curl -s -H "authorization: Bearer $TOKEN" localhost:8080/api/v1/users` → lista kont.
+   Rolą `odczyt` ten sam adres → `403`, a `GET /api/v1/targets` → `200`.
+3. Testy macierzy ról: `:!cargo test -q -p dscan-api role_permission_matrix 2>&1 | grep "test result"` → `ok`.
+4. Tabela uprawnień w kodzie: `:e crates/api/src/auth/rbac.rs` (`WRITE_RULES`; trasa spoza tabeli = tylko administrator).
+
+## 37. CLI jako klient API (C5)
+
+1. `:!ls -l ~/.config/dscan/credentials.json` → `-rw-------`.
+2. `:!./run.sh targets add 127.0.0.5 --group lab` → `dodano #N 127.0.0.5`; `:!./run.sh targets remove 127.0.0.5` → `usunięto`.
+3. `:!./run.sh sig list | head -3`, `:!./run.sh diff 1 2` — dane z serwera.
+4. `:!./run.sh logout` → `Wylogowano`; potem `:!./run.sh diff 1 2` → `brak ważnej sesji — zaloguj się …`. Zaloguj się ponownie.
+5. Testy: `:!cargo test -q -p dscan client 2>&1 | grep "test result"` → `ok`.
+
+## 38. Endpointy dashboardu (A8)
+
+`curl -s -H "authorization: Bearer $TOKEN" localhost:8080/api/v1/dashboard | python3 -m json.tool | head -40` →
+`latest_run`, `active_runs` (postęp, czas, prognoza), `findings` (panele, CI/CD, kamery, środowiska testowe,
+TLS niezweryfikowany), `changes`, `technologies`, liczniki `hosts`, `open_services`, `active_hosts`, `inactive_hosts`.
+
+## 39. Harmonogram i okna czasowe (S8)
+
+1. Profil z bazy uruchamiany co 5 minut w oknie obejmującym „teraz” (w terminalu; godziny dopasuj):
+   ```
+   curl -s -X POST -H "authorization: Bearer $TOKEN" -H 'content-type: application/json' -d '{"name":"co5min","mode":"discovery","ports":[],"windows":[{"start":"00:00","end":"23:59"}],"frequency_minutes":5}' localhost:8080/api/v1/profiles
+   ```
+   (profil bez `target_group` skanuje wszystkie cele z bazy — dodaj np. `./run.sh targets add 127.0.0.1`).
+2. Do minuty w logu serwera: `harmonogram: …`, a na pulpicie nowy przebieg profilu `co5min`; po 5 minutach kolejny.
+3. Okno, które już minęło (np. `"start":"01:00","end":"01:05"`) → profil czeka; ręczny skan profilu TOML z takim
+   oknem kończy się błędem `poza oknem czasowym`.
+4. Testy decyzji harmonogramu: `:!cargo test -q -p dscan-engine scheduler 2>&1 | grep "test result"` → `ok`.
+
+## 40. Przerwanie po końcu okna i wznowienie (S9)
+
+1. Uruchom dłuższy skan (np. `./run.sh scan 127.0.0.0/28` w `:terminal`) i w drugim terminalu `./run.sh stop N`
+   (N = numer przebiegu z pierwszej linii) → skan kończy się stanem `paused`, procesy nmap znikają (`:!pgrep nmap` → nic).
+2. `:!./run.sh resume N` → przebieg wraca do `running` i skanuje tylko niedokończone podgrupy; na pulpicie przycisk „Wznów”.
+3. Restart serwera w trakcie skanu → przy starcie `wstrzymano przerwane przebiegi: 1`.
+4. Testy: `:!cargo test -q -p dscan-scanner stop_interrupts 2>&1 | grep "test result"` i
+   `:!cargo test -q -p dscan-engine --test scan_job 2>&1 | grep "test result"` → `ok`.
+
+## 41. Host nieaktywny po K przebiegach (S11)
+
+1. `[stability] inactive_after_missed_runs = 3` w `dscan.toml`.
+2. Zaimportuj trzy razy wynik bez hosta, który wcześniej odpowiadał (sekcja 43) → w raporcie importu
+   `Hosty nieaktywne: …`, a w dashboardzie rośnie `inactive_hosts`.
+3. Historia: `:!docker compose exec -T postgres psql -U dscan -d dscan -c "SELECT ip, status, consecutive_misses FROM host_presence"`.
+4. Testy: `:!cargo test -q -p dscan-core presence 2>&1 | grep "test result"` → `ok`.
+
+## 42. Profile w TOML (C4)
+
+1. `:e dscan.toml` → sekcje `[profiles.szybki]`, `[profiles.pelny]`, `[profiles.nocny]` (wzór w `dscan.example.toml`).
+2. `:!curl -s -H "authorization: Bearer $TOKEN" localhost:8080/api/v1/scan-profiles` → `["nocny","pelny","szybki"]`.
+3. `:!./run.sh scan 127.0.0.1 --profile szybki --quiet` → przebieg zapisany z profilem `szybki`.
+4. Nieznany profil: `:!./run.sh scan 127.0.0.1 --profile brak` → błąd `nie ma profilu 'brak' (zdefiniowane w [profiles]: …)`.
+5. W UI na pulpicie lista „Profil” w formularzu „Uruchom skan”.
+
+## 43. Import wyników (I2)
+
+1. Zapisz wynik nmap: `:!nmap -sV -p 22,8001 -oX /tmp/wynik.xml 127.0.0.1`.
+2. `:!./run.sh import --kind results /tmp/wynik.xml --dry-run` → `Tryb próbny: 1 hostów …`.
+3. `:!./run.sh import --kind results /tmp/wynik.xml` → `Przebieg #N …` i `Pierwszy przebieg tego profilu`
+   (albo zmiany względem poprzedniego importu). Hosty spoza `[scope]` są wypisane jako pominięte.
+4. CSV/JSON: eksport z sekcji 44 można zaimportować z powrotem: `./run.sh export services --format csv -o /tmp/u.csv`,
+   potem `./run.sh import --kind results /tmp/u.csv`.
+5. Bez serwera: `:!./run.sh import --kind results /tmp/wynik.xml --local`.
+
+## 44. Eksport z filtrami (I3)
+
+1. `:!./run.sh export services --format csv` → nagłówek `ip,hostname,port,…` i wiersz na usługę.
+2. Filtry: `:!./run.sh export services --format csv --port 22`, `--state open`, `--technology nginx`, `--run N`.
+3. `:!./run.sh export hosts -o /tmp/hosty.json` → `Zapisano … bajtów`; `:!./run.sh export changes --format csv`.
+4. Rola `odczyt`: eksport działa, ale bez notatek, a `--edited` → `403`.
+5. Testy: `:!cargo test -q -p dscan-api --test results_flow 2>&1 | grep "test result"` → `2 passed`.
+
+## 45. Dashboard w UI (F2)
+
+1. Otwórz `http://127.0.0.1:8080/` i zaloguj się → karty: hosty, otwarte usługi, ważne znaleziska, aktywne/nieaktywne;
+   tabele „Trwające skany” (pasek postępu, czas, pozostało), „Najważniejsze znaleziska”, „Zmiany od poprzedniego skanu”,
+   „Technologie”. Dane odświeżają się co 10 s.
+2. Formularz „Uruchom skan”: cel `127.0.0.1`, profil `szybki` → komunikat `Uruchomiono przebieg #N`; postęp widać w tabelach.
+3. Przycisk „Wstrzymaj” przy trwającym przebiegu i „Wznów” przy wstrzymanym.
+4. Rola `odczyt` nie widzi formularza ani przycisków.
 
 ## Na koniec
 

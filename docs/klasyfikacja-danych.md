@@ -60,7 +60,15 @@ wymieniał każdą z nich.
 | `scan_profiles.*` | Konfiguracja skanów (grupa celów, porty, okna, częstotliwość); potrzebna harmonogramowi i UI. |
 | `http_info.tls_verified` | Czy certyfikat przeszedł weryfikację — cecha znaleziska, nie dana poufna. |
 | `users.password_hash` | Nie jest szyfrowane, tylko **haszowane** argon2id (jednokierunkowo, z solą); odszyfrowanie nie jest potrzebne ani możliwe. |
+| `host_presence.*`, `host_responses.*` | Stan aktywny/nieaktywny hosta i historia odpowiedzi w przebiegach (S11): adres, licznik pominięć, czasy — potrzebne do filtrów i dashboardu. |
+| `scan_runs.mode/profile_id/requested_by` | Kto i jakim profilem zlecił skan — metadane harmonogramu i audytu. |
 | `audit_log.*` | Kto, co i kiedy zmienił. Zasada: w `details` nie zapisujemy wartości pól poufnych, tylko nazwy pól. |
+
+## Token CLI (poza bazą)
+
+`dscan login` zapisuje token sesji w `~/.config/dscan/credentials.json` z uprawnieniami **0600**
+(tylko właściciel). W bazie jest wyłącznie skrót SHA-256 tokenu. `dscan logout` kończy sesję na serwerze
+i usuwa plik; token wygasa też sam po `[server] session_hours`.
 
 ## Planowane rozszerzenia
 
