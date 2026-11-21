@@ -1,5 +1,5 @@
 [package]
-name = "sztygar-api"
+name = "dscan-api"
 description = "REST API (axum) z uwierzytelnianiem i RBAC."
 version.workspace = true
 edition.workspace = true

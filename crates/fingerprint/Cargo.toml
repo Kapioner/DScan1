@@ -1,5 +1,5 @@
 [package]
-name = "sztygar-fingerprint"
+name = "dscan-fingerprint"
 description = "Fingerprinting usług: klient HTTP/HTTPS, ekstrakcja informacji, certyfikaty TLS, silnik sygnatur."
 version.workspace = true
 edition.workspace = true

@@ -3,7 +3,7 @@ use std::fmt;
 use crate::ConfigError;
 
 /// Zmienna środowiskowa z kluczem szyfrowania (64 znaki hex = 32 bajty, AES-256).
-pub const ENCRYPTION_KEY_ENV: &str = "SZTYGAR_ENCRYPTION_KEY";
+pub const ENCRYPTION_KEY_ENV: &str = "DSCAN_ENCRYPTION_KEY";
 
 /// Długość klucza AES-256 w bajtach.
 pub const ENCRYPTION_KEY_LEN: usize = 32;

@@ -79,6 +79,50 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "773648b94d0e5d620f64f280777445740e61fe701025087ec8b57f45c791888b"
 
 [[package]]
+name = "dscan"
+version = "0.1.0"
+dependencies = [
+ "dscan-config",
+]
+
+[[package]]
+name = "dscan-api"
+version = "0.1.0"
+
+[[package]]
+name = "dscan-config"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "dscan-core",
+ "figment",
+ "ipnet",
+ "serde",
+]
+
+[[package]]
+name = "dscan-core"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "ipnet",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "dscan-fingerprint"
+version = "0.1.0"
+
+[[package]]
+name = "dscan-scanner"
+version = "0.1.0"
+
+[[package]]
+name = "dscan-web"
+version = "0.1.0"
+
+[[package]]
 name = "equivalent"
 version = "1.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -491,50 +535,6 @@ dependencies = [
  "quote",
  "unicode-ident",
 ]
-
-[[package]]
-name = "sztygar"
-version = "0.1.0"
-dependencies = [
- "sztygar-config",
-]
-
-[[package]]
-name = "sztygar-api"
-version = "0.1.0"
-
-[[package]]
-name = "sztygar-config"
-version = "0.1.0"
-dependencies = [
- "chrono",
- "figment",
- "ipnet",
- "serde",
- "sztygar-core",
-]
-
-[[package]]
-name = "sztygar-core"
-version = "0.1.0"
-dependencies = [
- "chrono",
- "ipnet",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "sztygar-fingerprint"
-version = "0.1.0"
-
-[[package]]
-name = "sztygar-scanner"
-version = "0.1.0"
-
-[[package]]
-name = "sztygar-web"
-version = "0.1.0"
 
 [[package]]
 name = "tempfile"

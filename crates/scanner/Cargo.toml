@@ -1,5 +1,5 @@
 [package]
-name = "sztygar-scanner"
+name = "dscan-scanner"
 description = "Skaner sieci: parsowanie celów, wrapper nmap, podgrupy i pula workerów, ograniczanie tempa."
 version.workspace = true
 edition.workspace = true

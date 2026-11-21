@@ -1,6 +1,6 @@
 [package]
-name = "sztygar"
-description = "Sztygar — narzędzie do skanowania i inwentaryzacji usług sieciowych."
+name = "dscan"
+description = "DScan — narzędzie do skanowania i inwentaryzacji usług sieciowych."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -8,7 +8,7 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
-sztygar-config.workspace = true
+dscan-config.workspace = true
 
 [lints]
 workspace = true

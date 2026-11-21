@@ -1,5 +1,5 @@
 [package]
-name = "sztygar-web"
+name = "dscan-web"
 description = "Interfejs WWW renderowany po stronie serwera (askama + htmx)."
 version.workspace = true
 edition.workspace = true

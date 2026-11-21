@@ -1,12 +1,12 @@
 use std::fmt::Write;
 use std::path::Path;
 
-use sztygar_config::{AppConfig, ConfigError, ConfigLoader};
+use dscan_config::{AppConfig, ConfigError, ConfigLoader};
 
 /// Plik wczytywany automatycznie, jeśli użytkownik nie poda innego.
-pub const DEFAULT_CONFIG_FILE: &str = "sztygar.toml";
+pub const DEFAULT_CONFIG_FILE: &str = "dscan.toml";
 
-/// Uruchamia aplikację: `sztygar [PLIK_KONFIGURACJI]`.
+/// Uruchamia aplikację: `dscan [PLIK_KONFIGURACJI]`.
 /// Zwraca tekst do wypisania na standardowe wyjście.
 ///
 /// Tymczasowo wypisuje efektywną konfigurację; podkomendy (clap) dojdą w zadaniu C2.
@@ -36,7 +36,7 @@ pub fn format_report(config: &AppConfig, source: &str) -> String {
 
     let mut report = String::new();
     // Zapis do String nie może się nie udać, więc wynik write! jest pomijany.
-    let _ = writeln!(report, "Sztygar v{}", env!("CARGO_PKG_VERSION"));
+    let _ = writeln!(report, "DScan v{}", env!("CARGO_PKG_VERSION"));
     let _ = writeln!(report, "Plik konfiguracji: {source}");
     let _ = writeln!(report, "Klucz szyfrowania: {key_status}");
     let _ = writeln!(report, "Efektywna konfiguracja:\n{:#?}", config.settings);
@@ -46,7 +46,7 @@ pub fn format_report(config: &AppConfig, source: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use sztygar_config::EncryptionKey;
+    use dscan_config::EncryptionKey;
 
     const VALID_KEY: &str = "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f";
 
