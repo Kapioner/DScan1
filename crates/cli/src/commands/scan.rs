@@ -1,5 +1,6 @@
 use chrono::{Local, Utc};
 use clap::{Args, ValueEnum};
+use dscan_engine::adaptive::adaptive_subgroup_size;
 use dscan_engine::windows::window_stop;
 use dscan_engine::{
     EngineError, RateSettings, ScanObserver, ScanProgress, ScanRequest, SubgroupReport, create_job,
@@ -44,6 +45,9 @@ pub struct ScanArgs {
     /// Nie wypisuj listy hostów na końcu (tylko podsumowanie).
     #[arg(long)]
     pub quiet: bool,
+    /// Tylko plan: liczba adresów, podgrupy i szacowany czas — bez wysyłania pakietów (C8).
+    #[arg(long)]
+    pub dry_run: bool,
     /// Skan bezpośrednio z tej binarki (bez serwera i RBAC) — wymaga klucza szyfrowania i dostępu do bazy.
     #[arg(long)]
     pub local: bool,
@@ -64,6 +68,9 @@ impl ScanArgs {
 
 impl Command for ScanArgs {
     async fn execute(&self, context: &Context) -> Result<(), CliError> {
+        if self.dry_run {
+            return super::scan_plan::dry_run(self, context).await;
+        }
         if !self.local {
             return crate::client::commands::scan_via_api(self).await;
         }
@@ -90,7 +97,7 @@ async fn run_local(args: &ScanArgs, context: &Context) -> Result<(), CliError> {
         .collect();
     let stop_at = window_stop(&windows, Local::now()).map_err(|_| EngineError::OutsideWindow)?;
 
-    let prepared = match prepare_scan(&config.settings, &request).await {
+    let mut prepared = match prepare_scan(&config.settings, &request).await {
         Err(EngineError::NoTargetsInScope(plan)) => {
             eprint!("{}", format_plan(&plan));
             return Err(CliError::NoTargetsInScope);
@@ -99,6 +106,8 @@ async fn run_local(args: &ScanArgs, context: &Context) -> Result<(), CliError> {
     };
     eprint!("{}", format_plan(&prepared.plan));
     let pool = connect_database(&config).await?;
+    prepared.job.subgroup_size =
+        adaptive_subgroup_size(&pool, &settings, &prepared.job.mode, stop_at).await?;
     let plan = create_job(&pool, &prepared.plan.networks, &prepared.job).await?;
 
     let (stop_sender, stop) = watch::channel(false);

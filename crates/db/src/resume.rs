@@ -122,3 +122,59 @@ pub async fn pause_orphaned_runs(pool: &PgPool) -> Result<u64, DbError> {
     transaction.commit().await.map_err(DbError::Query)?;
     Ok(paused)
 }
+
+/// Pomiary przepustowości (S5): adresy i czas trwania (s) ostatnich ukończonych podgrup
+/// przebiegów w danym trybie, od najstarszej do najnowszej.
+pub async fn recent_subgroup_timings(
+    pool: &PgPool,
+    mode: &str,
+    limit: i64,
+) -> Result<Vec<(Vec<String>, f64)>, DbError> {
+    let mut rows: Vec<(Vec<String>, f64)> = sqlx::query_as(
+        "SELECT g.addresses, EXTRACT(EPOCH FROM (g.finished_at - g.started_at))::float8 \
+         FROM subgroups g JOIN scan_runs r ON r.id = g.scan_run_id \
+         WHERE g.status = 'completed' AND r.mode = $1 AND g.started_at IS NOT NULL \
+           AND g.finished_at > g.started_at AND g.retry_of IS NULL \
+         ORDER BY g.finished_at DESC LIMIT $2",
+    )
+    .bind(mode)
+    .bind(limit)
+    .fetch_all(pool)
+    .await
+    .map_err(DbError::Query)?;
+    rows.reverse();
+    Ok(rows)
+}
+
+/// Dodaje do przebiegu podgrupę z powtórnym pomiarem (S10). Liczniki przebiegu rosną,
+/// żeby postęp nadal sumował się do 100%.
+pub async fn add_retry_subgroup(
+    pool: &PgPool,
+    run_id: i64,
+    addresses: &[String],
+    attempt: i32,
+) -> Result<i64, DbError> {
+    let mut transaction = pool.begin().await.map_err(DbError::Query)?;
+    let (id,): (i64,) = sqlx::query_as(
+        "INSERT INTO subgroups (scan_run_id, sequence_no, addresses, retry_of) \
+         SELECT $1, COALESCE(MAX(sequence_no), -1) + 1, $2, $3 FROM subgroups WHERE scan_run_id = $1 \
+         RETURNING id",
+    )
+    .bind(run_id)
+    .bind(addresses)
+    .bind(attempt)
+    .fetch_one(&mut *transaction)
+    .await
+    .map_err(DbError::Query)?;
+    sqlx::query(
+        "UPDATE scan_runs SET total_subgroups = total_subgroups + 1, \
+         total_addresses = total_addresses + $2 WHERE id = $1",
+    )
+    .bind(run_id)
+    .bind(addresses.len() as i64)
+    .execute(&mut *transaction)
+    .await
+    .map_err(DbError::Query)?;
+    transaction.commit().await.map_err(DbError::Query)?;
+    Ok(id)
+}

@@ -4,11 +4,13 @@
 pub mod config;
 pub mod db;
 pub mod diff;
+pub mod evaluate;
 pub mod export;
 pub mod import;
 pub mod keys;
 pub mod run_control;
 pub mod scan;
+pub mod scan_plan;
 pub mod scan_report;
 pub mod serve;
 pub mod session;
@@ -138,6 +140,7 @@ impl Command for Commands {
             Commands::Config(args) => args.execute(context).await,
             Commands::Db(args) => args.execute(context).await,
             Commands::Keys(args) => args.execute(context).await,
+            Commands::Evaluate(args) => args.execute(context).await,
             Commands::Login(args) => args.execute(context).await,
             Commands::Logout(args) => args.execute(context).await,
             Commands::Stop(args) => args.execute(context).await,

@@ -59,6 +59,10 @@ pub struct RateLimitSettings {
     pub subgroup_size: u32,
     /// Bezpiecznik: skan większej liczby adresów jest odrzucany.
     pub max_addresses_per_scan: u64,
+    /// S5: dobieraj rozmiar podgrup do zmierzonej przepustowości (EWMA), najwyżej `subgroup_size`.
+    pub adaptive_subgroups: bool,
+    /// S5: docelowy czas skanu jednej podgrupy w sekundach (krócej = mniej pracy traconej o końcu okna).
+    pub target_subgroup_seconds: u64,
 }
 
 impl Default for RateLimitSettings {
@@ -70,6 +74,8 @@ impl Default for RateLimitSettings {
             http_requests_per_host: 20,
             subgroup_size: 256,
             max_addresses_per_scan: 1_048_576,
+            adaptive_subgroups: true,
+            target_subgroup_seconds: 300,
         }
     }
 }

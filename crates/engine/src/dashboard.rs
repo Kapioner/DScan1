@@ -169,6 +169,7 @@ mod tests {
             redirect_chain: Vec::new(),
             tls_verified: Some(false),
             certificate: None,
+            favicon: None,
         });
         host.services = vec![
             service(80, &["Jenkins", "nginx"]),

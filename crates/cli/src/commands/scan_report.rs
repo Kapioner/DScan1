@@ -72,6 +72,13 @@ pub fn format_summary(summary: &ScanJobSummary) -> String {
                 .collect();
             text.push_str(&format!(", nieaktywne od teraz: {}", ips.join(", ")));
         }
+        if !presence.unstable.is_empty() {
+            let ips: Vec<String> = presence.unstable.iter().map(ToString::to_string).collect();
+            text.push_str(&format!(
+                ", niestabilne (odpowiedziały przy powtórce): {}",
+                ips.join(", ")
+            ));
+        }
         text.push('\n');
     }
     if let Some(comparison) = &summary.comparison {
@@ -158,6 +165,9 @@ pub fn format_http(http: &HttpInfo) -> String {
     }
     if let Some(server) = http.header("server") {
         notes.push(format!("Server: {server}"));
+    }
+    if let Some(favicon) = &http.favicon {
+        notes.push(format!("favicon mmh3 {}", favicon.mmh3));
     }
     let notes = if notes.is_empty() {
         String::new()
@@ -296,6 +306,7 @@ mod tests {
             redirect_chain: Vec::new(),
             tls_verified: Some(false),
             certificate: None,
+            favicon: None,
         };
         assert_eq!(
             format_http(&http),

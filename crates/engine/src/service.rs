@@ -11,6 +11,7 @@ use dscan_db::PgPool;
 use dscan_scanner::targets::TargetPlan;
 use tokio::sync::watch;
 
+use crate::adaptive::adaptive_subgroup_size;
 use crate::launch::{JobScanner, build_scanner, effective_settings, job_settings};
 use crate::windows::window_stop;
 use crate::{
@@ -81,7 +82,14 @@ impl ScanService {
         request: ScanRequest,
         stop_at: Option<DateTime<Utc>>,
     ) -> Result<StartedScan, EngineError> {
-        let prepared = prepare_scan(&self.settings, &request).await?;
+        let mut prepared = prepare_scan(&self.settings, &request).await?;
+        let (settings, ..) = effective_settings(
+            &self.settings,
+            request.profile.as_deref(),
+            request.mode.as_deref(),
+        )?;
+        prepared.job.subgroup_size =
+            adaptive_subgroup_size(&self.pool, &settings, &prepared.job.mode, stop_at).await?;
         let plan = create_job(&self.pool, &prepared.plan.networks, &prepared.job).await?;
         let run_id = plan.run_id;
         self.spawn(plan, prepared.scanner, prepared.job, stop_at);

@@ -30,6 +30,8 @@ pub struct ScanRequest {
     /// Nazwa zapisywana w przebiegu, gdy inna niż profil (np. nazwa profilu z bazy).
     pub run_label: Option<String>,
     pub requested_by: Option<i64>,
+    /// Limit tempa nmap z profilu w bazie (F4), zastępuje `[limits] nmap_max_rate`.
+    pub max_rate: Option<u32>,
 }
 
 /// Skaner podgrup przebiegu: sam nmap albo nmap z fingerprintingiem WWW.
@@ -87,6 +89,9 @@ pub async fn prepare_scan(
         effective_settings(base, request.profile.as_deref(), request.mode.as_deref())?;
     if let Some(ports) = &request.ports {
         settings.scope.allowed_ports = ports.clone();
+    }
+    if let Some(rate) = request.max_rate {
+        settings.limits.nmap_max_rate = rate;
     }
     let resolver = SystemResolver::from_system_config()
         .map_err(|error| EngineError::Setup(error.to_string()))?;
@@ -158,6 +163,8 @@ pub fn job_settings(
         parallel: settings.limits.max_parallel_nmap,
         max_addresses: settings.limits.max_addresses_per_scan,
         inactive_after_missed_runs: settings.stability.inactive_after_missed_runs,
+        unstable_retries: settings.stability.unstable_retries,
+        retry_delay_seconds: settings.stability.retry_delay_seconds,
     }
 }
 

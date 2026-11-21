@@ -6,6 +6,7 @@
 //! - [`nmap_scanner`] — skaner nmap z tempem podzielonym między procesy (S7),
 //! - [`WebFingerprintScanner`] — dekorator dodający fingerprinting HTTP (H1, H2).
 
+pub mod adaptive;
 mod comparison;
 mod dashboard;
 mod error;
@@ -14,6 +15,7 @@ mod job;
 mod launch;
 mod options;
 mod progress;
+mod retry;
 mod running;
 pub mod scheduler;
 mod service;
@@ -36,6 +38,7 @@ pub use launch::{
 };
 pub use options::{NmapTuning, RateSettings, nmap_scanner, rate_per_process};
 pub use progress::{LogObserver, ScanObserver, ScanProgress, SilentObserver, SubgroupReport};
+pub use retry::{RetryPolicy, retry_candidates};
 pub use service::{ScanService, StartedScan};
 pub use setup::{build_analysis, build_fetcher, load_signatures};
 pub use web::WebFingerprintScanner;

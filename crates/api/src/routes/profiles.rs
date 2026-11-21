@@ -36,6 +36,8 @@ pub struct ProfileInput {
     pub frequency_minutes: Option<i32>,
     #[serde(default = "enabled_by_default")]
     pub enabled: bool,
+    /// Limit tempa nmap w pakietach/s (brak = `[limits] nmap_max_rate`).
+    pub max_rate: Option<i32>,
 }
 
 fn enabled_by_default() -> bool {
@@ -52,6 +54,7 @@ pub struct ProfileView {
     pub windows: Vec<WindowDto>,
     pub frequency_minutes: Option<i32>,
     pub enabled: bool,
+    pub max_rate: Option<i32>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -75,6 +78,7 @@ impl From<ScanProfile> for ProfileView {
                 .collect(),
             frequency_minutes: data.frequency_minutes,
             enabled: data.enabled,
+            max_rate: data.max_rate,
             created_at: profile.created_at,
             updated_at: profile.updated_at,
         }

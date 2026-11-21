@@ -18,7 +18,7 @@ pub use change::{Change, ChangeKind};
 pub use compare::{compare_runs, fingerprint_input, service_fingerprint};
 pub use detection::{Detection, Evidence, EvidenceKind, MAX_CONFIDENCE, cap_confidence};
 pub use host::{Host, HostStatus};
-pub use http::{Cookie, HttpHeader, HttpInfo, Redirect};
+pub use http::{Cookie, Favicon, HttpHeader, HttpInfo, Redirect};
 pub use overrides::{Override, OverrideField, apply_overrides};
 pub use port_range::{PortRange, PortRangeError, parse_port_range};
 pub use presence::{Presence, next_presence};

@@ -141,10 +141,23 @@ pub struct ProfilesPage {
     pub user: UserBar,
     pub menu: Vec<MenuItem>,
     pub profiles: Vec<ProfileRow>,
+    /// Formularze tylko dla ról z `targets:write` (F4).
+    pub can_edit: bool,
+    pub message: Option<String>,
+    /// Profile z `[profiles]` w dscan.toml: (nazwa, opis ustawień).
+    pub config_profiles: Vec<(String, String)>,
 }
 
 /// Wiersz tabeli profili.
 pub struct ProfileRow {
+    pub id: i64,
+    /// Wartości do pól formularza edycji.
+    pub group_raw: String,
+    pub ports_raw: String,
+    pub windows_raw: String,
+    pub frequency_raw: String,
+    pub rate_raw: String,
+    pub rate: String,
     pub name: String,
     pub mode: String,
     pub group: String,
@@ -162,7 +175,24 @@ impl ProfileRow {
             .iter()
             .map(|w| format!("{}–{}", w.start, w.end))
             .collect();
+        let windows_raw: Vec<String> = data
+            .windows
+            .iter()
+            .map(|w| format!("{}-{}", w.start, w.end))
+            .collect();
         ProfileRow {
+            id: profile.id,
+            group_raw: data.target_group.clone().unwrap_or_default(),
+            ports_raw: data.ports.join(", "),
+            windows_raw: windows_raw.join(", "),
+            frequency_raw: data
+                .frequency_minutes
+                .map(|m| m.to_string())
+                .unwrap_or_default(),
+            rate_raw: data.max_rate.map(|r| r.to_string()).unwrap_or_default(),
+            rate: data
+                .max_rate
+                .map_or("z konfiguracji".into(), |r| format!("{r} pakietów/s")),
             name: data.name.clone(),
             mode: data.mode.clone(),
             group: data

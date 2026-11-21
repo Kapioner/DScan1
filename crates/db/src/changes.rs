@@ -100,9 +100,30 @@ pub async fn list_changes(pool: &PgPool, current_run_id: i64) -> Result<Vec<Chan
     .fetch_all(pool)
     .await
     .map_err(DbError::Query)?;
+    Ok(changes_from_rows(rows))
+}
 
-    Ok(rows
-        .into_iter()
+/// Historia zmian jednego adresu we wszystkich przebiegach, od najnowszych (widok hosta, F5).
+pub async fn changes_for_ip(
+    pool: &PgPool,
+    ip: std::net::IpAddr,
+    limit: i64,
+) -> Result<Vec<Change>, DbError> {
+    let rows: Vec<ChangeRow> = sqlx::query_as(
+        "SELECT previous_run_id, current_run_id, ip, port, protocol, kind, previous_fingerprint, \
+         current_fingerprint, detected_at FROM changes WHERE ip = $1 \
+         ORDER BY current_run_id DESC, port LIMIT $2",
+    )
+    .bind(ip)
+    .bind(limit)
+    .fetch_all(pool)
+    .await
+    .map_err(DbError::Query)?;
+    Ok(changes_from_rows(rows))
+}
+
+fn changes_from_rows(rows: Vec<ChangeRow>) -> Vec<Change> {
+    rows.into_iter()
         .filter_map(
             |(previous, current, ip, port, protocol, kind, old, new, detected_at)| {
                 Some(Change {
@@ -120,7 +141,7 @@ pub async fn list_changes(pool: &PgPool, current_run_id: i64) -> Result<Vec<Chan
                 })
             },
         )
-        .collect())
+        .collect()
 }
 
 fn parse_protocol(text: &str) -> Protocol {

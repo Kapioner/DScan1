@@ -29,6 +29,14 @@ pub struct Redirect {
     pub status_code: u16,
 }
 
+/// Ikona strony (H4): skąd pobrana, mmh3 w wariancie Shodana i SHA-256.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Favicon {
+    pub url: String,
+    pub mmh3: i32,
+    pub sha256: String,
+}
+
 /// Informacje zebrane z odpowiedzi HTTP/HTTPS usługi.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct HttpInfo {
@@ -46,6 +54,9 @@ pub struct HttpInfo {
     /// Certyfikat TLS (tylko HTTPS).
     #[serde(default)]
     pub certificate: Option<CertificateInfo>,
+    /// Hash favicony (H4).
+    #[serde(default)]
+    pub favicon: Option<Favicon>,
 }
 
 impl HttpInfo {
@@ -80,6 +91,7 @@ mod tests {
             redirect_chain: Vec::new(),
             tls_verified: None,
             certificate: None,
+            favicon: None,
         }
     }
 

@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Host {{ ip }}{% endblock %}
+{% block content %}
+<p><a href="/hosts?run={{ run }}">← Hosty</a></p>
+<h1>Host <code>{{ ip }}</code> <small class="muted">przebieg #{{ run }} · stan: {{ status }}</small></h1>
+<section class="card">
+  <h2>Host</h2>
+  <table class="fields">
+    {% for f in fields %}{% let port = "" %}{% let protocol = "" %}{% include "edit_field.html" %}{% endfor %}
+  </table>
+</section>
+{% for s in services %}
+<section class="card">
+  <h2>{{ s.port }}/{{ s.protocol }} <small class="muted">{{ s.state }}</small></h2>
+  <table class="fields">
+    {% for f in s.fields %}{% let port = s.port.to_string() %}{% let protocol = s.protocol.clone() %}{% include "edit_field.html" %}{% endfor %}
+    {% if let Some(http) = s.http %}<tr><th>HTTP</th><td colspan="2">{{ http }}</td></tr>{% endif %}
+    {% if let Some(fav) = s.favicon %}<tr><th>Favicon</th><td colspan="2"><code>{{ fav }}</code></td></tr>{% endif %}
+    {% if let Some(cert) = s.certificate %}<tr><th>Certyfikat</th><td colspan="2">{{ cert }}{% if let Some(w) = s.certificate_warning %} <span class="badge warn">{{ w }}</span>{% endif %}</td></tr>{% endif %}
+  </table>
+  {% if !s.detections.is_empty() %}
+  <h3>Technologie</h3>
+  <table>
+    <thead><tr><th>Technologia</th><th>Pewność</th><th>Dowody</th></tr></thead>
+    <tbody>
+      {% for d in s.detections %}
+      <tr><td>{{ d.technology }}</td><td><progress max="100" value="{{ d.confidence }}"></progress> {{ d.confidence }}%</td><td>{{ d.evidence }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+</section>
+{% endfor %}
+<section class="card">
+  <h2>Historia zmian</h2>
+  {% if changes.is_empty() %}<p class="muted">Brak zapisanych zmian.</p>{% else %}
+  <table>
+    <thead><tr><th>Przebieg</th><th>Usługa</th><th>Zmiana</th></tr></thead>
+    <tbody>{% for c in changes %}<tr class="{{ c.css }}"><td>#{{ c.run }}</td><td>{{ c.address }}</td><td>{{ c.label }}</td></tr>{% endfor %}</tbody>
+  </table>
+  {% endif %}
+  <h3>Odpowiedzi w przebiegach</h3>
+  <p>{% for h in history %}<span class="badge {% if h.ok %}ok{% else %}warn{% endif %}">#{{ h.run }} {% if h.ok %}odpowiedział{% else %}brak odpowiedzi{% endif %}</span> {% endfor %}</p>
+</section>
+{% endblock %}

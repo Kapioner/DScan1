@@ -2,21 +2,55 @@
 {% block title %}Profile skanów{% endblock %}
 {% block content %}
 <h1>Profile skanów</h1>
+{% if let Some(msg) = message %}<p class="notice" role="status">{{ msg }}</p>{% endif %}
 <section class="card">
+  <h2>Profile harmonogramu (baza)</h2>
   {% if profiles.is_empty() %}
-  <p class="muted">Brak profili. Utwórz je przez API: <code>POST /api/v1/profiles</code>.</p>
+  <p class="muted">Brak profili.</p>
   {% else %}
   <table>
-    <thead><tr><th>Nazwa</th><th>Tryb</th><th>Grupa celów</th><th>Porty</th><th>Okna</th><th>Częstotliwość</th><th>Włączony</th></tr></thead>
+    <thead><tr><th>Nazwa</th><th>Tryb</th><th>Grupa celów</th><th>Porty</th><th>Okna</th><th>Częstotliwość</th><th>Tempo</th><th>Włączony</th></tr></thead>
     <tbody>
       {% for profile in profiles %}
       <tr>
         <td>{{ profile.name }}</td><td>{{ profile.mode }}</td><td>{{ profile.group }}</td><td>{{ profile.ports }}</td>
-        <td>{{ profile.windows }}</td><td>{{ profile.frequency }}</td><td>{% if profile.enabled %}tak{% else %}nie{% endif %}</td>
+        <td>{{ profile.windows }}</td><td>{{ profile.frequency }}</td><td>{{ profile.rate }}</td><td>{% if profile.enabled %}tak{% else %}nie{% endif %}</td>
       </tr>
+      {% if can_edit %}
+      <tr><td colspan="8">
+        <details><summary>Edytuj „{{ profile.name }}”</summary>
+          <form method="post" action="/ui/profiles/{{ profile.id }}" class="inline-form">
+            {% let p_name = profile.name.clone() %}{% let p_mode = profile.mode.clone() %}{% let p_group = profile.group_raw.clone() %}
+            {% let p_ports = profile.ports_raw.clone() %}{% let p_windows = profile.windows_raw.clone() %}
+            {% let p_frequency = profile.frequency_raw.clone() %}{% let p_rate = profile.rate_raw.clone() %}{% let p_enabled = profile.enabled %}
+            {% include "profile_fields.html" %}
+            <button type="submit">Zapisz</button>
+          </form>
+          <form method="post" action="/ui/profiles/{{ profile.id }}/delete"><button type="submit" class="link danger">Usuń profil</button></form>
+        </details>
+      </td></tr>
+      {% endif %}
       {% endfor %}
     </tbody>
   </table>
+  {% endif %}
+</section>
+{% if can_edit %}
+<section class="card">
+  <h2>Nowy profil</h2>
+  <form method="post" action="/ui/profiles" class="inline-form">
+    {% let p_name = "" %}{% let p_mode = "services" %}{% let p_group = "" %}{% let p_ports = "" %}
+    {% let p_windows = "" %}{% let p_frequency = "" %}{% let p_rate = "" %}{% let p_enabled = true %}
+    {% include "profile_fields.html" %}
+    <button type="submit">Utwórz</button>
+  </form>
+</section>
+{% endif %}
+<section class="card">
+  <h2>Profile z dscan.toml</h2>
+  <p class="muted">Do ręcznego uruchamiania (<code>--profile</code>, formularz na pulpicie); zmiana w pliku konfiguracji.</p>
+  {% if config_profiles.is_empty() %}<p class="muted">Brak sekcji [profiles].</p>{% else %}
+  <table><tbody>{% for (name, description) in config_profiles %}<tr><td>{{ name }}</td><td>{{ description }}</td></tr>{% endfor %}</tbody></table>
   {% endif %}
 </section>
 {% endblock %}

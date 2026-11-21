@@ -18,6 +18,21 @@ pub struct PresenceUpdate {
     pub responded: usize,
     pub missed: usize,
     pub became_inactive: Vec<IpAddr>,
+    /// Hosty, które odpowiedziały dopiero przy powtórnym pomiarze (S10).
+    pub unstable: Vec<IpAddr>,
+}
+
+/// Oznacza hosty jako niestabilne (odpowiedziały dopiero przy powtórnym pomiarze, S10).
+pub async fn mark_unstable(pool: &PgPool, ips: &[IpAddr]) -> Result<(), DbError> {
+    if ips.is_empty() {
+        return Ok(());
+    }
+    sqlx::query("UPDATE host_presence SET status = 'unstable' WHERE ip = ANY($1)")
+        .bind(ips.to_vec())
+        .execute(pool)
+        .await
+        .map(|_| ())
+        .map_err(DbError::Query)
 }
 
 type PresenceRow = (IpAddr, String, i32, DateTime<Utc>, DateTime<Utc>);

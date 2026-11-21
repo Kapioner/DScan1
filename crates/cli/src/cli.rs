@@ -8,6 +8,7 @@ use clap::{Parser, Subcommand};
 use crate::commands::config::ConfigArgs;
 use crate::commands::db::DbArgs;
 use crate::commands::diff::DiffArgs;
+use crate::commands::evaluate::EvaluateArgs;
 use crate::commands::export::ExportArgs;
 use crate::commands::import::ImportArgs;
 use crate::commands::keys::KeysArgs;
@@ -56,6 +57,8 @@ pub enum Commands {
     Db(DbArgs),
     /// Zarządza kluczami szyfrowania.
     Keys(KeysArgs),
+    /// Mierzy trafność wykrywania względem wyników referencyjnych.
+    Evaluate(EvaluateArgs),
     /// Loguje do serwera API i zapisuje token w pliku użytkownika.
     Login(LoginArgs),
     /// Wylogowuje i usuwa zapisany token.
@@ -71,9 +74,9 @@ mod tests {
     use super::*;
     use clap::CommandFactory;
 
-    const ALL_SUBCOMMANDS: [&str; 15] = [
+    const ALL_SUBCOMMANDS: [&str; 16] = [
         "serve", "scan", "targets", "import", "export", "diff", "sig", "user", "config", "db",
-        "keys", "login", "logout", "stop", "resume",
+        "keys", "login", "logout", "stop", "resume", "evaluate",
     ];
 
     #[test]

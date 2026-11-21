@@ -11,6 +11,7 @@ use ipnet::IpNet;
 use tokio::sync::watch;
 
 use crate::comparison::Comparison;
+use crate::retry::remeasure_silent_hosts;
 use crate::running::RunningJob;
 use crate::{EngineError, ScanObserver, ScanProgress};
 
@@ -30,6 +31,10 @@ pub struct ScanJobSettings {
     pub max_addresses: u64,
     /// K — host nieaktywny po tylu kolejnych przebiegach bez odpowiedzi (S11).
     pub inactive_after_missed_runs: u32,
+    /// N — powtórne pomiary znanych hostów, które nie odpowiedziały (S10); 0 = wyłączone.
+    pub unstable_retries: u32,
+    /// Odstęp między powtórkami w sekundach.
+    pub retry_delay_seconds: u64,
 }
 
 /// Podsumowanie przebiegu (zakończonego albo wstrzymanego).
@@ -188,7 +193,12 @@ pub async fn drive_job<S: SubgroupScanner>(
     };
     observer.scan_started(&job.progress);
 
-    let events = run_pool(scanner, groups, settings.parallel as usize, stop.clone());
+    let events = run_pool(
+        Arc::clone(&scanner),
+        groups,
+        settings.parallel as usize,
+        stop.clone(),
+    );
     if let Err(error) = job.consume(events, observer).await {
         // Najlepsza próba oznaczenia przebiegu — pierwotny błąd jest ważniejszy.
         let _ = dscan_db::finish_scan_run(pool, job.progress.run_id, ScanStatus::Failed).await;
@@ -198,5 +208,18 @@ pub async fn drive_job<S: SubgroupScanner>(
     if *stop.borrow() && unfinished {
         return job.pause().await;
     }
-    job.finish(settings).await
+    let unstable = if job.progress.failed_subgroups == 0 && settings.unstable_retries > 0 {
+        remeasure_silent_hosts(
+            pool,
+            cipher,
+            job.progress.run_id,
+            scanner.as_ref(),
+            settings,
+            stop,
+        )
+        .await?
+    } else {
+        Vec::new()
+    };
+    job.finish(settings, &unstable).await
 }

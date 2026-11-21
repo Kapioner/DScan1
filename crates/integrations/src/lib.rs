@@ -4,11 +4,13 @@
 //! oraz eksport hostów, usług i zmian do JSON/CSV z filtrami (I3).
 
 mod error;
+mod evaluation;
 mod export;
 mod result_import;
 mod target_import;
 
 pub use error::ImportError;
+pub use evaluation::{Evaluation, Score, evaluate};
 pub use export::{
     ChangeRow, ExportFilter, ServiceRow, change_rows, filter_hosts, service_rows, to_csv,
 };

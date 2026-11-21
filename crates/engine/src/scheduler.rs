@@ -130,6 +130,7 @@ async fn start_profile(
         ports: (!data.ports.is_empty()).then(|| data.ports.clone()),
         profile_id: Some(profile.id),
         run_label: Some(data.name.clone()),
+        max_rate: data.max_rate.and_then(|rate| u32::try_from(rate).ok()),
         ..ScanRequest::default()
     };
     match service.start_until(request, stop_at).await {
@@ -165,6 +166,7 @@ mod tests {
                     .collect(),
                 frequency_minutes: frequency,
                 enabled,
+                max_rate: None,
             },
             created_at: Utc::now(),
             updated_at: Utc::now(),

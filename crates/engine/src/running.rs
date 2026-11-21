@@ -19,6 +19,7 @@ pub(crate) async fn finalize_run(
     pool: &PgPool,
     run_id: i64,
     settings: &ScanJobSettings,
+    unstable: &[std::net::IpAddr],
 ) -> Result<(Option<Comparison>, dscan_db::PresenceUpdate), EngineError> {
     let networks: Vec<IpNet> = dscan_db::run_networks(pool, run_id)
         .await?
@@ -39,6 +40,9 @@ pub(crate) async fn finalize_run(
         settings.inactive_after_missed_runs,
     )
     .await?;
+    let mut presence = presence;
+    dscan_db::mark_unstable(pool, unstable).await?;
+    presence.unstable = unstable.to_vec();
     let comparison = compare_with_previous(pool, run_id, &settings.profile).await?;
     Ok((comparison, presence))
 }
@@ -131,6 +135,7 @@ impl RunningJob<'_> {
     pub(crate) async fn finish(
         self,
         settings: &ScanJobSettings,
+        unstable: &[std::net::IpAddr],
     ) -> Result<ScanJobSummary, EngineError> {
         let status = if self.progress.failed_subgroups == 0 {
             ScanStatus::Completed
@@ -143,7 +148,7 @@ impl RunningJob<'_> {
             return Ok(self.summary(status, None, None));
         }
         let (comparison, presence) =
-            finalize_run(self.pool, self.progress.run_id, settings).await?;
+            finalize_run(self.pool, self.progress.run_id, settings, unstable).await?;
         Ok(self.summary(status, comparison, Some(presence)))
     }
 

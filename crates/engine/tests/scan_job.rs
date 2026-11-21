@@ -126,6 +126,8 @@ fn settings(max_addresses: u64) -> ScanJobSettings {
         parallel: 3,
         max_addresses,
         inactive_after_missed_runs: 2,
+        unstable_retries: 0,
+        retry_delay_seconds: 0,
     }
 }
 

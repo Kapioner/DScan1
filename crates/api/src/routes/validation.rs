@@ -69,6 +69,14 @@ pub fn validate_profile(input: ProfileInput) -> Result<ProfileData, ApiError> {
             "częstotliwość musi wynosić co najmniej {MIN_FREQUENCY_MINUTES} minut"
         )));
     }
+    if input
+        .max_rate
+        .is_some_and(|rate| !(1..=100_000).contains(&rate))
+    {
+        return Err(bad(
+            "limit tempa musi wynosić od 1 do 100000 pakietów/s".into()
+        ));
+    }
     Ok(ProfileData {
         name,
         mode: input.mode,
@@ -88,6 +96,7 @@ pub fn validate_profile(input: ProfileInput) -> Result<ProfileData, ApiError> {
             .collect(),
         frequency_minutes: input.frequency_minutes,
         enabled: input.enabled,
+        max_rate: input.max_rate,
     })
 }
 
@@ -125,6 +134,7 @@ mod tests {
             }],
             frequency_minutes: Some(60),
             enabled: true,
+            max_rate: None,
         }
     }
 

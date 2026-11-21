@@ -7,7 +7,7 @@ use axum::extract::State;
 use dscan_core::models::Detection;
 use dscan_engine::{build_analysis, build_fetcher, load_signatures};
 use dscan_fingerprint::signatures::WebEvidence;
-use dscan_fingerprint::{probe_paths, to_http_info};
+use dscan_fingerprint::{fetch_favicon, probe_paths, to_http_info};
 use dscan_scanner::targets::{is_in_scope, single_address_network};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
@@ -114,8 +114,9 @@ pub async fn test_signature(
         .fetch(&input.url, ip)
         .await
         .map_err(|e| ApiError::BadRequest(e.to_string()))?;
-    let info = to_http_info(&response);
+    let mut info = to_http_info(&response);
     let body = String::from_utf8_lossy(&response.body);
+    info.favicon = fetch_favicon(&fetcher, &info.url, ip, &body).await;
     let probes = probe_paths(
         &fetcher,
         &input.url,
@@ -128,7 +129,7 @@ pub async fn test_signature(
         info: &info,
         body: &body,
         probes: &probes,
-        favicon_hash: None,
+        favicon_hash: info.favicon.as_ref().map(|f| f.mmh3),
     };
     let detections = analysis
         .analyze(&evidence, &[])

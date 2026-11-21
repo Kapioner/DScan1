@@ -88,7 +88,7 @@ pub async fn import_results(
     };
     dscan_db::complete_subgroup(pool, cipher, completion).await?;
     dscan_db::finish_scan_run(pool, run_id, ScanStatus::Completed).await?;
-    let (comparison, presence) = finalize_run(pool, run_id, &job).await?;
+    let (comparison, presence) = finalize_run(pool, run_id, &job, &[]).await?;
     let summary = ScanJobSummary {
         run_id,
         comparison,

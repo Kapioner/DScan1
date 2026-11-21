@@ -1,0 +1,15 @@
+<tr>
+  <th>{{ f.label }}</th>
+  <td>{{ f.value }}{% if f.edited %} <span class="badge">edytowane ręcznie</span>{% endif %}</td>
+  {% if can_edit %}<td>
+    <form method="post" action="/ui/hosts/{{ ip }}/edit" class="inline-form compact">
+      <input type="hidden" name="run" value="{{ run }}">
+      <input type="hidden" name="field" value="{{ f.field }}">
+      <input type="hidden" name="port" value="{{ port }}">
+      <input type="hidden" name="protocol" value="{{ protocol }}">
+      <input name="value" value="{{ f.value }}" maxlength="500" aria-label="{{ f.label }}">
+      <button type="submit">Zapisz</button>
+      {% if f.edited %}<button type="submit" name="reset" value="1" class="link">Przywróć wartość ze skanu</button>{% endif %}
+    </form>
+  </td>{% endif %}
+</tr>
