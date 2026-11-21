@@ -40,6 +40,7 @@ impl NmapCommand {
 
     /// Uruchamia nmap z argumentami, podaje cele przez stdin i zwraca XML ze stdout.
     pub async fn run(&self, args: &[String], targets: &[IpNet]) -> Result<String, ScannerError> {
+        crate::safety::check_nmap_args(args)?;
         let mut child = Command::new(&self.binary)
             .args(args)
             .stdin(Stdio::piped())

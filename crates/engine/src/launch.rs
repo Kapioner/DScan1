@@ -4,6 +4,7 @@ use std::net::IpAddr;
 use std::sync::Arc;
 
 use dscan_config::{Settings, resolve_profile};
+use dscan_scanner::safety::ports_within;
 use dscan_scanner::ScannerError;
 use dscan_scanner::nmap::{NmapProfile, ScanOutput, ports_argument};
 use dscan_scanner::pool::{NmapScanner, SubgroupScanner};
@@ -92,6 +93,14 @@ pub async fn prepare_scan(
     }
     if let Some(rate) = request.max_rate {
         settings.limits.nmap_max_rate = rate;
+    }
+    // Q5: porty z profilu (TOML lub bazy) muszą mieścić się w [scope] allowed_ports.
+    if !ports_within(&settings.scope.allowed_ports, &base.scope.allowed_ports) {
+        return Err(EngineError::Setup(format!(
+            "porty profilu ({}) wykraczają poza [scope] allowed_ports ({})",
+            settings.scope.allowed_ports.join(", "),
+            base.scope.allowed_ports.join(", ")
+        )));
     }
     let resolver = SystemResolver::from_system_config()
         .map_err(|error| EngineError::Setup(error.to_string()))?;
