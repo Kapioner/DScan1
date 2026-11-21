@@ -1,0 +1,43 @@
+# Docker Compose dla DScan (zadanie D2).
+#
+#   ./run.sh                    — uruchamia tylko PostgreSQL, a DScan natywnie (zalecane)
+#   docker compose up --build   — uruchamia całość w kontenerach
+#
+# Sekrety (hasło bazy, klucz szyfrowania) są w pliku .env, który tworzy ./run.sh.
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-dscan}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Brak POSTGRES_PASSWORD w .env - uruchom ./run.sh}
+      POSTGRES_DB: ${POSTGRES_DB:-dscan}
+    ports:
+      # Tylko lokalnie; port 5433, żeby nie kolidować z PostgreSQL zainstalowanym na hoście.
+      - "127.0.0.1:${POSTGRES_PORT:-5433}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  dscan:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file: .env
+    environment:
+      # Wewnątrz sieci Compose baza jest pod nazwą „postgres”, nie 127.0.0.1.
+      DSCAN_DATABASE_URL: postgres://${POSTGRES_USER:-dscan}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-dscan}
+    cap_add:
+      - NET_RAW    # skany SYN (nmap -sS); jawnie, choć Docker zwykle nadaje ją domyślnie
+    ports:
+      - "127.0.0.1:8080:8080"
+
+volumes:
+  pgdata:

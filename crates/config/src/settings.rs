@@ -1,6 +1,8 @@
 //! Struktury konfiguracji. `deny_unknown_fields` sprawia, że literówka w nazwie
 //! pola (np. `nmap_maxrate`) kończy się błędem, a nie cichym zignorowaniem.
 
+use std::net::{Ipv4Addr, SocketAddr};
+
 use ipnet::IpNet;
 use serde::{Deserialize, Serialize};
 
@@ -12,6 +14,8 @@ pub struct Settings {
     pub limits: RateLimitSettings,
     pub schedule: ScheduleSettings,
     pub stability: StabilitySettings,
+    pub server: ServerSettings,
+    pub database: DatabaseSettings,
 }
 
 /// Zakres dozwolonego skanowania — wartości od organizatora środowiska testowego.
@@ -96,6 +100,43 @@ impl Default for StabilitySettings {
             inactive_after_missed_runs: 3,
             unstable_retries: 2,
             retry_delay_seconds: 30,
+        }
+    }
+}
+
+/// Serwer HTTP (API i interfejs WWW).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct ServerSettings {
+    /// Adres i port nasłuchiwania. Domyślnie tylko lokalnie (`127.0.0.1`).
+    pub listen: SocketAddr,
+    /// Maksymalny rozmiar treści żądania w bajtach (np. wgrywany plik CSV).
+    pub max_body_bytes: usize,
+}
+
+impl Default for ServerSettings {
+    fn default() -> Self {
+        ServerSettings {
+            listen: SocketAddr::from((Ipv4Addr::LOCALHOST, 8080)),
+            max_body_bytes: 2 * 1024 * 1024,
+        }
+    }
+}
+
+/// Parametry połączenia z PostgreSQL. Sam adres bazy (z hasłem) to sekret
+/// i podaje się go wyłącznie w zmiennej `DSCAN_DATABASE_URL`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct DatabaseSettings {
+    pub max_connections: u32,
+    pub connect_timeout_seconds: u64,
+}
+
+impl Default for DatabaseSettings {
+    fn default() -> Self {
+        DatabaseSettings {
+            max_connections: 10,
+            connect_timeout_seconds: 5,
         }
     }
 }

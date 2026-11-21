@@ -3,7 +3,10 @@ use std::path::{Path, PathBuf};
 use figment::Figment;
 use figment::providers::{Env, Format, Serialized, Toml};
 
-use crate::{ConfigError, ENCRYPTION_KEY_ENV, EncryptionKey, Settings, validate_settings};
+use crate::{
+    CliOverrides, ConfigError, DATABASE_URL_ENV, DatabaseUrl, ENCRYPTION_KEY_ENV, EncryptionKey,
+    Settings, validate_settings,
+};
 
 /// Prefiks zmiennych środowiskowych, np. `DSCAN_LIMITS__NMAP_MAX_RATE`.
 pub const ENV_PREFIX: &str = "DSCAN_";
@@ -11,9 +14,17 @@ pub const ENV_PREFIX: &str = "DSCAN_";
 /// Separator sekcji w nazwie zmiennej: `DSCAN_<SEKCJA>__<POLE>`.
 const ENV_SECTION_SEPARATOR: &str = "__";
 
-/// Zmienne z prefiksem `DSCAN_`, które nie są polami [`Settings`]
-/// (bez prefiksu, bo tak porównuje je figment).
-const ENV_KEYS_OUTSIDE_SETTINGS: [&str; 1] = ["ENCRYPTION_KEY"];
+/// Sekcje [`Settings`]. Z env czytamy tylko zmienne `DSCAN_<SEKCJA>__<POLE>`,
+/// więc inne zmienne z prefiksem (sekrety, `DSCAN_CONFIG`, `DSCAN_TEST_…`) nie psują
+/// konfiguracji, a literówka w nazwie pola znanej sekcji nadal daje błąd.
+const SETTINGS_SECTIONS: [&str; 6] = [
+    "scope",
+    "limits",
+    "schedule",
+    "stability",
+    "server",
+    "database",
+];
 
 /// Gotowa, zwalidowana konfiguracja.
 #[derive(Debug, Clone)]
@@ -21,6 +32,8 @@ pub struct AppConfig {
     pub settings: Settings,
     /// `None`, gdy zmienna z kluczem nie jest ustawiona — nie każde polecenie go potrzebuje.
     pub encryption_key: Option<EncryptionKey>,
+    /// `None`, gdy zmienna z adresem bazy nie jest ustawiona.
+    pub database_url: Option<DatabaseUrl>,
 }
 
 impl AppConfig {
@@ -29,6 +42,13 @@ impl AppConfig {
         self.encryption_key
             .as_ref()
             .ok_or(ConfigError::MissingEncryptionKey)
+    }
+
+    /// Adres bazy dla poleceń, które z niej korzystają.
+    pub fn require_database_url(&self) -> Result<&DatabaseUrl, ConfigError> {
+        self.database_url
+            .as_ref()
+            .ok_or(ConfigError::MissingDatabaseUrl)
     }
 }
 
@@ -48,6 +68,7 @@ pub struct ConfigLoader {
     file_required: bool,
     toml_text: Option<String>,
     use_env: bool,
+    cli_overrides: CliOverrides,
 }
 
 impl Default for ConfigLoader {
@@ -64,6 +85,7 @@ impl ConfigLoader {
             file_required: false,
             toml_text: None,
             use_env: true,
+            cli_overrides: CliOverrides::default(),
         }
     }
 
@@ -93,21 +115,32 @@ impl ConfigLoader {
         self
     }
 
-    /// Łączy źródła, waliduje wynik i odczytuje klucz szyfrowania.
+    /// Wartości z flag wiersza poleceń (najwyższy priorytet).
+    pub fn cli_overrides(mut self, overrides: CliOverrides) -> Self {
+        self.cli_overrides = overrides;
+        self
+    }
+
+    /// Łączy źródła, waliduje wynik i odczytuje sekrety ze zmiennych środowiskowych.
     pub fn load(self) -> Result<AppConfig, ConfigError> {
         let settings: Settings = self.build_figment()?.extract()?;
         validate_settings(&settings)?;
 
-        let encryption_key = if self.use_env {
-            let value = std::env::var(ENCRYPTION_KEY_ENV).ok();
-            encryption_key_from_value(value.as_deref())?
+        let (encryption_key, database_url) = if self.use_env {
+            let key = std::env::var(ENCRYPTION_KEY_ENV).ok();
+            let url = std::env::var(DATABASE_URL_ENV).ok();
+            (
+                encryption_key_from_value(key.as_deref())?,
+                database_url_from_value(url.as_deref()),
+            )
         } else {
-            None
+            (None, None)
         };
 
         Ok(AppConfig {
             settings,
             encryption_key,
+            database_url,
         })
     }
 
@@ -125,11 +158,11 @@ impl ConfigLoader {
         }
         if self.use_env {
             let env = Env::prefixed(ENV_PREFIX)
-                .ignore(&ENV_KEYS_OUTSIDE_SETTINGS)
+                .filter(|key| is_settings_env_key(key.as_str()))
                 .split(ENV_SECTION_SEPARATOR);
             figment = figment.merge(env);
         }
-        Ok(figment)
+        Ok(self.cli_overrides.apply(figment))
     }
 }
 
@@ -138,6 +171,22 @@ fn encryption_key_from_value(value: Option<&str>) -> Result<Option<EncryptionKey
     match value.map(str::trim) {
         None | Some("") => Ok(None),
         Some(hex) => EncryptionKey::from_hex(hex).map(Some),
+    }
+}
+
+/// Czy klucz zmiennej (bez prefiksu, np. `limits__nmap_max_rate`) należy do znanej sekcji.
+fn is_settings_env_key(key: &str) -> bool {
+    let key = key.to_ascii_lowercase();
+    SETTINGS_SECTIONS
+        .iter()
+        .any(|section| key.starts_with(&format!("{section}{ENV_SECTION_SEPARATOR}")))
+}
+
+/// Pusta wartość zmiennej oznacza brak adresu bazy.
+fn database_url_from_value(value: Option<&str>) -> Option<DatabaseUrl> {
+    match value.map(str::trim) {
+        None | Some("") => None,
+        Some(url) => Some(DatabaseUrl::new(url)),
     }
 }
 
@@ -165,6 +214,76 @@ mod tests {
     #[test]
     fn invalid_key_value_is_an_error() {
         assert!(encryption_key_from_value(Some("xyz")).is_err());
+    }
+
+    #[test]
+    fn only_section_keys_are_read_from_env() {
+        assert!(is_settings_env_key("limits__nmap_max_rate"));
+        assert!(is_settings_env_key("SERVER__LISTEN"));
+        assert!(!is_settings_env_key("encryption_key"));
+        assert!(!is_settings_env_key("test_database_url"));
+        assert!(!is_settings_env_key("limits"));
+    }
+
+    #[test]
+    fn section_list_matches_settings_fields() {
+        let table = toml::Table::try_from(Settings::default()).unwrap();
+        let mut fields: Vec<&str> = table.keys().map(String::as_str).collect();
+        let mut sections = SETTINGS_SECTIONS.to_vec();
+        fields.sort_unstable();
+        sections.sort_unstable();
+        assert_eq!(fields, sections);
+    }
+
+    #[test]
+    fn empty_database_url_means_none() {
+        assert!(database_url_from_value(None).is_none());
+        assert!(database_url_from_value(Some(" ")).is_none());
+        assert!(database_url_from_value(Some("postgres://h/db")).is_some());
+    }
+
+    #[test]
+    fn cli_overrides_beat_toml() {
+        let overrides = CliOverrides {
+            listen: Some("0.0.0.0:9000".parse().unwrap()),
+            nmap_max_rate: Some(7),
+            max_parallel_nmap: None,
+        };
+
+        let config = ConfigLoader::new()
+            .without_env()
+            .toml_str("[limits]\nnmap_max_rate = 25\nmax_parallel_nmap = 2")
+            .cli_overrides(overrides)
+            .load()
+            .unwrap();
+
+        assert_eq!(config.settings.limits.nmap_max_rate, 7);
+        assert_eq!(config.settings.limits.max_parallel_nmap, 2);
+        assert_eq!(config.settings.server.listen.port(), 9000);
+    }
+
+    #[test]
+    fn cli_override_is_validated_too() {
+        let overrides = CliOverrides {
+            max_parallel_nmap: Some(0),
+            ..CliOverrides::default()
+        };
+
+        let result = ConfigLoader::new()
+            .without_env()
+            .cli_overrides(overrides)
+            .load();
+
+        assert!(matches!(result, Err(ConfigError::ZeroLimit(_))));
+    }
+
+    #[test]
+    fn require_database_url_fails_without_url() {
+        let config = ConfigLoader::new().without_env().load().unwrap();
+        assert!(matches!(
+            config.require_database_url(),
+            Err(ConfigError::MissingDatabaseUrl)
+        ));
     }
 
     #[test]

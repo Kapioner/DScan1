@@ -5,6 +5,9 @@ use crate::ConfigError;
 /// Zmienna środowiskowa z kluczem szyfrowania (64 znaki hex = 32 bajty, AES-256).
 pub const ENCRYPTION_KEY_ENV: &str = "DSCAN_ENCRYPTION_KEY";
 
+/// Zmienna środowiskowa z adresem bazy, np. `postgres://dscan:haslo@127.0.0.1:5433/dscan`.
+pub const DATABASE_URL_ENV: &str = "DSCAN_DATABASE_URL";
+
 /// Długość klucza AES-256 w bajtach.
 pub const ENCRYPTION_KEY_LEN: usize = 32;
 
@@ -27,6 +30,52 @@ impl EncryptionKey {
 impl fmt::Debug for EncryptionKey {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "EncryptionKey(***)")
+    }
+}
+
+/// Adres bazy danych. Zawiera hasło, więc `Debug` pokazuje go z ukrytym hasłem.
+#[derive(Clone, PartialEq, Eq)]
+pub struct DatabaseUrl(String);
+
+impl DatabaseUrl {
+    pub fn new(url: &str) -> Self {
+        DatabaseUrl(url.trim().to_string())
+    }
+
+    /// Pełny adres — tylko do nawiązania połączenia, nigdy do wypisywania.
+    pub fn expose(&self) -> &str {
+        &self.0
+    }
+
+    /// Adres bezpieczny do pokazania użytkownikowi.
+    pub fn masked(&self) -> String {
+        mask_url_password(&self.0)
+    }
+}
+
+impl fmt::Debug for DatabaseUrl {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "DatabaseUrl({})", self.masked())
+    }
+}
+
+/// Zastępuje hasło w adresie `schemat://użytkownik:hasło@host/...` gwiazdkami.
+pub fn mask_url_password(url: &str) -> String {
+    let Some(scheme_end) = url.find("://") else {
+        return url.to_string();
+    };
+    let credentials_start = scheme_end + 3;
+    let Some(at_offset) = url[credentials_start..].rfind('@') else {
+        return url.to_string();
+    };
+    let credentials_end = credentials_start + at_offset;
+
+    match url[credentials_start..credentials_end].find(':') {
+        Some(colon_offset) => {
+            let password_start = credentials_start + colon_offset + 1;
+            format!("{}***{}", &url[..password_start], &url[credentials_end..])
+        }
+        None => url.to_string(),
     }
 }
 
@@ -94,6 +143,36 @@ mod tests {
         // 63 znaki ASCII + "ą" (2 bajty) = 64 bajty, ale nie hex.
         let tricky = format!("{}ą", &VALID_KEY[..62]);
         assert!(decode_hex_key(&tricky).is_err());
+    }
+
+    #[test]
+    fn mask_hides_password() {
+        assert_eq!(
+            mask_url_password("postgres://dscan:tajne@127.0.0.1:5433/dscan"),
+            "postgres://dscan:***@127.0.0.1:5433/dscan"
+        );
+    }
+
+    #[test]
+    fn mask_handles_at_sign_in_password() {
+        assert_eq!(
+            mask_url_password("postgres://dscan:a@b@host/db"),
+            "postgres://dscan:***@host/db"
+        );
+    }
+
+    #[test]
+    fn mask_leaves_urls_without_password() {
+        for url in ["postgres://dscan@host/db", "postgres://host/db", "nie-url"] {
+            assert_eq!(mask_url_password(url), url);
+        }
+    }
+
+    #[test]
+    fn database_url_debug_is_masked() {
+        let url = DatabaseUrl::new("postgres://dscan:tajne@host/db");
+        assert!(!format!("{url:?}").contains("tajne"));
+        assert_eq!(url.expose(), "postgres://dscan:tajne@host/db");
     }
 
     #[test]

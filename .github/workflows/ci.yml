@@ -12,6 +12,26 @@ jobs:
   check:
     name: fmt + clippy + test
     runs-on: ubuntu-latest
+
+    # Baza do testów migracji (crates/db/tests). Bez niej te testy są pomijane.
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: dscan_test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: dscan_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U dscan_test"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 30
+
+    env:
+      DSCAN_TEST_DATABASE_URL: postgres://dscan_test:test@localhost:5432/dscan_test
+
     steps:
       - uses: actions/checkout@v4
 
@@ -30,3 +50,11 @@ jobs:
 
       - name: cargo test
         run: cargo test --workspace
+
+  docker:
+    name: docker build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Budowa obrazu (Dockerfile)
+        run: docker build -t dscan:ci .

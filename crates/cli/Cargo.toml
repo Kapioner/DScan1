@@ -1,6 +1,6 @@
 [package]
 name = "dscan"
-description = "DScan — narzędzie do skanowania i inwentaryzacji usług sieciowych."
+description = "DScan (Defect Scan) — skanowanie i inwentaryzacja usług sieciowych."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -9,6 +9,12 @@ repository.workspace = true
 
 [dependencies]
 dscan-config.workspace = true
+dscan-db.workspace = true
+dscan-api.workspace = true
+clap.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
 
 [lints]
 workspace = true

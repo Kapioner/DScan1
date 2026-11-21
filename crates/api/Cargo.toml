@@ -1,6 +1,6 @@
 [package]
 name = "dscan-api"
-description = "REST API (axum) z uwierzytelnianiem i RBAC."
+description = "REST API DScan (axum): routing, obsługa błędów, opis OpenAPI."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -8,6 +8,18 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
+dscan-db.workspace = true
+axum.workspace = true
+tokio.workspace = true
+tower-http.workspace = true
+tracing.workspace = true
+utoipa.workspace = true
+serde.workspace = true
+
+[dev-dependencies]
+tower.workspace = true
+http-body-util.workspace = true
+serde_json.workspace = true
 
 [lints]
 workspace = true
