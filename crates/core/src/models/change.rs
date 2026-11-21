@@ -15,6 +15,26 @@ pub enum ChangeKind {
     Modified,
 }
 
+impl ChangeKind {
+    /// Nazwa zapisywana w bazie (kolumna `changes.kind`).
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            ChangeKind::Appeared => "appeared",
+            ChangeKind::Disappeared => "disappeared",
+            ChangeKind::Modified => "modified",
+        }
+    }
+
+    /// Opis dla użytkownika.
+    pub fn label(&self) -> &'static str {
+        match self {
+            ChangeKind::Appeared => "nowa",
+            ChangeKind::Disappeared => "zniknęła",
+            ChangeKind::Modified => "zmieniona",
+        }
+    }
+}
+
 /// Zmiana wykryta przy porównaniu przebiegów `previous_run_id` → `current_run_id`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Change {

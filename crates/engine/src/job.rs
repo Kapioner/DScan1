@@ -9,6 +9,7 @@ use dscan_scanner::subgroups::split_into_subgroups;
 use dscan_scanner::targets::count_addresses;
 use ipnet::IpNet;
 
+use crate::comparison::{Comparison, compare_with_previous};
 use crate::{EngineError, ScanObserver, ScanProgress, SubgroupReport};
 
 /// Ustawienia przebiegu.
@@ -25,6 +26,9 @@ pub struct ScanJobSettings {
 #[derive(Debug, Clone)]
 pub struct ScanJobSummary {
     pub run_id: i64,
+    /// Zmiany względem poprzedniego udanego przebiegu tego profilu (M1):
+    /// `None`, gdy nie było z czym porównać albo przebieg się nie udał.
+    pub comparison: Option<Comparison>,
     pub status: ScanStatus,
     pub duration: TimeDelta,
     pub subgroups: usize,
@@ -80,7 +84,7 @@ pub async fn run_scan_job<S: SubgroupScanner>(
         let _ = dscan_db::finish_scan_run(pool, created.run_id, ScanStatus::Failed).await;
         return Err(error);
     }
-    job.finish().await
+    job.finish(&settings.profile).await
 }
 
 /// Stan przebiegu w trakcie odbierania wyników z puli.
@@ -156,15 +160,22 @@ impl RunningJob<'_> {
         Ok(report)
     }
 
-    async fn finish(self) -> Result<ScanJobSummary, EngineError> {
+    async fn finish(self, profile: &str) -> Result<ScanJobSummary, EngineError> {
         let status = if self.progress.failed_subgroups == 0 {
             ScanStatus::Completed
         } else {
             ScanStatus::Failed
         };
         dscan_db::finish_scan_run(self.pool, self.progress.run_id, status).await?;
+        // Niepełny (nieudany) przebieg dałby fałszywe „zniknięcia”, więc go nie porównujemy.
+        let comparison = if status == ScanStatus::Completed {
+            compare_with_previous(self.pool, self.progress.run_id, profile).await?
+        } else {
+            None
+        };
         Ok(ScanJobSummary {
             run_id: self.progress.run_id,
+            comparison,
             status,
             duration: self.progress.elapsed(Utc::now()),
             subgroups: self.progress.total_subgroups,

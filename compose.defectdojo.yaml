@@ -1,0 +1,85 @@
+# Lokalny DefectDojo do testów integracji (zadanie D4) — na podstawie oficjalnego
+# docker-compose.yml DefectDojo 3.5.202. Uruchamiaj skryptem: ./scripts/defectdojo-setup.sh
+#
+# Działa obok DScan, ale jako osobny projekt (własna baza, własne wolumeny).
+# Interfejs: http://127.0.0.1:8081 (login admin, hasło DEFECTDOJO_ADMIN_PASSWORD z .env).
+# Obrazy: Docker Hub; przy limicie pobrań ustaw w .env DEFECTDOJO_REGISTRY=registry.defectdojo.com.
+
+name: dscan-defectdojo
+
+x-django: &django
+  image: "${DEFECTDOJO_REGISTRY:-docker.io}/defectdojo/defectdojo-django:${DEFECTDOJO_VERSION:-3.5.202}"
+  depends_on:
+    postgres:
+      condition: service_healthy
+    valkey:
+      condition: service_started
+  environment: &django-env
+    DD_DATABASE_URL: postgresql://defectdojo:${DEFECTDOJO_DB_PASSWORD:?uruchom ./scripts/defectdojo-setup.sh}@postgres:5432/defectdojo
+    DD_CELERY_BROKER_URL: redis://valkey:6379/0
+    DD_CACHE_URL: redis://valkey:6379/1
+    DD_SECRET_KEY: ${DEFECTDOJO_SECRET_KEY:?uruchom ./scripts/defectdojo-setup.sh}
+    DD_CREDENTIAL_AES_256_KEY: ${DEFECTDOJO_AES_KEY:?uruchom ./scripts/defectdojo-setup.sh}
+    DD_ALLOWED_HOSTS: "*"
+    DD_DEBUG: "False"
+    DD_DATABASE_READINESS_TIMEOUT: "60"
+  volumes:
+    - media:/app/media
+
+services:
+  nginx:
+    image: "${DEFECTDOJO_REGISTRY:-docker.io}/defectdojo/defectdojo-nginx:${DEFECTDOJO_VERSION:-3.5.202}"
+    depends_on: [uwsgi]
+    environment:
+      DD_UWSGI_HOST: uwsgi
+      DD_UWSGI_PORT: "3031"
+    volumes:
+      - media:/usr/share/nginx/html/media
+    ports:
+      - "127.0.0.1:${DEFECTDOJO_PORT:-8081}:8080"
+
+  uwsgi:
+    <<: *django
+    entrypoint: ["/wait-for-it.sh", "postgres:5432", "-t", "60", "--", "/entrypoint-uwsgi.sh"]
+
+  celerybeat:
+    <<: *django
+    entrypoint: ["/wait-for-it.sh", "postgres:5432", "-t", "60", "--", "/entrypoint-celery-beat.sh"]
+
+  celeryworker:
+    <<: *django
+    entrypoint: ["/wait-for-it.sh", "postgres:5432", "-t", "60", "--", "/entrypoint-celery-worker.sh"]
+
+  initializer:
+    <<: *django
+    entrypoint: ["/wait-for-it.sh", "postgres:5432", "-t", "60", "--", "/entrypoint-initializer.sh"]
+    environment:
+      <<: *django-env
+      DD_ADMIN_USER: admin
+      DD_ADMIN_MAIL: admin@defectdojo.local
+      DD_ADMIN_PASSWORD: ${DEFECTDOJO_ADMIN_PASSWORD:?uruchom ./scripts/defectdojo-setup.sh}
+      DD_INITIALIZE: "true"
+    restart: "no"
+
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: defectdojo
+      POSTGRES_USER: defectdojo
+      POSTGRES_PASSWORD: ${DEFECTDOJO_DB_PASSWORD:?uruchom ./scripts/defectdojo-setup.sh}
+    volumes:
+      - postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U defectdojo"]
+      interval: 3s
+      retries: 30
+
+  valkey:
+    image: valkey/valkey:8-alpine
+    volumes:
+      - valkey:/data
+
+volumes:
+  media:
+  postgres:
+  valkey:

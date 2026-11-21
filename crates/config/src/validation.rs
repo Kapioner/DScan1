@@ -11,7 +11,22 @@ pub fn validate_settings(settings: &Settings) -> Result<(), ConfigError> {
     validate_windows(settings)?;
     validate_limits(settings)?;
     validate_subgroup_size(settings.limits.subgroup_size)?;
+    validate_probe_paths(&settings.http.probe_paths)?;
     Ok(())
+}
+
+/// Sondowane ścieżki: tylko zwykłe ścieżki na skanowanym hoście (bez `..`, parametrów, innych hostów).
+fn validate_probe_paths(paths: &[String]) -> Result<(), ConfigError> {
+    let safe = |path: &str| {
+        path.starts_with('/')
+            && !path.starts_with("//")
+            && !path.contains("..")
+            && !path.contains(['?', '#'])
+    };
+    match paths.iter().find(|path| !safe(path)) {
+        Some(path) => Err(ConfigError::InvalidProbePath(path.clone())),
+        None => Ok(()),
+    }
 }
 
 /// Największa dozwolona podgrupa — /16 dla IPv4.
@@ -165,6 +180,21 @@ mod tests {
         let warnings = collect_warnings(&config);
 
         assert!(warnings.iter().any(|w| w.contains("0.0.0.0:8080")));
+    }
+
+    #[test]
+    fn unsafe_probe_paths_are_rejected() {
+        let mut settings = Settings::default();
+        for path in ["admin", "/../etc", "/login?x=1", "//evil.example"] {
+            settings.http.probe_paths = vec![path.to_string()];
+            assert!(
+                matches!(
+                    validate_settings(&settings),
+                    Err(ConfigError::InvalidProbePath(_))
+                ),
+                "{path}"
+            );
+        }
     }
 
     #[test]

@@ -2,22 +2,25 @@
 {% block title %}Cele{% endblock %}
 {% block content %}
 <h1>Cele</h1>
-<section class="card">
-  {% if targets.is_empty() %}
-  <p class="muted">Brak celów. Zaimportuj je: <code>./run.sh import cele.csv</code> albo dodaj przez API.</p>
-  {% else %}
-  <table>
-    <thead><tr><th>#</th><th>Rodzaj</th><th>Cel</th><th>Grupa</th><th>Notatka</th></tr></thead>
-    <tbody>
-      {% for target in targets %}
-      <tr>
-        <td>{{ target.id }}</td><td>{{ target.kind }}</td><td><code>{{ target.value }}</code></td>
-        <td>{% if let Some(group) = target.group %}{{ group }}{% else %}—{% endif %}</td>
-        <td>{% if let Some(note) = target.note %}{{ note }}{% endif %}</td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-  {% endif %}
+{% if section.can_edit %}
+<div class="forms">
+  <form class="card" hx-post="/ui/targets" hx-target="#targets-section">
+    <h2>Dodaj cel</h2>
+    <label>Cel (IP, CIDR lub domena) <input name="target" placeholder="10.10.0.0/24" required></label>
+    <label>Grupa <input name="group" placeholder="lab"></label>
+    <label>Notatka <input name="note" placeholder="opcjonalnie (zapisywana zaszyfrowana)"></label>
+    <button type="submit">Dodaj</button>
+  </form>
+  <form class="card" hx-post="/ui/targets/import" hx-encoding="multipart/form-data" hx-target="#targets-section">
+    <h2>Wgraj plik</h2>
+    <p class="muted">CSV z kolumną <code>target</code> (opcjonalnie <code>group</code>, <code>note</code>) albo tablica JSON.</p>
+    <label>Plik <input type="file" name="file" accept=".csv,.json" required></label>
+    <label class="inline"><input type="checkbox" name="dry_run"> tylko sprawdź (nic nie zapisuj)</label>
+    <button type="submit">Wgraj</button>
+  </form>
+</div>
+{% endif %}
+<section class="card" id="targets-section">
+  {{ section|safe }}
 </section>
 {% endblock %}

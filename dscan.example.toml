@@ -83,3 +83,8 @@ max_redirects = 5
 # Ile bajtów treści odpowiedzi czytać (wystarczy na tytuł strony).
 max_body_bytes = 262144
 user_agent = "DScan/0.1.0 (skaner bezpieczeństwa)"
+# Bezpieczne sondowanie (tylko GET, bez formularzy i haseł): ścieżki sprawdzane na każdej
+# usłudze WWW. Dochodzą do nich ścieżki z sygnatur (np. /wp-login.php).
+probe_paths = ["/login", "/admin", "/version"]
+# Najwyżej tyle sond na usługę (obowiązuje też limits.http_requests_per_host).
+max_probes_per_service = 10

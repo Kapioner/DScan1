@@ -20,6 +20,7 @@ wymieniał każdą z nich.
 | `DSCAN_ENCRYPTION_KEY` | Klucz AES-256 do pól poufnych. Kto go ma, odczyta wszystkie dane poufne, więc nie może trafić do bazy ani do repozytorium. |
 | `DSCAN_DATABASE_URL` / `POSTGRES_PASSWORD` | Hasło do bazy daje dostęp do wszystkich danych wewnętrznych. |
 | `DSCAN_ADMIN_PASSWORD` | Hasło pierwszego administratora; w bazie zostaje tylko jego skrót argon2id. |
+| `DSCAN_DEFECTDOJO_TOKEN`, `DEFECTDOJO_*` | Token API i sekrety lokalnego DefectDojo (D4) — dostęp do zgłoszeń w DefectDojo. |
 
 ## Dane poufne (szyfrowane)
 
@@ -50,7 +51,7 @@ wymieniał każdą z nich.
 | `services.name/product/version/cpe` | Statystyki technologii na dashboardzie i wyszukiwanie podatnych wersji. Pełny baner (bogatszy w szczegóły) jest szyfrowany. |
 | `services.fingerprint_hash` | Skrót odcisku usługi (do wykrywania zmian); z samego skrótu nie da się odtworzyć danych. |
 | `http_info.url/status_code/title`, `redirect_chain` | Filtrowanie i lista hostów w UI. Tytuł strony jest widoczny publicznie dla każdego, kto ją otworzy. |
-| `detections.*` | Rozpoznane technologie z pewnością i opisem dowodu; potrzebne do filtrów i oceny znalezisk. Zasada dla silnika sygnatur (H5, H8): dowody zawierają nazwy ciasteczek i nagłówków, nie ich wartości. |
+| `detections.*` | Rozpoznane technologie z pewnością i opisem dowodu; potrzebne do filtrów i oceny znalezisk. Dowody ciasteczek zawierają tylko nazwę ciasteczka, nie wartość (identyfikator sesji). Dowody nagłówków zawierają wartość tylko dla nagłówków wskazanych w sygnaturach (np. `Server`). |
 | `targets.kind/value/target_group` | Zakres skanowania musi dać się wyszukiwać i porównywać z `[scope]`. |
 | `scan_runs.*`, `subgroups.addresses/status/czasy/error` | Metadane przebiegu: postęp, czasy, prognoza, wznawianie. |
 | `changes.*` | Wynik porównania przebiegów: adres, port i skróty odcisków. |

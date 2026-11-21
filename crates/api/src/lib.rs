@@ -18,5 +18,6 @@ pub use openapi::ApiDoc;
 pub use router::{build_router, build_router_with};
 pub use routes::health::{DatabaseStatus, HealthResponse};
 pub use routes::scans::ScanRunView;
+pub use routes::validation::{clean_group, clean_note};
 pub use server::serve;
 pub use state::{AppState, AuthConfig};

@@ -1,11 +1,38 @@
 use dscan_core::models::Host;
 
+use crate::probe::{merge_probe_paths, probe_paths};
+use crate::signatures::{SignatureSet, WebEvidence};
 use crate::{HttpFetcher, service_url, to_http_info, web_scheme};
 
-/// Odpytuje każdą otwartą usługę WWW na hostach i zapisuje wynik w `service.http`.
-/// Usługa, której nie udało się odpytać, zostaje bez informacji HTTP (to nie przerywa skanu).
+/// Analiza usług WWW: sygnatury i lista ścieżek do sondowania.
+pub struct WebAnalysis {
+    pub signatures: SignatureSet,
+    /// Ścieżki z konfiguracji i sygnatur (już połączone i sprawdzone).
+    pub probe_paths: Vec<String>,
+    pub max_probes: usize,
+}
+
+impl WebAnalysis {
+    /// Łączy ścieżki z konfiguracji ze ścieżkami potrzebnymi sygnaturom.
+    pub fn new(signatures: SignatureSet, configured_paths: &[String], max_probes: usize) -> Self {
+        let probe_paths = merge_probe_paths(configured_paths, &signatures.probe_paths());
+        WebAnalysis {
+            signatures,
+            probe_paths,
+            max_probes,
+        }
+    }
+}
+
+/// Odpytuje każdą otwartą usługę WWW na hostach: strona główna (H1, H2), sondy ścieżek (H6)
+/// i dopasowanie sygnatur (H5). Wynik trafia do `service.http` i `service.detections`.
+/// Usługa, której nie udało się odpytać, zostaje bez tych informacji (skan trwa dalej).
 /// Zwraca liczbę usług z odczytanymi informacjami.
-pub async fn fingerprint_hosts(fetcher: &HttpFetcher, hosts: &mut [Host]) -> usize {
+pub async fn fingerprint_hosts(
+    fetcher: &HttpFetcher,
+    analysis: &WebAnalysis,
+    hosts: &mut [Host],
+) -> usize {
     let mut fetched = 0;
     for host in hosts.iter_mut() {
         let ip = host.ip;
@@ -14,10 +41,28 @@ pub async fn fingerprint_hosts(fetcher: &HttpFetcher, hosts: &mut [Host]) -> usi
                 continue;
             };
             let url = service_url(ip, service.port, scheme);
-            if let Ok(response) = fetcher.fetch(&url, ip).await {
-                service.http = Some(to_http_info(&response));
-                fetched += 1;
-            }
+            let Ok(response) = fetcher.fetch(&url, ip).await else {
+                continue;
+            };
+            let info = to_http_info(&response);
+            let body = String::from_utf8_lossy(&response.body);
+            let probes = probe_paths(
+                fetcher,
+                &url,
+                ip,
+                &analysis.probe_paths,
+                analysis.max_probes,
+            )
+            .await;
+            let evidence = WebEvidence {
+                info: &info,
+                body: &body,
+                probes: &probes,
+                favicon_hash: None,
+            };
+            service.detections = analysis.signatures.detect(&evidence);
+            service.http = Some(info);
+            fetched += 1;
         }
     }
     fetched

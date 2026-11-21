@@ -54,13 +54,15 @@ nmap ma CAP_NET_RAW do skanów SYN (`nmap --privileged -sS …`).
 | `serve` | działa | Interfejs WWW i API; migracje bazy, konto administratora przy pierwszym starcie |
 | `scan CEL… [--mode discovery\|services] [--parallel N] [--quiet]` | działa | Skan nmap celów z `[scope]` w podgrupach, równolegle, z fingerprintingiem HTTP; postęp z prognozą, wyniki w bazie |
 | `targets check CEL…` | działa | Sprawdza cele bez skanowania: poprawność, DNS, duplikaty, zakres |
+| `diff A B` | działa | Porównanie dwóch przebiegów: usługi nowe, zniknięte, zmienione |
+| `sig list`, `sig test SYGNATURA --host URL` | działa | Wbudowane sygnatury; test sygnatury na usłudze WWW z zakresu |
 | `targets list` | działa | Cele zapisane w bazie (z odszyfrowanymi notatkami) |
 | `import PLIK [--dry-run]` | działa | Import celów z CSV/JSON z raportem odrzuconych wierszy |
 | `user create-admin LOGIN`, `user list` | działa | Konto administratora (hasło argon2id), lista użytkowników |
 | `keys generate`, `keys rotate` | działa | Nowy klucz; przeszyfrowanie wszystkich pól wrażliwych |
 | `config show`, `config validate` | działa | Efektywna konfiguracja (sekrety ukryte), sprawdzenie i ostrzeżenia |
 | `db migrate`, `db status` | działa | Migracje schematu bazy |
-| `targets add/remove`, `export`, `diff`, `sig`, `import --kind results` | zdefiniowane | Mają `--help`; logika powstanie w kolejnych zadaniach planu |
+| `targets add/remove`, `export`, `import --kind results` | zdefiniowane | Mają `--help`; logika powstanie w kolejnych zadaniach planu |
 
 Flaga globalna `-c/--config PLIK` (lub zmienna `DSCAN_CONFIG`) wskazuje plik konfiguracji.
 Polecenia administracyjne działające bezpośrednio na bazie (`db migrate`, `user create-admin`,
@@ -96,6 +98,15 @@ Polecenia administracyjne działające bezpośrednio na bazie (`db migrate`, `us
   Tylko GET, bez wysyłania ciasteczek i haseł, bez systemowego proxy; przekierowania tylko w obrębie hosta.
   Certyfikat HTTPS, który nie przechodzi weryfikacji (np. self-signed), nie blokuje odczytu — wynik jest
   oznaczany „TLS niezweryfikowany”. Nagłówki i ciasteczka trafiają do bazy zaszyfrowane. Wyłączenie: `[http] enabled = false`.
+- **Sygnatury (H5):** technologie rozpoznawane są sygnaturami YAML ([`crates/fingerprint/signatures/default.yaml`](crates/fingerprint/signatures/default.yaml)):
+  matchery `header`, `cookie`, `body` (regex), `favicon` (hash), `path`; warunek `any`/`all`; wersja z regexu.
+  Pewność = suma wag pasujących matcherów (max 100), a każda detekcja ma listę dowodów.
+- **Sondowanie ścieżek (H6):** ścieżki z `[http] probe_paths` i z sygnatur (np. `/wp-login.php`) — wyłącznie GET,
+  bez formularzy i haseł, najwyżej `max_probes_per_service` na usługę i w budżecie `limits.http_requests_per_host`.
+- **Porównanie przebiegów (M1):** każda otwarta usługa ma odcisk (SHA-256 z produktu, wersji, nazwy, kodu i tytułu HTTP,
+  stabilnych nagłówków i stanu TLS). Po udanym skanie DScan porównuje go z poprzednim udanym przebiegiem tego samego
+  trybu po kluczu (IP, port, protokół): **nowa / zniknęła / zmieniona**. Zmiany są zapisywane w bazie i wypisywane;
+  dowolne dwa przebiegi porówna `./run.sh diff A B`.
 - Wymaga zainstalowanego nmap (`sudo apt install nmap`). Po wdrożeniu RBAC (C5) skan będzie zlecany przez API.
 
 ### Import celów
@@ -133,7 +144,9 @@ Zmienne podane w linii poleceń mają pierwszeństwo przed wartościami z `.env`
 
 Strony renderowane w Ruście (askama), interakcje przez htmx (wkompilowany w binarkę — działa bez internetu).
 Logowanie formularzem, menu zależne od roli (np. „Użytkownicy” tylko dla administracji), pulpit z listą
-przebiegów odświeżaną co 5 s (postęp, czas, prognoza), listy celów i profili skanów.
+przebiegów odświeżaną co 5 s (postęp, czas, prognoza), cele i profile skanów.
+**Formularz celów (F3):** wpis ręczny, wgranie pliku CSV/JSON z tabelą odrzuconych wierszy (opcja „tylko sprawdź”)
+i usuwanie — dostępne dla ról z prawem zapisu; pozostali widzą tylko listę.
 Nagłówki bezpieczeństwa: `Content-Security-Policy` (tylko zasoby z własnego serwera), `X-Frame-Options: DENY`.
 
 ## API
@@ -161,6 +174,19 @@ Błędy zwracane są jako JSON `{"error": "..."}` (400, 401, 403, 404, 409, 413)
 - Ciasteczko `HttpOnly; SameSite=Strict` (ochrona przed CSRF), `Secure` po ustawieniu `server.secure_cookies = true`.
 - Zablokowane konto traci dostęp natychmiast; wygasłe sesje są usuwane przy starcie serwera.
 
+## DefectDojo do testów integracji (D4)
+
+```bash
+./scripts/defectdojo-setup.sh
+```
+
+Uruchamia lokalny DefectDojo 3.5.202 (`compose.defectdojo.yaml`, osobny projekt, http://127.0.0.1:8081),
+generuje jego sekrety w `.env`, pobiera token API i tworzy testowy produkt „DScan lab” oraz engagement
+„DScan — testy”. Wynik trafia do `.env`: `DSCAN_DEFECTDOJO_URL`, `DSCAN_DEFECTDOJO_TOKEN`,
+`DSCAN_DEFECTDOJO_PRODUCT_ID`, `DSCAN_DEFECTDOJO_ENGAGEMENT_ID` (użyje ich eksport w zadaniach I4/I5).
+Login do DefectDojo: `admin`, hasło `DEFECTDOJO_ADMIN_PASSWORD` z `.env`. Zatrzymanie: `./scripts/defectdojo-setup.sh stop`.
+Przy limicie pobrań Docker Hub: `DEFECTDOJO_REGISTRY=registry.defectdojo.com` w `.env`.
+
 ## Konfiguracja
 
 Kolejność ważności: **wartości domyślne < plik TOML < zmienne `DSCAN_*` < flagi CLI**.
@@ -180,7 +206,7 @@ Kolejność ważności: **wartości domyślne < plik TOML < zmienne `DSCAN_*` < 
 | `[stability]` | K przebiegów do statusu „nieaktywny”, N ponowień, odstęp ponowień |
 | `[server]` | adres nasłuchiwania, limit rozmiaru żądania, ważność sesji, flaga `Secure` ciasteczka |
 | `[database]` | rozmiar puli połączeń, timeout połączenia |
-| `[http]` | fingerprinting HTTP: włączony, limit czasu, przekierowania, limit treści, User-Agent |
+| `[http]` | fingerprinting HTTP: włączony, limit czasu, przekierowania, limit treści, User-Agent, sondowane ścieżki |
 
 ### Środowisko testowe (D3)
 
@@ -202,7 +228,7 @@ i limity ruchu z regulaminu organizatora.
 | `dscan-scanner` | `crates/scanner` | Cele (parsowanie, DNS, scalanie, zakres), wrapper nmap, podgrupy, pula workerów, tempo |
 | `dscan-engine` | `crates/engine` | Przebieg skanu: podgrupy → pula → zapis w bazie, postęp i prognoza (Observer) |
 | `dscan-integrations` | `crates/integrations` | Import celów z CSV/JSON |
-| `dscan-fingerprint` | `crates/fingerprint` | Klient HTTP/HTTPS (reqwest + rustls), ekstrakcja informacji (scraper), limiter zapytań (governor) |
+| `dscan-fingerprint` | `crates/fingerprint` | Klient HTTP/HTTPS (reqwest + rustls), ekstrakcja (scraper), silnik sygnatur YAML, sondowanie ścieżek, limiter |
 | `dscan` | `crates/cli` | Binarka `dscan` (clap) |
 
 Schemat bazy (migracje `0001`–`0003`): `targets`, `scan_profiles`, `sessions`,, `scan_runs`, `subgroups`, `hosts`, `services`,

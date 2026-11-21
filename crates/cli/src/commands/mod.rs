@@ -3,12 +3,14 @@
 
 pub mod config;
 pub mod db;
+pub mod diff;
 pub mod import;
 pub mod keys;
 pub mod planned;
 pub mod scan;
 pub mod scan_report;
 pub mod serve;
+pub mod sig;
 pub mod targets;
 pub mod user;
 

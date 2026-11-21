@@ -235,14 +235,19 @@ impl SubgroupScanner for LocalWebScanner {
 #[tokio::test]
 async fn web_fingerprint_decorator_adds_http_info() {
     use dscan_engine::WebFingerprintScanner;
-    use dscan_fingerprint::{HttpFetcher, HttpOptions};
+    use dscan_fingerprint::signatures::SignatureSet;
+    use dscan_fingerprint::{HttpFetcher, HttpOptions, WebAnalysis};
 
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let address = listener.local_addr().unwrap();
     tokio::spawn(async move {
         let app = axum::Router::new().route(
             "/",
-            axum::routing::get(|| async { axum::response::Html("<title>Strona testowa</title>") }),
+            axum::routing::get(|| async {
+                axum::response::Html(
+                    r#"<title>Strona testowa</title><form><input type="password"></form>"#,
+                )
+            }),
         );
         axum::serve(listener, app).await.unwrap();
     });
@@ -253,7 +258,8 @@ async fn web_fingerprint_decorator_adds_http_info() {
         user_agent: "test".into(),
     };
     let fetcher = Arc::new(HttpFetcher::new(options, None).unwrap());
-    let scanner = WebFingerprintScanner::new(LocalWebScanner(address), fetcher);
+    let analysis = Arc::new(WebAnalysis::new(SignatureSet::builtin().unwrap(), &[], 5));
+    let scanner = WebFingerprintScanner::new(LocalWebScanner(address), fetcher, analysis);
 
     let output = scanner
         .scan(&["127.0.0.1/32".parse().unwrap()])
@@ -263,4 +269,87 @@ async fn web_fingerprint_decorator_adds_http_info() {
     let http = output.hosts[0].services[0].http.as_ref().unwrap();
     assert_eq!(http.title.as_deref(), Some("Strona testowa"));
     assert_eq!(http.status_code, 200);
+    let detections = &output.hosts[0].services[0].detections;
+    assert!(
+        detections.iter().any(|d| d.technology == "Panel logowania"),
+        "{detections:?}"
+    );
+}
+
+/// Atrapa: jeden host 10.0.0.0 z usługami podanymi jako (port, produkt).
+struct FixedScanner(Vec<(u16, &'static str)>);
+
+impl SubgroupScanner for FixedScanner {
+    async fn scan(&self, targets: &[IpNet]) -> Result<ScanOutput, ScannerError> {
+        let mut host = Host::new(targets[0].network(), Utc::now());
+        for (port, product) in &self.0 {
+            let mut service = Service::new(*port, Protocol::Tcp, ServiceState::Open);
+            service.product = Some(product.to_string());
+            host.services.push(service);
+        }
+        Ok(ScanOutput {
+            hosts: vec![host],
+            raw_xml: "<nmaprun/>".into(),
+        })
+    }
+}
+
+#[tokio::test]
+async fn second_run_is_compared_with_previous_one() {
+    use dscan_core::models::ChangeKind;
+
+    let Some((pool, schema, url)) = test_pool().await else {
+        return;
+    };
+    let networks: Vec<IpNet> = vec!["10.0.0.0/32".parse().unwrap()];
+    let cipher = Cipher::new(&[3; 32]);
+    let observer = RecordingObserver::default();
+
+    let first = run_scan_job(
+        &pool,
+        &cipher,
+        &networks,
+        Arc::new(FixedScanner(vec![(22, "OpenSSH 9.6"), (443, "nginx")])),
+        &settings(10),
+        &observer,
+    )
+    .await
+    .unwrap();
+    assert!(
+        first.comparison.is_none(),
+        "pierwszy przebieg nie ma z czym się porównać"
+    );
+
+    let second = run_scan_job(
+        &pool,
+        &cipher,
+        &networks,
+        Arc::new(FixedScanner(vec![(22, "OpenSSH 9.7"), (80, "nginx")])),
+        &settings(10),
+        &observer,
+    )
+    .await
+    .unwrap();
+
+    let comparison = second.comparison.unwrap();
+    assert_eq!(comparison.previous_run_id, first.run_id);
+    let kinds: Vec<(u16, ChangeKind)> = comparison
+        .changes
+        .iter()
+        .map(|c| (c.key.port, c.kind))
+        .collect();
+    assert_eq!(
+        kinds,
+        vec![
+            (22, ChangeKind::Modified),
+            (80, ChangeKind::Appeared),
+            (443, ChangeKind::Disappeared)
+        ]
+    );
+
+    let stored = dscan_db::list_changes(&pool, second.run_id).await.unwrap();
+    assert_eq!(stored.len(), 3);
+
+    pool.close().await;
+    drop_schema(&url, &schema).await;
 }

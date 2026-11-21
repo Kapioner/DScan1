@@ -1,0 +1,120 @@
+# Wbudowane sygnatury DScan (zadanie H5). Startowa baza sygnatur (H7) rozszerzy ten plik.
+#
+# Format:
+#   name, category, condition: any|all (domyślnie any)
+#   matchers: lista warunków (type: header | cookie | body | favicon | path), każdy z wagą 0–100
+#   version: opcjonalnie { source: header|body, name: <nagłówek>, pattern: <regex z grupą> }
+# Pewność detekcji = suma wag pasujących matcherów (najwyżej 100).
+
+- name: nginx
+  category: serwer-www
+  matchers:
+    - type: header
+      name: server
+      pattern: '(?i)^nginx'
+      weight: 90
+  version:
+    source: header
+    name: server
+    pattern: '(?i)nginx/([0-9][0-9.]*)'
+
+- name: Apache HTTP Server
+  category: serwer-www
+  matchers:
+    - type: header
+      name: server
+      pattern: '(?i)^apache'
+      weight: 90
+  version:
+    source: header
+    name: server
+    pattern: '(?i)apache/([0-9][0-9.]*)'
+
+- name: PHP
+  category: język
+  matchers:
+    - type: header
+      name: x-powered-by
+      pattern: '(?i)php'
+      weight: 80
+    - type: cookie
+      name: PHPSESSID
+      weight: 40
+  version:
+    source: header
+    name: x-powered-by
+    pattern: '(?i)php/([0-9][0-9.]*)'
+
+- name: WordPress
+  category: cms
+  matchers:
+    - type: body
+      pattern: '/wp-(content|includes)/'
+      weight: 50
+    - type: body
+      pattern: '<meta name="generator" content="WordPress'
+      weight: 40
+    - type: header
+      name: link
+      pattern: 'wp-json'
+      weight: 30
+    - type: path
+      path: /wp-login.php
+      pattern: 'user_login'
+      weight: 40
+  version:
+    source: body
+    pattern: '<meta name="generator" content="WordPress ([0-9.]+)"'
+
+- name: Joomla
+  category: cms
+  matchers:
+    - type: body
+      pattern: '<meta name="generator" content="Joomla'
+      weight: 60
+    - type: path
+      path: /administrator/
+      pattern: '(?i)joomla'
+      weight: 40
+
+- name: Drupal
+  category: cms
+  matchers:
+    - type: header
+      name: x-generator
+      pattern: '(?i)drupal'
+      weight: 70
+    - type: body
+      pattern: 'Drupal\.settings|/sites/default/files/'
+      weight: 40
+  version:
+    source: header
+    name: x-generator
+    pattern: '(?i)drupal ([0-9]+)'
+
+- name: Panel logowania
+  category: panel-admina
+  matchers:
+    - type: body
+      pattern: '(?i)<input[^>]+type="password"'
+      weight: 60
+    - type: path
+      path: /login
+      pattern: '(?i)type="password"'
+      weight: 30
+    - type: path
+      path: /admin
+      pattern: '(?i)type="password"'
+      weight: 30
+
+- name: DScan
+  category: skaner
+  condition: all
+  matchers:
+    - type: body
+      pattern: 'DScan'
+      weight: 50
+    - type: path
+      path: /api/v1/health
+      pattern: '"database"'
+      weight: 50

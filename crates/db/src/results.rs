@@ -7,23 +7,23 @@
 use std::collections::HashMap;
 use std::net::IpAddr;
 
-use dscan_core::models::{Host, HttpInfo, Protocol, Service};
+use dscan_core::models::{Host, HttpInfo, Protocol, Service, service_fingerprint};
 use dscan_crypto::Cipher;
 use sqlx::{PgConnection, Postgres, QueryBuilder};
 
 use crate::columns::SERVICES_BANNER;
-use crate::http_results::insert_http_info;
+use crate::http_results::{DETECTIONS_PER_INSERT, insert_detections, insert_http_info};
 use crate::{DbError, Encrypted, PgPool};
 
 /// Hostów w jednym INSERT (6 parametrów na wiersz).
 pub const HOSTS_PER_INSERT: usize = 1000;
-/// Usług w jednym INSERT (9 parametrów na wiersz).
+/// Usług w jednym INSERT (10 parametrów na wiersz).
 pub const SERVICES_PER_INSERT: usize = 1000;
 
 // Sprawdzenie w czasie kompilacji: paczki mieszczą się w limicie parametrów PostgreSQL.
 pub(crate) const POSTGRES_MAX_PARAMETERS: usize = 65_535;
 const _: () = assert!(HOSTS_PER_INSERT * 6 <= POSTGRES_MAX_PARAMETERS);
-const _: () = assert!(SERVICES_PER_INSERT * 9 <= POSTGRES_MAX_PARAMETERS);
+const _: () = assert!(SERVICES_PER_INSERT * 10 <= POSTGRES_MAX_PARAMETERS);
 
 /// Ile wierszy zapisano.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -81,6 +81,23 @@ pub async fn insert_hosts_with_services(
         insert_http_info(connection, cipher, chunk).await?;
     }
 
+    let detection_rows: Vec<(i64, &dscan_core::models::Detection)> = services
+        .iter()
+        .filter_map(|(host_id, service)| {
+            let id = service_ids.get(&(*host_id, service.port, service.protocol))?;
+            Some(
+                service
+                    .detections
+                    .iter()
+                    .map(move |detection| (*id, detection)),
+            )
+        })
+        .flatten()
+        .collect();
+    for chunk in detection_rows.chunks(DETECTIONS_PER_INSERT) {
+        insert_detections(connection, chunk).await?;
+    }
+
     Ok(SaveSummary {
         hosts: host_ids.len() as u64,
         services: services.len() as u64,
@@ -130,7 +147,7 @@ async fn insert_services(
         .collect::<Result<Vec<_>, DbError>>()?;
 
     let mut query: QueryBuilder<Postgres> = QueryBuilder::new(
-        "INSERT INTO services (host_id, port, protocol, state, name, product, version, cpe, banner) ",
+        "INSERT INTO services (host_id, port, protocol, state, name, product, version, cpe, banner, fingerprint_hash) ",
     );
     query.push_values(
         services.iter().zip(banners),
@@ -143,7 +160,8 @@ async fn insert_services(
                 .push_bind(&service.product)
                 .push_bind(&service.version)
                 .push_bind(&service.cpe)
-                .push_bind(banner);
+                .push_bind(banner)
+                .push_bind(service_fingerprint(service));
         },
     );
     query.push(" RETURNING host_id, port, protocol, id");

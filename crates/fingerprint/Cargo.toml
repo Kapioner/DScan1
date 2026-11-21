@@ -12,6 +12,9 @@ dscan-core.workspace = true
 governor.workspace = true
 reqwest.workspace = true
 scraper.workspace = true
+serde.workspace = true
+serde_yaml.workspace = true
+regex.workspace = true
 
 [dev-dependencies]
 tokio.workspace = true

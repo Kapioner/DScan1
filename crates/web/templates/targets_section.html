@@ -1,0 +1,38 @@
+{% if let Some(notice) = notice %}
+<p class="notice {% if notice.ok %}notice-ok{% else %}notice-error{% endif %}" role="status">{{ notice.text }}</p>
+{% endif %}
+{% if let Some(report) = report %}
+<div class="report">
+  <h2>Plik {{ report.file_name }}</h2>
+  <p>Poprawne cele: <strong>{{ report.accepted }}</strong>, odrzucone wiersze: <strong>{{ report.rejected.len() }}</strong>.
+  {% if report.dry_run %}Tryb „tylko sprawdź” — nic nie zapisano.{% endif %}
+  {% if let Some((inserted, existing)) = report.saved %}Zapisano: {{ inserted }} nowych, {{ existing }} już istniało.{% endif %}</p>
+  {% if !report.rejected.is_empty() %}
+  <table>
+    <thead><tr><th>Wiersz</th><th>Wartość</th><th>Powód</th></tr></thead>
+    <tbody>
+      {% for row in report.rejected %}
+      <tr class="rejected"><td>{{ row.row }}</td><td><code>{{ row.value }}</code></td><td>{{ row.reason }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+</div>
+{% endif %}
+{% if targets.is_empty() %}
+<p class="muted">Brak celów.</p>
+{% else %}
+<table>
+  <thead><tr><th>#</th><th>Rodzaj</th><th>Cel</th><th>Grupa</th><th>Notatka</th>{% if can_edit %}<th></th>{% endif %}</tr></thead>
+  <tbody>
+    {% for target in targets %}
+    <tr>
+      <td>{{ target.id }}</td><td>{{ target.kind }}</td><td><code>{{ target.value }}</code></td>
+      <td>{% if let Some(group) = target.group %}{{ group }}{% else %}—{% endif %}</td>
+      <td>{% if let Some(note) = target.note %}{{ note }}{% endif %}</td>
+      {% if can_edit %}<td><button class="link danger" hx-delete="/ui/targets/{{ target.id }}" hx-target="#targets-section" hx-confirm="Usunąć cel {{ target.value }}?">Usuń</button></td>{% endif %}
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endif %}

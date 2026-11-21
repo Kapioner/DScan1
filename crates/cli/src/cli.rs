@@ -7,11 +7,13 @@ use clap::{Parser, Subcommand};
 
 use crate::commands::config::ConfigArgs;
 use crate::commands::db::DbArgs;
+use crate::commands::diff::DiffArgs;
 use crate::commands::import::ImportArgs;
 use crate::commands::keys::KeysArgs;
-use crate::commands::planned::{DiffArgs, ExportArgs, SigArgs};
+use crate::commands::planned::ExportArgs;
 use crate::commands::scan::ScanArgs;
 use crate::commands::serve::ServeArgs;
+use crate::commands::sig::SigArgs;
 use crate::commands::targets::TargetsArgs;
 use crate::commands::user::UserArgs;
 
