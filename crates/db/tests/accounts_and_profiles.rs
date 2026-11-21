@@ -200,6 +200,7 @@ async fn http_info_is_saved_with_encrypted_headers_and_cookies() {
         }],
         redirect_chain: Vec::new(),
         tls_verified: Some(false),
+        certificate: None,
     });
     host.services = vec![web, Service::new(22, Protocol::Tcp, ServiceState::Open)];
 
@@ -262,5 +263,95 @@ async fn detections_and_fingerprints_are_saved() {
     let fingerprints = run_fingerprints(&db.pool, run.run_id).await.unwrap();
     assert_eq!(fingerprints.len(), 1);
     assert_eq!(fingerprints.values().next().unwrap().len(), 64);
+    db.drop().await;
+}
+
+#[tokio::test]
+async fn overrides_survive_new_runs_and_are_applied_on_read() {
+    use dscan_core::models::{OverrideField, apply_overrides};
+
+    let Some(db) = TestDatabase::create().await else {
+        return;
+    };
+    let admin = create_admin(&db.pool, "admin", "$argon2id$x")
+        .await
+        .unwrap();
+    let scan = |product: &'static str| {
+        let mut host = Host::new("10.0.0.5".parse().unwrap(), Utc::now());
+        let mut web = Service::new(80, Protocol::Tcp, ServiceState::Open);
+        web.product = Some(product.into());
+        host.services = vec![web];
+        host
+    };
+    let first = create_scan_run(&db.pool, "test", 1, &[]).await.unwrap();
+    save_scan_results(&db.pool, &cipher(), first.run_id, &[scan("nginx")])
+        .await
+        .unwrap();
+    let target = OverrideTarget {
+        ip: "10.0.0.5".parse().unwrap(),
+        port: Some(80),
+        protocol: Some(Protocol::Tcp),
+    };
+    set_override(
+        &db.pool,
+        &cipher(),
+        target,
+        OverrideField::Product,
+        "Kamera Hikvision",
+        Some(admin),
+    )
+    .await
+    .unwrap();
+    set_override(
+        &db.pool,
+        &cipher(),
+        target,
+        OverrideField::Product,
+        "Kamera Hikvision DS-2CD",
+        Some(admin),
+    )
+    .await
+    .unwrap();
+
+    // Nowy przebieg (np. trwający skan) — poprawka nadal obowiązuje, bo jest przypięta do adresu.
+    let second = create_scan_run(&db.pool, "test", 1, &[]).await.unwrap();
+    save_scan_results(&db.pool, &cipher(), second.run_id, &[scan("nginx")])
+        .await
+        .unwrap();
+    let overrides = list_overrides(&db.pool, &cipher()).await.unwrap();
+    assert_eq!(overrides.len(), 1);
+    assert_eq!(overrides[0].updated_by.as_deref(), Some("admin"));
+    let mut hosts = load_run_hosts(&db.pool, second.run_id).await.unwrap();
+    apply_overrides(&mut hosts, &overrides);
+    assert_eq!(
+        hosts[0].services[0].product.as_deref(),
+        Some("Kamera Hikvision DS-2CD")
+    );
+    assert_eq!(hosts[0].services[0].edited_fields, vec!["product"]);
+
+    // Obserwacja w bazie bez zmian, a wartość poprawki jest zaszyfrowana.
+    let stored: String =
+        sqlx::query_scalar("SELECT product FROM services ORDER BY id DESC LIMIT 1")
+            .fetch_one(&db.pool)
+            .await
+            .unwrap();
+    assert_eq!(stored, "nginx");
+    let raw: Vec<u8> = sqlx::query_scalar("SELECT value FROM overrides")
+        .fetch_one(&db.pool)
+        .await
+        .unwrap();
+    assert!(!String::from_utf8_lossy(&raw).contains("Hikvision"));
+
+    assert!(
+        delete_override(&db.pool, target, OverrideField::Product)
+            .await
+            .unwrap()
+    );
+    assert!(
+        list_overrides(&db.pool, &cipher())
+            .await
+            .unwrap()
+            .is_empty()
+    );
     db.drop().await;
 }

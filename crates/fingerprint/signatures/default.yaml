@@ -118,3 +118,203 @@
       path: /api/v1/health
       pattern: '"database"'
       weight: 50
+
+# ---------------------------------------------------------------------------
+# Startowa baza sygnatur (zadanie H7)
+# Wagi: 70–90 = znacznik jednoznaczny (np. dedykowany nagłówek), 30–50 = poszlaka.
+# ---------------------------------------------------------------------------
+
+# --- Serwery WWW i aplikacyjne -------------------------------------------------
+- name: Microsoft IIS
+  category: serwer-www
+  matchers:
+    - { type: header, name: server, pattern: '(?i)microsoft-iis', weight: 90 }
+  version: { source: header, name: server, pattern: '(?i)microsoft-iis/([0-9.]+)' }
+
+- name: Caddy
+  category: serwer-www
+  matchers:
+    - { type: header, name: server, pattern: '(?i)^caddy', weight: 90 }
+
+- name: LiteSpeed
+  category: serwer-www
+  matchers:
+    - { type: header, name: server, pattern: '(?i)litespeed', weight: 90 }
+
+- name: Apache Tomcat
+  category: serwer-aplikacji
+  matchers:
+    - { type: body, pattern: '(?i)<title>Apache Tomcat', weight: 70 }
+    - { type: path, path: /manager/html, status: 401, weight: 50 }
+  version: { source: body, pattern: 'Apache Tomcat/([0-9.]+)' }
+
+- name: Jetty
+  category: serwer-aplikacji
+  matchers:
+    - { type: header, name: server, pattern: '(?i)jetty', weight: 90 }
+  version: { source: header, name: server, pattern: '(?i)jetty\(([0-9.]+)' }
+
+- name: JBoss / WildFly
+  category: serwer-aplikacji
+  matchers:
+    - { type: header, name: x-powered-by, pattern: '(?i)(jboss|undertow|wildfly)', weight: 80 }
+    - { type: body, pattern: '(?i)welcome to (jboss|wildfly)', weight: 60 }
+
+- name: Microsoft ASP.NET
+  category: framework
+  matchers:
+    - { type: header, name: x-aspnet-version, weight: 90 }
+    - { type: header, name: x-powered-by, pattern: '(?i)asp\.net', weight: 70 }
+    - { type: cookie, name: ASP.NET_SessionId, weight: 50 }
+  version: { source: header, name: x-aspnet-version, pattern: '([0-9.]+)' }
+
+# --- Frameworki ------------------------------------------------------------------
+- name: Express (Node.js)
+  category: framework
+  matchers:
+    - { type: header, name: x-powered-by, pattern: '(?i)^express', weight: 90 }
+
+- name: Laravel
+  category: framework
+  matchers:
+    - { type: cookie, name: laravel_session, weight: 80 }
+    - { type: cookie, name: XSRF-TOKEN, weight: 20 }
+
+- name: Django
+  category: framework
+  matchers:
+    - { type: cookie, name: csrftoken, weight: 50 }
+    - { type: body, pattern: 'csrfmiddlewaretoken', weight: 50 }
+
+- name: Ruby on Rails
+  category: framework
+  matchers:
+    - { type: header, name: x-runtime, pattern: '^[0-9.]+$', weight: 30 }
+    - { type: body, pattern: 'name="csrf-param" content="authenticity_token"', weight: 70 }
+
+- name: Spring Boot
+  category: framework
+  matchers:
+    - { type: body, pattern: 'Whitelabel Error Page', weight: 80 }
+    - { type: path, path: /actuator/health, pattern: '"status"\s*:\s*"(UP|DOWN)"', weight: 70 }
+
+- name: Next.js
+  category: framework
+  matchers:
+    - { type: header, name: x-powered-by, pattern: '(?i)next\.js', weight: 90 }
+    - { type: body, pattern: '/_next/static/', weight: 60 }
+
+# --- Panele administracyjne i narzędzia ------------------------------------------
+- name: phpMyAdmin
+  category: panel-admina
+  matchers:
+    - { type: body, pattern: '(?i)<title>phpMyAdmin', weight: 90 }
+    - { type: cookie, name: phpMyAdmin, weight: 60 }
+    - { type: path, path: /phpmyadmin/, pattern: '(?i)phpmyadmin', weight: 70 }
+
+- name: Adminer
+  category: panel-admina
+  matchers:
+    - { type: body, pattern: '(?i)<title>[^<]*Adminer', weight: 80 }
+
+- name: Grafana
+  category: panel-admina
+  matchers:
+    - { type: body, pattern: '(?i)<title>Grafana', weight: 80 }
+    - { type: path, path: /api/health, pattern: '"database"\s*:\s*"ok"', weight: 30 }
+  version: { source: body, pattern: '"version":"([0-9.]+)"' }
+
+- name: Kibana
+  category: panel-admina
+  matchers:
+    - { type: header, name: kbn-name, weight: 90 }
+    - { type: header, name: kbn-version, weight: 90 }
+  version: { source: header, name: kbn-version, pattern: '([0-9.]+)' }
+
+- name: Jenkins
+  category: ci-cd
+  matchers:
+    - { type: header, name: x-jenkins, weight: 95 }
+    - { type: body, pattern: '(?i)<title>[^<]*Jenkins', weight: 60 }
+  version: { source: header, name: x-jenkins, pattern: '([0-9.]+)' }
+
+- name: GitLab
+  category: ci-cd
+  matchers:
+    - { type: body, pattern: '(?i)<meta content="GitLab"', weight: 80 }
+    - { type: cookie, name: _gitlab_session, weight: 80 }
+
+- name: Portainer
+  category: panel-admina
+  matchers:
+    - { type: body, pattern: '(?i)<title>Portainer', weight: 90 }
+
+- name: Webmin
+  category: panel-admina
+  matchers:
+    - { type: header, name: server, pattern: '(?i)miniserv', weight: 80 }
+    - { type: body, pattern: '(?i)<title>[^<]*Webmin', weight: 60 }
+
+- name: pgAdmin
+  category: panel-admina
+  matchers:
+    - { type: body, pattern: '(?i)<title>pgAdmin', weight: 90 }
+
+- name: RabbitMQ Management
+  category: panel-admina
+  matchers:
+    - { type: body, pattern: '(?i)<title>RabbitMQ Management', weight: 90 }
+
+- name: Elasticsearch
+  category: baza-danych
+  matchers:
+    - { type: body, pattern: '"tagline"\s*:\s*"You Know, for Search"', weight: 95 }
+  version: { source: body, pattern: '"number"\s*:\s*"([0-9.]+)"' }
+
+- name: Prometheus
+  category: monitoring
+  matchers:
+    - { type: body, pattern: '(?i)<title>Prometheus', weight: 80 }
+
+# --- Urządzenia IoT, kamery, sieć -------------------------------------------------
+- name: Hikvision
+  category: iot-kamera
+  matchers:
+    - { type: header, name: server, pattern: '(?i)(app-webs|dnvrs-webs|hikvision)', weight: 80 }
+    - { type: body, pattern: '(?i)(doc/page/login\.asp|/ISAPI/)', weight: 60 }
+
+- name: Dahua
+  category: iot-kamera
+  matchers:
+    - { type: body, pattern: '(?i)(dahua|/RPC2_Login)', weight: 70 }
+
+- name: Axis
+  category: iot-kamera
+  matchers:
+    - { type: body, pattern: '(?i)(AXIS [A-Z0-9-]+ (Network|Video)|/axis-cgi/)', weight: 80 }
+
+- name: Kamera IP (ogólna)
+  category: iot-kamera
+  matchers:
+    - { type: body, pattern: '(?i)<title>[^<]*(ip ?camera|network camera|webcam|nvr|dvr)', weight: 60 }
+
+- name: MikroTik RouterOS
+  category: sieć
+  matchers:
+    - { type: body, pattern: '(?i)<title>RouterOS', weight: 90 }
+  version: { source: body, pattern: 'RouterOS v([0-9.]+)' }
+
+- name: Ubiquiti UniFi
+  category: sieć
+  matchers:
+    - { type: body, pattern: '(?i)<title>UniFi', weight: 90 }
+
+- name: Drukarka sieciowa
+  category: iot-drukarka
+  matchers:
+    - { type: body, pattern: '(?i)(hp laserjet|embedded web server|brother|xerox|canon remote ui)', weight: 50 }
+
+# --- Przykłady od organizatora ----------------------------------------------------
+# Sygnatury z materiałów organizatora dopisz w osobnym pliku i wskaż go w dscan.toml:
+#   [http] signatures_file = "sygnatury-organizatora.yaml"
+# (ten sam format; sygnatury z pliku są dodawane do wbudowanych).

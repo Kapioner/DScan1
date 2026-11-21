@@ -3,8 +3,9 @@
 use std::fmt::Write;
 
 use chrono::TimeDelta;
+use chrono::{DateTime, Utc};
 use dscan_core::format::format_duration;
-use dscan_core::models::{Host, HttpInfo, Service};
+use dscan_core::models::{CertificateInfo, Detection, Host, HttpInfo, Service};
 use dscan_engine::{ScanJobSummary, ScanProgress, SubgroupReport};
 
 /// Np. `[2/4] podgrupa 3: 256 adresów, 2 hosty, 12.3 s | 50% | pozostało ok. 0:24`.
@@ -78,17 +79,19 @@ pub fn format_hosts(hosts: &[Host]) -> String {
             if let Some(http) = &service.http {
                 let _ = writeln!(text, "      {}", format_http(http));
             }
-            for detection in &service.detections {
-                let version = detection
-                    .version
-                    .as_deref()
-                    .map(|v| format!(" {v}"))
-                    .unwrap_or_default();
+            if let Some(certificate) = service
+                .http
+                .as_ref()
+                .and_then(|http| http.certificate.as_ref())
+            {
                 let _ = writeln!(
                     text,
-                    "      ⚑ {}{version} ({}%)",
-                    detection.technology, detection.confidence
+                    "      {}",
+                    format_certificate(certificate, Utc::now())
                 );
+            }
+            for detection in &service.detections {
+                let _ = writeln!(text, "      {}", format_detection(detection));
             }
         }
     }
@@ -141,6 +144,51 @@ pub fn format_http(http: &HttpInfo) -> String {
         format!(" ({})", notes.join(", "))
     };
     format!("HTTP {}{title}{notes}", http.status_code)
+}
+
+/// Np. `⚑ nginx 1.24.0 (90%: nagłówek server: nginx/1.24.0)` — z dowodami (H8).
+pub fn format_detection(detection: &Detection) -> String {
+    let version = detection
+        .version
+        .as_deref()
+        .map(|v| format!(" {v}"))
+        .unwrap_or_default();
+    let evidence: Vec<&str> = detection
+        .evidence
+        .iter()
+        .map(|e| e.description.as_str())
+        .collect();
+    format!(
+        "⚑ {}{version} ({}%: {})",
+        detection.technology,
+        detection.confidence,
+        evidence.join("; ")
+    )
+}
+
+/// Np. `TLS: CN=app.lab.local, ważny do 2027-01-01, self-signed`.
+pub fn format_certificate(certificate: &CertificateInfo, now: DateTime<Utc>) -> String {
+    let name = certificate
+        .common_name
+        .as_deref()
+        .unwrap_or(&certificate.subject);
+    let mut notes = vec![format!(
+        "ważny do {}",
+        certificate.not_after.format("%Y-%m-%d")
+    )];
+    if certificate.is_expired(now) {
+        notes.push("WYGASŁY".into());
+    } else if certificate.days_left(now) < 30 {
+        notes.push(format!("wygasa za {} dni", certificate.days_left(now)));
+    }
+    if certificate.self_signed {
+        notes.push("self-signed".into());
+    }
+    format!(
+        "TLS: CN={name}, {}, {}",
+        notes.join(", "),
+        certificate.signature_algorithm
+    )
 }
 
 #[cfg(test)]
@@ -226,10 +274,48 @@ mod tests {
             cookies: Vec::new(),
             redirect_chain: Vec::new(),
             tls_verified: Some(false),
+            certificate: None,
         };
         assert_eq!(
             format_http(&http),
             "HTTP 200 „Panel” (TLS niezweryfikowany, Server: nginx)"
+        );
+    }
+
+    #[test]
+    fn certificate_line_flags_problems() {
+        let certificate = CertificateInfo {
+            subject: "CN=app".into(),
+            common_name: Some("app.lab.local".into()),
+            alt_names: Vec::new(),
+            issuer: "CN=app".into(),
+            not_before: "2026-01-01T00:00:00Z".parse().unwrap(),
+            not_after: "2026-06-01T00:00:00Z".parse().unwrap(),
+            signature_algorithm: "sha256WithRSAEncryption".into(),
+            sha256: String::new(),
+            self_signed: true,
+        };
+        let line = format_certificate(&certificate, "2026-11-21T00:00:00Z".parse().unwrap());
+        assert_eq!(
+            line,
+            "TLS: CN=app.lab.local, ważny do 2026-06-01, WYGASŁY, self-signed, sha256WithRSAEncryption"
+        );
+    }
+
+    #[test]
+    fn detection_line_lists_evidence() {
+        let detection = Detection::from_evidence(
+            "nginx".into(),
+            Some("1.24.0".into()),
+            vec![dscan_core::models::Evidence {
+                kind: dscan_core::models::EvidenceKind::Header,
+                description: "nagłówek server: nginx/1.24.0".into(),
+                weight: 90,
+            }],
+        );
+        assert_eq!(
+            format_detection(&detection),
+            "⚑ nginx 1.24.0 (90%: nagłówek server: nginx/1.24.0)"
         );
     }
 

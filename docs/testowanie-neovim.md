@@ -1,4 +1,4 @@
-# Testowanie DScan w Neovimie (zadania 1–30 planu)
+# Testowanie DScan w Neovimie (zadania 1–35 planu)
 
 Aplikacja: **DScan** (*Defect Scan*), binarka `dscan`.
 
@@ -408,6 +408,67 @@ Wymaga Dockera i ok. 2 GB miejsca; pierwszy start trwa kilka minut.
 2. Limit: `:!DSCAN_HTTP__MAX_PROBES_PER_SERVICE=2 ./run.sh sig test '*' --host http://127.0.0.1:8000/` → `(sondy: 2)`.
 3. Niebezpieczna ścieżka w konfiguracji: `:!DSCAN_HTTP__PROBE_PATHS='["/../etc"]' ./run.sh config validate` → błąd `niedozwolona ścieżka`.
 4. Testy: `:!cargo test -q -p dscan-fingerprint probe 2>&1 | grep "test result"` → `ok`.
+
+## Przygotowanie do sekcji 30–34
+
+W terminalu (`:tabnew | terminal`), jako root lub przez `sudo`:
+```
+echo "127.0.0.1 staging.lab.local" | sudo tee -a /etc/hosts
+openssl req -x509 -newkey rsa:2048 -nodes -days 10 -subj /CN=staging.lab.local -addext "subjectAltName=DNS:staging.lab.local" -keyout /tmp/k.pem -out /tmp/c.pem
+openssl s_server -www -accept 8443 -cert /tmp/c.pem -key /tmp/k.pem
+```
+W drugim terminalu serwer z nagłówkiem debugowania i `robots.txt` (skrypt z repozytorium nie jest potrzebny —
+wystarczy dowolny serwer; przykład w Pythonie):
+```
+mkdir -p /tmp/www && cd /tmp/www
+printf 'User-agent: *\nDisallow: /\nDisallow: /admin-old/\n' > robots.txt
+echo '<title>Admin Panel - Login</title><input type="password">' > index.html
+python3 -m http.server 8001 --bind 127.0.0.1
+```
+
+## 30. Startowa baza sygnatur (H7)
+
+1. `:!./run.sh sig list | wc -l` → ok. 40 sygnatur; `:!./run.sh sig list | grep -iE "kamera|hikvision|jenkins|grafana"`.
+2. Próbki odpowiedzi rozpoznawane przez sygnatury: `:!cargo test -q -p dscan-fingerprint --test signature_samples 2>&1 | grep "test result"` → `4 passed`.
+3. Własny plik sygnatur: utwórz `:e moje-sygnatury.yaml` z treścią
+   `- { name: Aplikacja labu, matchers: [ { type: body, pattern: 'Admin Panel', weight: 90 } ] }`, zapisz,
+   potem `:!DSCAN_HTTP__SIGNATURES_FILE=moje-sygnatury.yaml ./run.sh sig test 'Aplikacja labu' --host http://127.0.0.1:8001/`
+   → `Aplikacja labu — pewność 90%`.
+
+## 31. Pewność i dowody (H8)
+
+1. `:!./run.sh sig test '*' --host http://127.0.0.1:8001/` → każda detekcja z `pewność N%` i listą dowodów `• … (+waga)`.
+2. Próg: `:!DSCAN_HTTP__MIN_CONFIDENCE=70 ./run.sh sig test '*' --host http://127.0.0.1:8001/` → zostają tylko detekcje ≥ 70%.
+3. W raporcie skanu (sekcja 32) przy `⚑` jest pewność i dowód, np. `⚑ Tryb debugowania (80%: nagłówek x-debug-token)`.
+
+## 32. Środowiska testowe i panele (M6)
+
+1. `:!./run.sh scan staging.lab.local` (nazwa z `/etc/hosts`; `127.0.0.0/8` w `allowed_networks`) →
+   pod usługą 8001 m.in. `⚑ Środowisko testowe (60%: nazwa hosta staging.lab.local)`,
+   `⚑ Wskazówki w robots.txt (70%: robots.txt blokuje całą witrynę; robots.txt ukrywa: /admin-old/)`,
+   `⚑ Panel administracyjny (50%: tytuł „Admin Panel - Login”)`.
+2. Testy heurystyk: `:!cargo test -q -p dscan-fingerprint environment 2>&1 | grep "test result"` → `ok`.
+
+## 33. Certyfikat TLS (H3)
+
+1. W raporcie skanu z sekcji 32 pod portem 8443:
+   `TLS: CN=staging.lab.local, ważny do …, wygasa za 9 dni, self-signed, sha256WithRSAEncryption`.
+2. Certyfikat w bazie jest zaszyfrowany:
+   `:!docker compose exec -T postgres psql -U dscan -d dscan -c "SELECT encode(substr(certificate,1,8),'hex') FROM http_info WHERE certificate IS NOT NULL LIMIT 1"`.
+3. Testy (odczyt CN/SAN/self-signed z prawdziwego serwera TLS): `:!cargo test -q -p dscan-fingerprint --test fetch_live certificate 2>&1 | grep "test result"`.
+
+## 34. Edycja wyników niezależna od skanu (A6)
+
+W terminalu z `TOKEN` (logowanie jak w sekcji 22) i numerem ostatniego przebiegu `RUN`:
+```
+curl -s -X PUT -H "authorization: Bearer $TOKEN" -H 'content-type: application/json' -d '{"ip":"127.0.0.1","port":8001,"protocol":"tcp","field":"product","value":"Panel testowy"}' localhost:8080/api/v1/overrides -w '%{http_code}\n'
+curl -s -H "authorization: Bearer $TOKEN" localhost:8080/api/v1/scans/$RUN/hosts | python3 -m json.tool | grep -E '"product"|edited_fields' -A1 | head
+```
+→ `204`, a w wynikach `"product": "Panel testowy"` i `"edited_fields": ["product"]`.
+1. Uruchom nowy skan (`./run.sh scan 127.0.0.1 --quiet`) i odczytaj hosty nowego przebiegu → poprawka nadal obowiązuje.
+2. W bazie zostaje obserwacja skanera: `:!docker compose exec -T postgres psql -U dscan -d dscan -c "SELECT product FROM services WHERE port = 8001 ORDER BY id DESC LIMIT 1"`.
+3. Usunięcie: `curl -s -X DELETE -H "authorization: Bearer $TOKEN" 'localhost:8080/api/v1/overrides?ip=127.0.0.1&port=8001&protocol=tcp&field=product'` → `204`, wartość wraca do zaobserwowanej.
+4. Pole usługi bez portu → `400`; rola „odczyt” → `403`.
 
 ## Na koniec
 

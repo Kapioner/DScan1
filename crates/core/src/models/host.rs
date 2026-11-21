@@ -37,6 +37,12 @@ pub struct Host {
     pub services: Vec<Service>,
     pub first_seen: DateTime<Utc>,
     pub last_seen: DateTime<Utc>,
+    /// Notatka (tylko z ręcznej poprawki, A6).
+    #[serde(default)]
+    pub note: Option<String>,
+    /// Pola poprawione ręcznie (A6), np. `["hostname"]`.
+    #[serde(default)]
+    pub edited_fields: Vec<String>,
 }
 
 impl Host {
@@ -49,6 +55,8 @@ impl Host {
             services: Vec::new(),
             first_seen: seen_at,
             last_seen: seen_at,
+            note: None,
+            edited_fields: Vec::new(),
         }
     }
 

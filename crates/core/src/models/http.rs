@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
 
+use super::CertificateInfo;
+
 /// Pojedynczy nagłówek odpowiedzi HTTP.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct HttpHeader {
@@ -41,6 +43,9 @@ pub struct HttpInfo {
     /// niepasująca nazwa — dane odczytano mimo to). `None` dla zwykłego HTTP.
     #[serde(default)]
     pub tls_verified: Option<bool>,
+    /// Certyfikat TLS (tylko HTTPS).
+    #[serde(default)]
+    pub certificate: Option<CertificateInfo>,
 }
 
 impl HttpInfo {
@@ -74,6 +79,7 @@ mod tests {
             cookies: Vec::new(),
             redirect_chain: Vec::new(),
             tls_verified: None,
+            certificate: None,
         }
     }
 

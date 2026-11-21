@@ -32,7 +32,7 @@ wymieniał każdą z nich.
 | `http_info.headers` | Nagłówki odpowiedzi HTTP | Mogą zawierać nazwy wewnętrznych serwerów, identyfikatory sesji (`Set-Cookie`), tokeny i nagłówki debugowania. |
 | `http_info.cookies` | Ciasteczka z atrybutami | Identyfikatory sesji pozwalają przejąć zalogowaną sesję. |
 | `http_info.certificate` | Certyfikat TLS | Pola SAN/CN zdradzają wewnętrzne nazwy i strukturę organizacji. |
-| `overrides.value` | Ręczne poprawki wyników | Operator może wpisać w nich dowolne poufne informacje (jak w notatkach). |
+| `overrides.value` | Ręczne poprawki wyników (A6) | Operator może wpisać w nich dowolne poufne informacje (jak w notatkach). |
 
 ### Model szyfrowania
 

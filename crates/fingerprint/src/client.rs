@@ -60,6 +60,11 @@ impl HttpFetcher {
         })
     }
 
+    /// Limit czasu zapytań (używany też przy odczycie certyfikatu TLS).
+    pub fn timeout(&self) -> Duration {
+        self.options.timeout
+    }
+
     /// Pobiera stronę spod `url`; `ip` to adres hosta (do limitu zapytań na host).
     pub async fn fetch(&self, url: &str, ip: IpAddr) -> Result<RawResponse, FetchError> {
         let start = Url::parse(url).map_err(|_| FetchError::InvalidUrl(url.to_string()))?;

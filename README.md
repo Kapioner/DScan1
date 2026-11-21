@@ -101,6 +101,16 @@ Polecenia administracyjne działające bezpośrednio na bazie (`db migrate`, `us
 - **Sygnatury (H5):** technologie rozpoznawane są sygnaturami YAML ([`crates/fingerprint/signatures/default.yaml`](crates/fingerprint/signatures/default.yaml)):
   matchery `header`, `cookie`, `body` (regex), `favicon` (hash), `path`; warunek `any`/`all`; wersja z regexu.
   Pewność = suma wag pasujących matcherów (max 100), a każda detekcja ma listę dowodów.
+- **Startowa baza sygnatur (H7):** ok. 40 sygnatur — serwery WWW i aplikacyjne, frameworki, CMS-y, panele
+  administracyjne (phpMyAdmin, Grafana, Jenkins, Kibana…), IoT/kamery (Hikvision, Dahua, Axis), urządzenia sieciowe.
+  Własne sygnatury (np. przykłady od organizatora): plik YAML wskazany w `[http] signatures_file`.
+- **Pewność (H8):** każda detekcja ma pewność 0–100 (suma wag dowodów) i listę dowodów; detekcje poniżej
+  `[http] min_confidence` (domyślnie 30) są pomijane. Raport skanu i API pokazują dowody.
+- **Środowiska testowe i panele (M6):** heurystyki — nazwy hostów (dev/test/staging/uat…), nagłówki debugowania
+  (np. `X-Debug-Token`), domyślne strony serwerów, `robots.txt` (blokada całej witryny, ukryte ścieżki), tytuły paneli.
+- **Certyfikat TLS (H3):** CN/SAN, wystawca, ważność, algorytm podpisu, SHA-256; oznaczenie wygasłych,
+  wygasających w ciągu 30 dni i self-signed. Zapisywany w bazie zaszyfrowany; zmiana certyfikatu = zmiana usługi (M1).
+- **Nazwy z `/etc/hosts`:** gdy DNS nie zna domeny, DScan pyta resolver systemu (np. wpisy laboratorium w `/etc/hosts`).
 - **Sondowanie ścieżek (H6):** ścieżki z `[http] probe_paths` i z sygnatur (np. `/wp-login.php`) — wyłącznie GET,
   bez formularzy i haseł, najwyżej `max_probes_per_service` na usługę i w budżecie `limits.http_requests_per_host`.
 - **Porównanie przebiegów (M1):** każda otwarta usługa ma odcisk (SHA-256 z produktu, wersji, nazwy, kodu i tytułu HTTP,
@@ -163,6 +173,8 @@ i profili wymaga uprawnienia `targets:write` (role: administracja, dodawanie/usu
 | `GET /api/v1/groups` | Grupy celów z liczbą celów |
 | `GET/POST /api/v1/profiles`, `GET/PUT/DELETE /api/v1/profiles/{id}` | Profile skanów: tryb, grupa celów, porty, okna czasowe, częstotliwość |
 | `GET /api/v1/scans?limit=N`, `GET /api/v1/scans/{id}` | Przebiegi: stan, postęp, czas trwania, prognoza do końca |
+| `GET /api/v1/scans/{id}/hosts` | Hosty przebiegu z usługami, HTTP i detekcjami (z dowodami), z nałożonymi poprawkami |
+| `GET/PUT/DELETE /api/v1/overrides` | Ręczne poprawki wyników (A6): `hostname`, `host_note`, `product`, `version`, `service_name`, `service_note` |
 | `GET /api/openapi.json` | Opis API (OpenAPI 3.1), np. do Swagger Editor lub Postmana |
 
 Błędy zwracane są jako JSON `{"error": "..."}` (400, 401, 403, 404, 409, 413).
@@ -173,6 +185,20 @@ Błędy zwracane są jako JSON `{"error": "..."}` (400, 401, 403, 404, 409, 413)
 - Sesje w PostgreSQL (przetrwają restart, można je unieważnić); w bazie tylko skrót SHA-256 tokenu.
 - Ciasteczko `HttpOnly; SameSite=Strict` (ochrona przed CSRF), `Secure` po ustawieniu `server.secure_cookies = true`.
 - Zablokowane konto traci dostęp natychmiast; wygasłe sesje są usuwane przy starcie serwera.
+
+### Ręczne poprawki wyników (A6)
+
+Poprawki są przechowywane osobno od obserwacji, przypięte do adresu (IP, opcjonalnie port i protokół),
+a nie do przebiegu, i nakładane przy odczycie. Działają więc także w trakcie skanu i przetrwają kolejne
+przebiegi, a porównanie przebiegów (M1) widzi tylko to, co faktycznie zaobserwował skaner.
+Poprawione pola są wymienione w `edited_fields`. Zapis wymaga uprawnienia `results:write`
+(role: administracja, dodawanie/usuwanie/modyfikacja, modyfikacja i odczyt); wartości są szyfrowane.
+
+```bash
+curl -X PUT -H "Authorization: Bearer $TOKEN" -H 'content-type: application/json' \
+  -d '{"ip":"10.10.0.5","port":80,"protocol":"tcp","field":"product","value":"Kamera Hikvision"}' \
+  http://127.0.0.1:8080/api/v1/overrides
+```
 
 ## DefectDojo do testów integracji (D4)
 

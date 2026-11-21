@@ -2,19 +2,17 @@ use std::sync::Arc;
 
 use chrono::Utc;
 use clap::{Args, ValueEnum};
-use dscan_config::AppConfig;
 use dscan_engine::{
     RateSettings, ScanJobSettings, ScanJobSummary, ScanObserver, ScanProgress, SubgroupReport,
     WebFingerprintScanner, nmap_scanner, rate_per_process, run_scan_job,
 };
-use dscan_fingerprint::signatures::SignatureSet;
-use dscan_fingerprint::{HttpFetcher, HttpOptions, HttpRateLimiter, WebAnalysis};
 use dscan_scanner::nmap::{NmapProfile, ports_argument};
 use dscan_scanner::pool::SubgroupScanner;
 use ipnet::IpNet;
 
 use super::scan_report::{format_hosts, format_progress_line, format_summary};
 use super::targets::{build_plan, format_plan};
+use super::web_setup::{build_analysis, build_fetcher};
 use super::{Command, Context, OverrideArgs, cipher_from_config, connect_database};
 use crate::error::CliError;
 
@@ -96,7 +94,7 @@ impl Command for ScanArgs {
         // Fingerprinting HTTP ma sens tylko po skanie usług (discovery nie zna portów).
         let summary = if self.mode == ScanMode::Services && config.settings.http.enabled {
             let fetcher = Arc::new(build_fetcher(&config)?);
-            let analysis = Arc::new(build_analysis(&config)?);
+            let analysis = Arc::new(build_analysis(&config, &plan.hostnames)?);
             job.run(WebFingerprintScanner::new(nmap, fetcher, analysis))
                 .await?
         } else {
@@ -134,34 +132,6 @@ impl Job<'_> {
         )
         .await?)
     }
-}
-
-/// Sygnatury (wbudowane) i ścieżki do sondowania z `[http]`.
-fn build_analysis(config: &AppConfig) -> Result<WebAnalysis, CliError> {
-    let signatures = SignatureSet::builtin().map_err(|error| CliError::Http(error.to_string()))?;
-    let http = &config.settings.http;
-    Ok(WebAnalysis::new(
-        signatures,
-        &http.probe_paths,
-        http.max_probes_per_service as usize,
-    ))
-}
-
-/// Klient HTTP z limitami z konfiguracji (`[http]` i `[limits]`).
-pub fn build_fetcher(config: &AppConfig) -> Result<HttpFetcher, CliError> {
-    let http = &config.settings.http;
-    let limits = &config.settings.limits;
-    let options = HttpOptions {
-        timeout: std::time::Duration::from_secs(http.timeout_seconds),
-        max_redirects: http.max_redirects,
-        max_body_bytes: http.max_body_bytes,
-        user_agent: http.user_agent.clone(),
-    };
-    let limiter = Arc::new(HttpRateLimiter::new(
-        limits.http_requests_per_second,
-        limits.http_requests_per_host,
-    ));
-    HttpFetcher::new(options, Some(limiter)).map_err(|error| CliError::Http(error.to_string()))
 }
 
 /// Wypisuje postęp skanu na stderr (wyniki idą na stdout, więc można je przekierować do pliku).

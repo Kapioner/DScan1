@@ -64,6 +64,12 @@ pub struct Service {
     pub banner: Option<String>,
     pub http: Option<HttpInfo>,
     pub detections: Vec<Detection>,
+    /// Notatka (tylko z ręcznej poprawki, A6).
+    #[serde(default)]
+    pub note: Option<String>,
+    /// Pola poprawione ręcznie (A6), np. `["product"]`.
+    #[serde(default)]
+    pub edited_fields: Vec<String>,
 }
 
 impl Service {
@@ -80,6 +86,8 @@ impl Service {
             banner: None,
             http: None,
             detections: Vec::new(),
+            note: None,
+            edited_fields: Vec::new(),
         }
     }
 

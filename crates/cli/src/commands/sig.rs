@@ -3,13 +3,13 @@ use std::net::IpAddr;
 use std::sync::Arc;
 
 use clap::{Args, Subcommand};
-use dscan_config::CliOverrides;
+use dscan_config::{AppConfig, CliOverrides};
 use dscan_core::models::Detection;
 use dscan_fingerprint::signatures::{SignatureSet, WebEvidence};
-use dscan_fingerprint::{merge_probe_paths, probe_paths, to_http_info};
+use dscan_fingerprint::{probe_paths, to_http_info};
 use dscan_scanner::targets::{is_in_scope, single_address_network};
 
-use super::scan::build_fetcher;
+use super::web_setup::{build_analysis, build_fetcher, load_signatures};
 use super::{Command, Context};
 use crate::error::CliError;
 
@@ -36,25 +36,18 @@ pub enum SigAction {
 
 impl Command for SigArgs {
     async fn execute(&self, context: &Context) -> Result<(), CliError> {
-        let signatures =
-            SignatureSet::builtin().map_err(|error| CliError::Http(error.to_string()))?;
+        let config = context.load_config(CliOverrides::default())?;
         match &self.action {
-            SigAction::List => print!("{}", format_signature_list(&signatures)),
-            SigAction::Test { signature, host } => {
-                test_signature(context, &signatures, signature, host).await?
-            }
+            SigAction::List => print!("{}", format_signature_list(&load_signatures(&config)?)),
+            SigAction::Test { signature, host } => test_signature(&config, signature, host).await?,
         }
         Ok(())
     }
 }
 
-async fn test_signature(
-    context: &Context,
-    signatures: &SignatureSet,
-    name: &str,
-    url: &str,
-) -> Result<(), CliError> {
-    let config = context.load_config(CliOverrides::default())?;
+/// Odpytuje usługę tak jak skan (strona, certyfikat nie, sondy, sygnatury, heurystyki M6)
+/// i wypisuje detekcje pasujące do nazwy (`*` = wszystkie).
+async fn test_signature(config: &AppConfig, name: &str, url: &str) -> Result<(), CliError> {
     let ip = host_ip(url).ok_or_else(|| {
         CliError::Http(format!(
             "adres {url} musi zawierać IP hosta, np. http://10.0.0.5:80/"
@@ -66,24 +59,30 @@ async fn test_signature(
     ) {
         return Err(CliError::NoTargetsInScope);
     }
-    let fetcher = Arc::new(build_fetcher(&config)?);
+    let analysis = build_analysis(config, &[])?;
+    let fetcher = Arc::new(build_fetcher(config)?);
     let response = fetcher
         .fetch(url, ip)
         .await
         .map_err(|error| CliError::Http(error.to_string()))?;
     let info = to_http_info(&response);
     let body = String::from_utf8_lossy(&response.body);
-    let paths = merge_probe_paths(&config.settings.http.probe_paths, &signatures.probe_paths());
-    let max = config.settings.http.max_probes_per_service as usize;
-    let probes = probe_paths(&fetcher, url, ip, &paths, max).await;
+    let probes = probe_paths(
+        &fetcher,
+        url,
+        ip,
+        &analysis.probe_paths,
+        analysis.max_probes,
+    )
+    .await;
     let evidence = WebEvidence {
         info: &info,
         body: &body,
         probes: &probes,
         favicon_hash: None,
     };
-    let detections: Vec<Detection> = signatures
-        .detect(&evidence)
+    let detections: Vec<Detection> = analysis
+        .analyze(&evidence, &[])
         .into_iter()
         .filter(|detection| name == "*" || detection.technology.eq_ignore_ascii_case(name))
         .collect();

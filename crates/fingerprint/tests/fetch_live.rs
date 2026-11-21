@@ -170,6 +170,8 @@ fn start_self_signed_server(port: u16) -> Option<SelfSignedServer> {
             "1",
             "-subj",
             "/CN=test.invalid",
+            "-addext",
+            "subjectAltName=DNS:test.invalid,IP:127.0.0.1",
         ])
         .arg("-keyout")
         .arg(&key)
@@ -211,4 +213,40 @@ async fn self_signed_certificate_is_read_but_marked_unverified() {
 
     assert_eq!(response.status, 200);
     assert_eq!(response.tls_verified, Some(false));
+}
+
+#[tokio::test]
+async fn certificate_fields_are_read() {
+    let port = 18_444;
+    let Some(_server) = start_self_signed_server(port) else {
+        eprintln!("pomijam test: brak programu openssl");
+        return;
+    };
+    tokio::time::sleep(Duration::from_millis(500)).await;
+
+    let certificate =
+        dscan_fingerprint::fetch_certificate(localhost(), port, Duration::from_secs(5))
+            .await
+            .unwrap();
+
+    assert_eq!(certificate.common_name.as_deref(), Some("test.invalid"));
+    assert_eq!(certificate.alt_names, vec!["test.invalid", "127.0.0.1"]);
+    assert!(certificate.self_signed);
+    assert!(!certificate.is_expired(chrono::Utc::now()));
+    assert_eq!(certificate.days_left(chrono::Utc::now()), 0);
+    assert!(
+        certificate.signature_algorithm.contains("sha256"),
+        "{}",
+        certificate.signature_algorithm
+    );
+    assert_eq!(certificate.sha256.len(), 64);
+}
+
+#[tokio::test]
+async fn certificate_of_plain_http_port_fails_cleanly() {
+    let address = start_server().await;
+    let result =
+        dscan_fingerprint::fetch_certificate(localhost(), address.port(), Duration::from_secs(2))
+            .await;
+    assert!(result.is_err());
 }

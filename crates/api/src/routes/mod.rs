@@ -2,6 +2,7 @@
 
 pub mod health;
 pub mod profiles;
+pub mod results;
 pub mod scans;
 pub mod targets;
 pub mod validation;
