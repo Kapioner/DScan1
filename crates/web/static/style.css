@@ -47,3 +47,10 @@ label.inline { display: flex; gap: 8px; align-items: center; }
 .report { margin-bottom: 16px; }
 tr.rejected td { color: var(--error); }
 button.danger { color: var(--error); }
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 20px; }
+.stat { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 14px; display: flex; flex-direction: column; }
+.stat-value { font-size: 1.8em; font-weight: 600; }
+.stat-label { color: var(--muted); font-size: 0.9em; }
+.inline-form { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
+.inline-form label { display: flex; flex-direction: column; gap: 4px; }
+progress { width: 100px; vertical-align: middle; }

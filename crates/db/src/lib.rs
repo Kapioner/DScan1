@@ -12,8 +12,10 @@ mod keys;
 mod migrations;
 mod overrides;
 mod pool;
+mod presence;
 mod profiles;
 mod results;
+mod resume;
 mod run_hosts;
 mod scan_runs;
 mod sessions;
@@ -33,6 +35,7 @@ pub use migrations::{
 };
 pub use overrides::{OverrideTarget, delete_override, list_overrides, set_override};
 pub use pool::{PgPool, PoolOptions, check_connection, connect, connect_lazy};
+pub use presence::{PresenceUpdate, load_presence, response_history, update_presence};
 pub use profiles::{
     ProfileData, ProfileSaved, ProfileWindow, ScanProfile, create_profile, delete_profile,
     get_profile, list_profiles, update_profile,
@@ -41,9 +44,14 @@ pub use results::{
     HOSTS_PER_INSERT, SERVICES_PER_INSERT, SaveSummary, insert_hosts_with_services,
     save_scan_results,
 };
+pub use resume::{
+    ResumableRun, last_profile_run, load_resumable_run, pause_orphaned_runs, reset_subgroup,
+    run_networks, set_run_status,
+};
 pub use run_hosts::load_run_hosts;
 pub use scan_runs::{
-    CreatedScanRun, create_scan_run, finish_scan_run, get_scan_run, list_scan_runs,
+    CreatedScanRun, NewRun, create_scan_run, create_scan_run_with, finish_scan_run, get_scan_run,
+    list_scan_runs,
 };
 pub use sessions::{
     SessionUser, create_session, delete_expired_sessions, delete_session, find_session_user,

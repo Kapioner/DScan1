@@ -15,6 +15,10 @@ pub struct NmapOptions {
     pub ports: String,
     /// Limit pakietów na sekundę (`--max-rate`).
     pub max_rate: u32,
+    /// `--host-timeout` (sekundy): po tym czasie nmap porzuca host.
+    pub host_timeout_seconds: Option<u64>,
+    /// `--max-retries`: ponowienia sond portu.
+    pub max_retries: Option<u32>,
 }
 
 /// Argumenty nmap dla podanych opcji. Cele nie są w argumentach — `-iL -` czyta je
@@ -24,6 +28,12 @@ pub fn build_nmap_args(options: &NmapOptions) -> Vec<String> {
         NmapProfile::Discovery => vec!["-sn".into()],
         NmapProfile::Services => vec!["-sV".into(), "-p".into(), options.ports.clone()],
     };
+    if let Some(seconds) = options.host_timeout_seconds {
+        args.extend(["--host-timeout".to_string(), format!("{seconds}s")]);
+    }
+    if let Some(retries) = options.max_retries {
+        args.extend(["--max-retries".to_string(), retries.to_string()]);
+    }
     args.extend([
         // Bez odwrotnego DNS: szybciej i bez dodatkowego ruchu (domeny rozwiązujemy sami).
         "-n".to_string(),
@@ -56,6 +66,8 @@ mod tests {
             profile,
             ports: "22,80".to_string(),
             max_rate: 50,
+            host_timeout_seconds: None,
+            max_retries: None,
         }
     }
 
@@ -81,6 +93,16 @@ mod tests {
             assert!(args.ends_with("-iL -"));
             assert!(args.contains("-n"));
         }
+    }
+
+    #[test]
+    fn timeouts_and_retries_are_optional() {
+        let mut opts = options(NmapProfile::Services);
+        assert!(!build_nmap_args(&opts).join(" ").contains("--host-timeout"));
+        opts.host_timeout_seconds = Some(300);
+        opts.max_retries = Some(2);
+        let args = build_nmap_args(&opts).join(" ");
+        assert!(args.contains("--host-timeout 300s") && args.contains("--max-retries 2"));
     }
 
     #[test]

@@ -53,6 +53,27 @@ pub fn format_summary(summary: &ScanJobSummary) -> String {
         format_duration(summary.duration),
         summary.subgroups
     );
+    if summary.status == dscan_core::models::ScanStatus::Paused {
+        text.push_str(&format!(
+            "Przebieg wstrzymany — wznowienie od niedokończonych podgrup: dscan resume {}\n",
+            summary.run_id
+        ));
+    }
+    if let Some(presence) = &summary.presence {
+        text.push_str(&format!(
+            "Obecność hostów: odpowiedziało {}, bez odpowiedzi {}",
+            presence.responded, presence.missed
+        ));
+        if !presence.became_inactive.is_empty() {
+            let ips: Vec<String> = presence
+                .became_inactive
+                .iter()
+                .map(ToString::to_string)
+                .collect();
+            text.push_str(&format!(", nieaktywne od teraz: {}", ips.join(", ")));
+        }
+        text.push('\n');
+    }
     if let Some(comparison) = &summary.comparison {
         text.push_str(&crate::commands::diff::format_changes(
             comparison.previous_run_id,
@@ -339,6 +360,7 @@ mod tests {
             failed_subgroups: 1,
             hosts: Vec::new(),
             comparison: None,
+            presence: None,
         };
         assert_eq!(
             format_summary(&summary),

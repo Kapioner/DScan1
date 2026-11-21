@@ -53,6 +53,8 @@ async fn discovery_finds_localhost() {
         profile: NmapProfile::Discovery,
         ports: String::new(),
         max_rate: 100,
+        host_timeout_seconds: None,
+        max_retries: None,
     };
 
     let output = run_scan(&NmapCommand::default(), &options, &localhost())
@@ -73,6 +75,8 @@ async fn service_scan_detects_ssh_banner() {
         profile: NmapProfile::Services,
         ports: address.port().to_string(),
         max_rate: 100,
+        host_timeout_seconds: None,
+        max_retries: None,
     };
 
     let output = run_scan(&NmapCommand::default(), &options, &localhost())

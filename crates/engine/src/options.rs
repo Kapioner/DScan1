@@ -20,14 +20,28 @@ pub fn rate_per_process(rate: RateSettings) -> u32 {
     per_process_rate(total, rate.parallel)
 }
 
+/// Dodatkowe opcje nmap z profilu skanu (C4).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct NmapTuning {
+    pub host_timeout_seconds: Option<u64>,
+    pub max_retries: Option<u32>,
+}
+
 /// Skaner podgrup nmap z tempem ustawionym tak, by suma procesów nie przekroczyła limitu.
-pub fn nmap_scanner(profile: NmapProfile, ports: String, rate: RateSettings) -> NmapScanner {
+pub fn nmap_scanner(
+    profile: NmapProfile,
+    ports: String,
+    rate: RateSettings,
+    tuning: NmapTuning,
+) -> NmapScanner {
     NmapScanner {
         command: NmapCommand::default(),
         options: NmapOptions {
             profile,
             ports,
             max_rate: rate_per_process(rate),
+            host_timeout_seconds: tuning.host_timeout_seconds,
+            max_retries: tuning.max_retries,
         },
     }
 }
@@ -64,7 +78,12 @@ mod tests {
             bandwidth_kbps: 10_000,
             parallel: 2,
         };
-        let scanner = nmap_scanner(NmapProfile::Discovery, String::new(), rate);
+        let scanner = nmap_scanner(
+            NmapProfile::Discovery,
+            String::new(),
+            rate,
+            NmapTuning::default(),
+        );
         assert_eq!(scanner.options.max_rate, 50);
     }
 }

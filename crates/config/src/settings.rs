@@ -17,6 +17,8 @@ pub struct Settings {
     pub server: ServerSettings,
     pub database: DatabaseSettings,
     pub http: HttpSettings,
+    /// Nazwane profile skanów (C4): `[profiles.NAZWA]`.
+    pub profiles: std::collections::BTreeMap<String, crate::ScanProfileSettings>,
 }
 
 /// Zakres dozwolonego skanowania — wartości od organizatora środowiska testowego.

@@ -8,11 +8,13 @@ use clap::{Parser, Subcommand};
 use crate::commands::config::ConfigArgs;
 use crate::commands::db::DbArgs;
 use crate::commands::diff::DiffArgs;
+use crate::commands::export::ExportArgs;
 use crate::commands::import::ImportArgs;
 use crate::commands::keys::KeysArgs;
-use crate::commands::planned::ExportArgs;
+use crate::commands::run_control::{ResumeArgs, StopArgs};
 use crate::commands::scan::ScanArgs;
 use crate::commands::serve::ServeArgs;
+use crate::commands::session::{LoginArgs, LogoutArgs};
 use crate::commands::sig::SigArgs;
 use crate::commands::targets::TargetsArgs;
 use crate::commands::user::UserArgs;
@@ -54,6 +56,14 @@ pub enum Commands {
     Db(DbArgs),
     /// Zarządza kluczami szyfrowania.
     Keys(KeysArgs),
+    /// Loguje do serwera API i zapisuje token w pliku użytkownika.
+    Login(LoginArgs),
+    /// Wylogowuje i usuwa zapisany token.
+    Logout(LogoutArgs),
+    /// Wstrzymuje trwający skan na serwerze.
+    Stop(StopArgs),
+    /// Wznawia wstrzymany skan na serwerze.
+    Resume(ResumeArgs),
 }
 
 #[cfg(test)]
@@ -61,9 +71,9 @@ mod tests {
     use super::*;
     use clap::CommandFactory;
 
-    const ALL_SUBCOMMANDS: [&str; 11] = [
+    const ALL_SUBCOMMANDS: [&str; 15] = [
         "serve", "scan", "targets", "import", "export", "diff", "sig", "user", "config", "db",
-        "keys",
+        "keys", "login", "logout", "stop", "resume",
     ];
 
     #[test]

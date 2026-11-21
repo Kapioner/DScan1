@@ -85,10 +85,35 @@ pub trait ScanObserver {
     fn subgroup_finished(&self, _report: &SubgroupReport, _progress: &ScanProgress) {}
 }
 
-/// Obserwator, który niczego nie robi (np. dla skanów w tle).
+/// Obserwator, który niczego nie robi.
 pub struct SilentObserver;
 
 impl ScanObserver for SilentObserver {}
+
+/// Obserwator dla skanów w tle (serwer): postęp trafia do logów.
+pub struct LogObserver;
+
+impl ScanObserver for LogObserver {
+    fn scan_started(&self, progress: &ScanProgress) {
+        tracing::info!(
+            "przebieg #{}: {} adresów w {} podgrupach (ukończone: {})",
+            progress.run_id,
+            progress.total_addresses,
+            progress.total_subgroups,
+            progress.finished_subgroups
+        );
+    }
+
+    fn subgroup_finished(&self, report: &SubgroupReport, progress: &ScanProgress) {
+        tracing::info!(
+            "przebieg #{}: podgrupa {} — {} hostów, {:.0}%",
+            progress.run_id,
+            report.index + 1,
+            report.hosts,
+            progress.percent()
+        );
+    }
+}
 
 #[cfg(test)]
 mod tests {

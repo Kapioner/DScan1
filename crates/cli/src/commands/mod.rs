@@ -4,16 +4,17 @@
 pub mod config;
 pub mod db;
 pub mod diff;
+pub mod export;
 pub mod import;
 pub mod keys;
-pub mod planned;
+pub mod run_control;
 pub mod scan;
 pub mod scan_report;
 pub mod serve;
+pub mod session;
 pub mod sig;
 pub mod targets;
 pub mod user;
-pub mod web_setup;
 
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
@@ -137,6 +138,10 @@ impl Command for Commands {
             Commands::Config(args) => args.execute(context).await,
             Commands::Db(args) => args.execute(context).await,
             Commands::Keys(args) => args.execute(context).await,
+            Commands::Login(args) => args.execute(context).await,
+            Commands::Logout(args) => args.execute(context).await,
+            Commands::Stop(args) => args.execute(context).await,
+            Commands::Resume(args) => args.execute(context).await,
         }
     }
 }

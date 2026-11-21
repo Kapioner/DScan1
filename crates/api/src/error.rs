@@ -20,6 +20,7 @@ pub enum ApiError {
     /// Zalogowany, ale bez wymaganego uprawnienia.
     Forbidden,
     Conflict(String),
+    Unavailable(String),
     /// Szczegóły trafiają tylko do logów — klient dostaje ogólny komunikat.
     Internal(String),
 }
@@ -32,6 +33,7 @@ impl ApiError {
             ApiError::Unauthorized => StatusCode::UNAUTHORIZED,
             ApiError::Forbidden => StatusCode::FORBIDDEN,
             ApiError::Conflict(_) => StatusCode::CONFLICT,
+            ApiError::Unavailable(_) => StatusCode::SERVICE_UNAVAILABLE,
             ApiError::Internal(_) => StatusCode::INTERNAL_SERVER_ERROR,
         }
     }
@@ -39,7 +41,9 @@ impl ApiError {
     fn public_message(&self) -> String {
         match self {
             ApiError::NotFound => "nie znaleziono zasobu".to_string(),
-            ApiError::BadRequest(reason) | ApiError::Conflict(reason) => reason.clone(),
+            ApiError::BadRequest(reason)
+            | ApiError::Conflict(reason)
+            | ApiError::Unavailable(reason) => reason.clone(),
             ApiError::Unauthorized => "wymagane zalogowanie".to_string(),
             ApiError::Forbidden => "brak uprawnień do tej operacji".to_string(),
             ApiError::Internal(_) => "wewnętrzny błąd serwera".to_string(),
@@ -56,6 +60,16 @@ impl IntoResponse for ApiError {
             error: self.public_message(),
         };
         (self.status_code(), Json(body)).into_response()
+    }
+}
+
+/// Błędy silnika skanów: problemy z żądaniem → 400, baza → 500.
+impl From<dscan_engine::EngineError> for ApiError {
+    fn from(error: dscan_engine::EngineError) -> Self {
+        match error {
+            dscan_engine::EngineError::Database(db) => ApiError::Internal(db.to_string()),
+            other => ApiError::BadRequest(other.to_string()),
+        }
     }
 }
 

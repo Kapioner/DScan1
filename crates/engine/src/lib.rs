@@ -7,15 +7,35 @@
 //! - [`WebFingerprintScanner`] — dekorator dodający fingerprinting HTTP (H1, H2).
 
 mod comparison;
+mod dashboard;
 mod error;
+mod import;
 mod job;
+mod launch;
 mod options;
 mod progress;
+mod running;
+pub mod scheduler;
+mod service;
+mod setup;
 mod web;
+pub mod windows;
 
 pub use comparison::{Comparison, compare_with_previous};
+pub use dashboard::{
+    Dashboard, Finding, IMPORTANT_CATEGORIES, important_findings, load_dashboard, technology_stats,
+};
 pub use error::EngineError;
-pub use job::{ScanJobSettings, ScanJobSummary, run_scan_job};
-pub use options::{RateSettings, nmap_scanner, rate_per_process};
-pub use progress::{ScanObserver, ScanProgress, SilentObserver, SubgroupReport};
+pub use import::{ImportOutcome, ResultImport, import_results, split_by_scope};
+pub use job::{
+    JobPlan, ScanJobSettings, ScanJobSummary, create_job, drive_job, load_job, run_scan_job,
+};
+pub use launch::{
+    JobScanner, PreparedScan, ScanRequest, build_scanner, effective_settings, job_settings,
+    prepare_scan,
+};
+pub use options::{NmapTuning, RateSettings, nmap_scanner, rate_per_process};
+pub use progress::{LogObserver, ScanObserver, ScanProgress, SilentObserver, SubgroupReport};
+pub use service::{ScanService, StartedScan};
+pub use setup::{build_analysis, build_fetcher, load_signatures};
 pub use web::WebFingerprintScanner;

@@ -2,10 +2,12 @@
 //! interakcje przez htmx (dołączony do binarki — działa bez internetu).
 //!
 //! Na tym etapie: układ strony, logowanie i wylogowanie, menu zależne od roli,
-//! pulpit z listą przebiegów odświeżaną co 5 s, formularz celów (F3: wpis ręczny, wgranie
+//! pulpit (F2: znaleziska, zmiany, technologie, postęp skanów, formularz „Uruchom skan”
+//! z wyborem profilu, wstrzymanie i wznowienie), lista przebiegów odświeżana co 5 s, formularz celów (F3: wpis ręczny, wgranie
 //! CSV/JSON z podglądem błędów, usuwanie) oraz listy profili i użytkowników.
 
 mod assets;
+mod dashboard;
 mod login;
 mod menu;
 mod pages;
@@ -34,6 +36,9 @@ pub fn web_routes() -> Router<AppState> {
         .route("/profiles", get(pages::profiles))
         .route("/users", get(pages::users))
         .route("/ui/partials/scans", get(pages::scans_partial))
+        .route("/ui/partials/overview", get(dashboard::overview_partial))
+        .route("/ui/scans", post(dashboard::start_scan))
+        .route("/ui/scans/{id}/{action}", post(dashboard::control_scan))
         .route("/ui/targets", post(targets_form::add_target))
         .route("/ui/targets/import", post(targets_form::import_file))
         .route("/ui/targets/{id}", delete(targets_form::delete_target))

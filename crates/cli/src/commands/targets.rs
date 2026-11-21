@@ -6,6 +6,7 @@ use dscan_db::StoredTarget;
 use dscan_scanner::targets::{AddressIterator, SystemResolver, TargetPlan, prepare_targets};
 
 use super::{Command, Context, cipher_from_config, connect_database};
+use crate::client::commands::{add_targets_via_api, remove_targets_via_api};
 use crate::error::CliError;
 
 #[derive(Debug, Args)]
@@ -26,7 +27,7 @@ pub enum TargetsAction {
         #[arg(long, default_value_t = 10, value_name = "LICZBA")]
         show: usize,
     },
-    /// Dodaje cele (IP, CIDR, domeny).
+    /// Dodaje cele (IP, CIDR, domeny) przez API — wymaga `dscan login`.
     Add {
         #[arg(required = true, value_name = "CEL")]
         targets: Vec<String>,
@@ -34,7 +35,7 @@ pub enum TargetsAction {
         #[arg(long, value_name = "NAZWA")]
         group: Option<String>,
     },
-    /// Usuwa cele.
+    /// Usuwa cele (po wartości) przez API — wymaga `dscan login`.
     Remove {
         #[arg(required = true, value_name = "CEL")]
         targets: Vec<String>,
@@ -58,11 +59,11 @@ impl Command for TargetsArgs {
                 print!("{}", format_plan(&plan));
                 print!("{}", format_address_preview(&plan, *show));
             }
-            TargetsAction::Add { .. } | TargetsAction::Remove { .. } => {
-                return Err(CliError::NotImplemented {
-                    command: "targets add/remove",
-                    tasks: "A5, C5",
-                });
+            TargetsAction::Add { targets, group } => {
+                print!("{}", add_targets_via_api(targets, group.as_deref()).await?);
+            }
+            TargetsAction::Remove { targets } => {
+                print!("{}", remove_targets_via_api(targets).await?)
             }
         }
         Ok(())

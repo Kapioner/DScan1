@@ -32,22 +32,33 @@ fn user_bar(user: &CurrentUser) -> UserBar {
     }
 }
 
-pub async fn dashboard(WebUser(user): WebUser) -> Result<Html<String>, ApiError> {
+pub async fn dashboard(
+    State(state): State<AppState>,
+    WebUser(user): WebUser,
+) -> Result<Html<String>, ApiError> {
+    let profiles = state
+        .scans
+        .as_ref()
+        .map(|service| dscan_config::profile_names(service.settings()))
+        .unwrap_or_default();
     render(&DashboardPage {
         menu: menu_for(&user, "/"),
         user: user_bar(&user),
+        can_scan: user.has(permissions::TARGETS_WRITE) && state.scans.is_some(),
+        profiles,
     })
 }
 
 /// Fragment HTML z tabelą przebiegów — odświeżany przez htmx co kilka sekund.
 pub async fn scans_partial(
     State(state): State<AppState>,
-    WebUser(_user): WebUser,
+    WebUser(user): WebUser,
 ) -> Result<Html<String>, ApiError> {
     let now = Utc::now();
     let runs = dscan_db::list_scan_runs(&state.db, RECENT_SCANS).await?;
     render(&ScansTable {
         scans: runs.iter().map(|run| ScanRow::from_run(run, now)).collect(),
+        can_control: user.has(permissions::TARGETS_WRITE) && state.scans.is_some(),
     })
 }
 

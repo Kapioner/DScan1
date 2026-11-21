@@ -18,6 +18,15 @@ pub enum HostStatus {
 }
 
 impl HostStatus {
+    /// Odczyt nazwy z bazy (nieznana = aktywny).
+    pub fn parse(text: &str) -> HostStatus {
+        match text {
+            "inactive" => HostStatus::Inactive,
+            "unstable" => HostStatus::Unstable,
+            _ => HostStatus::Active,
+        }
+    }
+
     /// Nazwa zapisywana w bazie (kolumna `hosts.status`).
     pub fn as_str(&self) -> &'static str {
         match self {

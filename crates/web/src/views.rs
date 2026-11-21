@@ -26,12 +26,18 @@ pub struct LoginPage {
 pub struct DashboardPage {
     pub user: UserBar,
     pub menu: Vec<MenuItem>,
+    /// Formularz „Uruchom skan” tylko dla ról z `targets:write`.
+    pub can_scan: bool,
+    /// Nazwy profili z `[profiles]` w dscan.toml (C4).
+    pub profiles: Vec<String>,
 }
 
 #[derive(Template)]
 #[template(path = "scans_table.html")]
 pub struct ScansTable {
     pub scans: Vec<ScanRow>,
+    /// Przyciski „Wstrzymaj”/„Wznów” (S9) dla ról z `targets:write`.
+    pub can_control: bool,
 }
 
 /// Wiersz tabeli przebiegów (wartości już sformatowane).
@@ -41,6 +47,8 @@ pub struct ScanRow {
     pub status: String,
     pub started_at: String,
     pub progress: String,
+    /// Postęp jako liczba całkowita (do paska `<progress>`).
+    pub percent: u32,
     pub subgroups: String,
     pub elapsed: String,
     pub remaining: String,
@@ -54,6 +62,7 @@ impl ScanRow {
             status: run.status.as_str().to_string(),
             started_at: run.started_at.format("%Y-%m-%d %H:%M:%S UTC").to_string(),
             progress: format!("{:.0}%", run.progress_percent()),
+            percent: run.progress_percent().round().clamp(0.0, 100.0) as u32,
             subgroups: format!("{}/{}", run.completed_subgroups, run.total_subgroups),
             elapsed: format_duration(run.elapsed(now)),
             remaining: run

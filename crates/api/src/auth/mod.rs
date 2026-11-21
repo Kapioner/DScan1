@@ -7,10 +7,12 @@
 mod cookie;
 mod extractor;
 pub mod handlers;
+mod rbac;
 mod service;
 
 pub use cookie::{SESSION_COOKIE, clear_session_cookie, session_cookie, token_from_headers};
 pub use extractor::{CurrentUser, authenticate};
+pub use rbac::{Access, authorize, required_access};
 pub use service::{LoginOutcome, login, logout};
 
 /// Uprawnienia ról (z migracji 0001). Rola z `admin` ma wszystkie uprawnienia.

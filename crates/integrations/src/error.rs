@@ -8,6 +8,7 @@ pub enum ImportError {
     MissingTargetColumn,
     InvalidCsv(String),
     InvalidJson(String),
+    InvalidResults(String),
 }
 
 impl fmt::Display for ImportError {
@@ -24,6 +25,7 @@ impl fmt::Display for ImportError {
                 )
             }
             ImportError::InvalidCsv(reason) => write!(f, "niepoprawny plik CSV: {reason}"),
+            ImportError::InvalidResults(reason) => write!(f, "niepoprawne wyniki skanu: {reason}"),
             ImportError::InvalidJson(reason) => write!(
                 f,
                 "niepoprawny plik JSON: {reason} (oczekiwano tablicy celów)"

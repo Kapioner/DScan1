@@ -1,11 +1,10 @@
 use std::fmt::Write;
 
-use chrono::Utc;
 use clap::Args;
-use dscan_config::CliOverrides;
-use dscan_core::models::{Change, compare_runs};
+use dscan_core::models::Change;
 
-use super::{Command, Context, connect_database};
+use super::{Command, Context};
+use crate::client::commands::diff_via_api;
 use crate::error::CliError;
 
 #[derive(Debug, Args)]
@@ -19,29 +18,9 @@ pub struct DiffArgs {
 }
 
 impl Command for DiffArgs {
-    /// Porównanie dwóch dowolnych przebiegów (M1) — liczone na bieżąco, bez zapisu.
-    /// Zmiany względem poprzedniego przebiegu zapisuje sam skan.
-    async fn execute(&self, context: &Context) -> Result<(), CliError> {
-        let config = context.load_config(CliOverrides::default())?;
-        let pool = connect_database(&config).await?;
-        for run_id in [self.previous_run, self.current_run] {
-            if dscan_db::get_scan_run(&pool, run_id).await?.is_none() {
-                return Err(CliError::RunNotFound(run_id));
-            }
-        }
-        let previous = dscan_db::run_fingerprints(&pool, self.previous_run).await?;
-        let current = dscan_db::run_fingerprints(&pool, self.current_run).await?;
-        let changes = compare_runs(
-            &previous,
-            &current,
-            (self.previous_run, self.current_run),
-            Utc::now(),
-        );
-        print!(
-            "{}",
-            format_changes(self.previous_run, self.current_run, &changes)
-        );
-        Ok(())
+    /// Porównanie dwóch dowolnych przebiegów (M1) przez API — liczone na bieżąco, bez zapisu.
+    async fn execute(&self, _context: &Context) -> Result<(), CliError> {
+        diff_via_api(self.previous_run, self.current_run).await
     }
 }
 
@@ -87,6 +66,7 @@ pub fn summarize(changes: &[Change]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use chrono::Utc;
     use dscan_core::models::{ChangeKind, Protocol, ServiceKey};
 
     fn change(port: u16, kind: ChangeKind) -> Change {

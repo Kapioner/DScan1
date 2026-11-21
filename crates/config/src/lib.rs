@@ -12,6 +12,7 @@
 mod error;
 mod loader;
 mod overrides;
+mod profiles;
 mod schedule;
 mod secret;
 mod settings;
@@ -21,6 +22,7 @@ mod validation;
 pub use error::ConfigError;
 pub use loader::{AppConfig, ConfigLoader, ENV_PREFIX};
 pub use overrides::CliOverrides;
+pub use profiles::{ResolvedProfile, ScanProfileSettings, profile_names, resolve_profile};
 pub use schedule::{parse_clock_time, window_length_minutes};
 pub use secret::{
     ADMIN_PASSWORD_ENV, ADMIN_USERNAME_ENV, DATABASE_URL_ENV, DatabaseUrl, ENCRYPTION_KEY_ENV,
