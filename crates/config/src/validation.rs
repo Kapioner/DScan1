@@ -12,6 +12,9 @@ pub fn validate_settings(settings: &Settings) -> Result<(), ConfigError> {
     validate_limits(settings)?;
     validate_subgroup_size(settings.limits.subgroup_size)?;
     validate_probe_paths(&settings.http.probe_paths)?;
+    if settings.http.min_confidence > 100 {
+        return Err(ConfigError::ZeroLimit("http.min_confidence (0–100)"));
+    }
     Ok(())
 }
 

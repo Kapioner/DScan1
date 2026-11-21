@@ -160,6 +160,7 @@ mod tests {
             invalid: vec![("zły".into(), "niepoprawny cel".into())],
             unresolved: vec![("x.lab".into(), "NXDOMAIN".into())],
             out_of_scope: vec!["8.8.8.8/32".parse().unwrap()],
+            hostnames: Vec::new(),
         }
     }
 

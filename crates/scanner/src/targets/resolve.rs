@@ -29,13 +29,26 @@ impl SystemResolver {
 impl DomainResolver for SystemResolver {
     async fn resolve(&self, domain: &str) -> Result<Vec<IpAddr>, String> {
         // Kropka na końcu = nazwa pełna; resolver nie dokleja wtedy domen z `search`.
-        let lookup = self
-            .inner
-            .lookup_ip(format!("{domain}."))
-            .await
-            .map_err(|error| describe_resolve_error(&error))?;
-        Ok(lookup.iter().collect())
+        match self.inner.lookup_ip(format!("{domain}.")).await {
+            Ok(lookup) => Ok(lookup.iter().collect()),
+            // DNS nie zna nazwy — próbujemy resolvera systemu (m.in. /etc/hosts, częste w laboratoriach).
+            Err(error) => os_lookup(domain)
+                .await
+                .ok_or_else(|| describe_resolve_error(&error)),
+        }
     }
+}
+
+/// Rozwiązanie nazwy przez system operacyjny (getaddrinfo: /etc/hosts, nsswitch).
+async fn os_lookup(domain: &str) -> Option<Vec<IpAddr>> {
+    let mut addresses: Vec<IpAddr> = tokio::net::lookup_host((domain, 0))
+        .await
+        .ok()?
+        .map(|socket| socket.ip())
+        .collect();
+    addresses.sort();
+    addresses.dedup();
+    (!addresses.is_empty()).then_some(addresses)
 }
 
 /// Czytelny opis błędu DNS (domyślny opis biblioteki zawiera szczegóły zapytania).

@@ -85,6 +85,10 @@ max_body_bytes = 262144
 user_agent = "DScan/0.1.0 (skaner bezpieczeństwa)"
 # Bezpieczne sondowanie (tylko GET, bez formularzy i haseł): ścieżki sprawdzane na każdej
 # usłudze WWW. Dochodzą do nich ścieżki z sygnatur (np. /wp-login.php).
-probe_paths = ["/login", "/admin", "/version"]
+probe_paths = ["/login", "/admin", "/version", "/robots.txt"]
 # Najwyżej tyle sond na usługę (obowiązuje też limits.http_requests_per_host).
-max_probes_per_service = 10
+max_probes_per_service = 12
+# Detekcje o pewności poniżej progu (0–100) są pomijane.
+min_confidence = 30
+# Dodatkowe sygnatury (np. przykłady od organizatora) w tym samym formacie YAML co wbudowane:
+# signatures_file = "sygnatury-organizatora.yaml"

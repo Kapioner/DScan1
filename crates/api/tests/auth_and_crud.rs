@@ -355,3 +355,95 @@ async fn profiles_crud_and_validation() {
     assert_eq!(status, StatusCode::NO_CONTENT);
     app.stop().await;
 }
+
+#[tokio::test]
+async fn overrides_are_applied_to_run_results() {
+    use dscan_core::models::{Host, Protocol, Service, ServiceState};
+
+    let Some(app) = TestApp::start().await else {
+        return;
+    };
+    app.add_user("analityk", "haslo-analityka-1", "modyfikacja_odczyt")
+        .await;
+    app.add_user("czytelnik", "haslo-czytelnika-1", "odczyt")
+        .await;
+    let analyst = app.login("analityk", "haslo-analityka-1").await;
+    let reader = app.login("czytelnik", "haslo-czytelnika-1").await;
+
+    let run = dscan_db::create_scan_run(&app.pool, "services", 1, &[])
+        .await
+        .unwrap();
+    let mut host = Host::new("10.0.0.5".parse().unwrap(), chrono::Utc::now());
+    let mut web = Service::new(80, Protocol::Tcp, ServiceState::Open);
+    web.product = Some("nginx".into());
+    host.services = vec![web];
+    dscan_db::save_scan_results(&app.pool, &Cipher::new(&[2; 32]), run.run_id, &[host])
+        .await
+        .unwrap();
+
+    let edit = json!({"ip": "10.0.0.5", "port": 80, "protocol": "tcp", "field": "product", "value": "Kamera Hikvision"});
+    let (status, _, _) = app
+        .call(
+            "PUT",
+            "/api/v1/overrides",
+            Some(&reader),
+            Some(edit.clone()),
+        )
+        .await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+    let (status, _, _) = app
+        .call("PUT", "/api/v1/overrides", Some(&analyst), Some(edit))
+        .await;
+    assert_eq!(status, StatusCode::NO_CONTENT);
+    let (status, body, _) = app
+        .call(
+            "PUT",
+            "/api/v1/overrides",
+            Some(&analyst),
+            Some(json!({"ip": "10.0.0.5", "field": "product", "value": "x"})),
+        )
+        .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    assert!(body["error"].as_str().unwrap().contains("portu"));
+
+    let (status, hosts, _) = app
+        .call(
+            "GET",
+            &format!("/api/v1/scans/{}/hosts", run.run_id),
+            Some(&reader),
+            None,
+        )
+        .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(hosts[0]["services"][0]["product"], "Kamera Hikvision");
+    assert_eq!(hosts[0]["services"][0]["edited_fields"], json!(["product"]));
+
+    let (_, list, _) = app
+        .call("GET", "/api/v1/overrides", Some(&reader), None)
+        .await;
+    assert_eq!(list[0]["updated_by"], "analityk");
+
+    let (status, _, _) = app
+        .call(
+            "DELETE",
+            "/api/v1/overrides?ip=10.0.0.5&port=80&protocol=tcp&field=product",
+            Some(&analyst),
+            None,
+        )
+        .await;
+    assert_eq!(status, StatusCode::NO_CONTENT);
+    let (_, hosts, _) = app
+        .call(
+            "GET",
+            &format!("/api/v1/scans/{}/hosts", run.run_id),
+            Some(&reader),
+            None,
+        )
+        .await;
+    assert_eq!(hosts[0]["services"][0]["product"], "nginx");
+    let (status, _, _) = app
+        .call("GET", "/api/v1/scans/999999/hosts", Some(&reader), None)
+        .await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+    app.stop().await;
+}

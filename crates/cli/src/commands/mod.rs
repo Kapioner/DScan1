@@ -13,6 +13,7 @@ pub mod serve;
 pub mod sig;
 pub mod targets;
 pub mod user;
+pub mod web_setup;
 
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};

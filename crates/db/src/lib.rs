@@ -10,9 +10,11 @@ mod error;
 mod http_results;
 mod keys;
 mod migrations;
+mod overrides;
 mod pool;
 mod profiles;
 mod results;
+mod run_hosts;
 mod scan_runs;
 mod sessions;
 mod subgroups;
@@ -29,6 +31,7 @@ pub use keys::{RotatedColumn, reencrypt, rotate_encryption_key};
 pub use migrations::{
     MigrationInfo, available_migrations, compute_migration_status, migration_status, run_migrations,
 };
+pub use overrides::{OverrideTarget, delete_override, list_overrides, set_override};
 pub use pool::{PgPool, PoolOptions, check_connection, connect, connect_lazy};
 pub use profiles::{
     ProfileData, ProfileSaved, ProfileWindow, ScanProfile, create_profile, delete_profile,
@@ -38,6 +41,7 @@ pub use results::{
     HOSTS_PER_INSERT, SERVICES_PER_INSERT, SaveSummary, insert_hosts_with_services,
     save_scan_results,
 };
+pub use run_hosts::load_run_hosts;
 pub use scan_runs::{
     CreatedScanRun, create_scan_run, finish_scan_run, get_scan_run, list_scan_runs,
 };

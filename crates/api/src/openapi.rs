@@ -5,6 +5,7 @@ use crate::ErrorBody;
 use crate::auth::handlers::{LoginRequest, LoginResponse, UserView};
 use crate::routes::health::{DatabaseStatus, HealthResponse};
 use crate::routes::profiles::{ProfileInput, ProfileView, WindowDto};
+use crate::routes::results::{OverrideInput, OverrideView};
 use crate::routes::scans::ScanRunView;
 use crate::routes::targets::{GroupView, NewTarget, TargetChanges, TargetView};
 
@@ -31,18 +32,23 @@ use crate::routes::targets::{GroupView, NewTarget, TargetChanges, TargetView};
         crate::routes::profiles::update_profile,
         crate::routes::profiles::delete_profile,
         crate::routes::scans::list_scans,
-        crate::routes::scans::get_scan
+        crate::routes::scans::get_scan,
+        crate::routes::results::run_hosts,
+        crate::routes::results::list_overrides,
+        crate::routes::results::set_override,
+        crate::routes::results::delete_override
     ),
     components(schemas(
         HealthResponse, DatabaseStatus, ErrorBody, ScanRunView, LoginRequest, LoginResponse, UserView,
-        TargetView, NewTarget, TargetChanges, GroupView, ProfileInput, ProfileView, WindowDto
+        TargetView, NewTarget, TargetChanges, GroupView, ProfileInput, ProfileView, WindowDto, OverrideInput, OverrideView
     )),
     tags(
         (name = "system", description = "Stan usługi"),
         (name = "uwierzytelnianie", description = "Logowanie i sesje"),
         (name = "cele", description = "Cele i grupy celów"),
         (name = "profile", description = "Profile skanów: tryb, porty, okna czasowe, częstotliwość"),
-        (name = "skany", description = "Przebiegi skanów: postęp, czas, prognoza")
+        (name = "skany", description = "Przebiegi skanów: postęp, czas, prognoza"),
+        (name = "wyniki", description = "Hosty i usługi przebiegu, ręczne poprawki wyników")
     )
 )]
 pub struct ApiDoc;

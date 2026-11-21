@@ -12,6 +12,7 @@ use crate::openapi::openapi_json;
 use crate::routes::profiles::{
     create_profile, delete_profile, get_profile, list_profiles, update_profile,
 };
+use crate::routes::results::{delete_override, list_overrides, run_hosts, set_override};
 use crate::routes::scans::{get_scan, list_scans};
 use crate::routes::targets::{
     create_target, delete_target, get_target, list_groups, list_targets, update_target,
@@ -66,6 +67,13 @@ fn api_routes() -> Router<AppState> {
         )
         .route("/api/v1/scans", get(list_scans))
         .route("/api/v1/scans/{id}", get(get_scan))
+        .route("/api/v1/scans/{id}/hosts", get(run_hosts))
+        .route(
+            "/api/v1/overrides",
+            get(list_overrides)
+                .put(set_override)
+                .delete(delete_override),
+        )
         .route("/api/openapi.json", get(openapi_json))
 }
 

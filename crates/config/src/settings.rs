@@ -171,6 +171,10 @@ pub struct HttpSettings {
     pub probe_paths: Vec<String>,
     /// Najwyżej tyle sondowanych ścieżek na jedną usługę.
     pub max_probes_per_service: u32,
+    /// Detekcje o pewności poniżej progu (0–100) są pomijane.
+    pub min_confidence: u8,
+    /// Dodatkowy plik sygnatur YAML (np. od organizatora), dodawany do wbudowanych.
+    pub signatures_file: Option<String>,
 }
 
 impl Default for HttpSettings {
@@ -184,8 +188,15 @@ impl Default for HttpSettings {
                 "DScan/{} (skaner bezpieczeństwa)",
                 env!("CARGO_PKG_VERSION")
             ),
-            probe_paths: vec!["/login".into(), "/admin".into(), "/version".into()],
-            max_probes_per_service: 10,
+            probe_paths: vec![
+                "/login".into(),
+                "/admin".into(),
+                "/version".into(),
+                "/robots.txt".into(),
+            ],
+            max_probes_per_service: 12,
+            min_confidence: 30,
+            signatures_file: None,
         }
     }
 }

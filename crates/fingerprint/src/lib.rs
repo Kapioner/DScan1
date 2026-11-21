@@ -8,12 +8,14 @@
 //! - [`fingerprint_hosts`] — odpytanie wszystkich usług WWW znalezionych przez nmap.
 
 mod client;
+pub mod environment;
 mod error;
 mod extract;
 mod hosts;
 mod probe;
 mod rate_limit;
 mod redirect;
+mod robots;
 pub mod signatures;
 mod tls;
 mod web_service;

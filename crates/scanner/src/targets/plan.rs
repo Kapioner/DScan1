@@ -18,6 +18,8 @@ pub struct TargetPlan {
     pub unresolved: Vec<(String, String)>,
     /// Sieci poza `[scope] allowed_networks`.
     pub out_of_scope: Vec<IpNet>,
+    /// Adresy rozwiązane z domen: (IP, domena) — nazwy przydają się w analizie (np. „staging.”).
+    pub hostnames: Vec<(std::net::IpAddr, String)>,
 }
 
 /// Parsuje cele, rozwiązuje domeny, scala sieci i odrzuca cele spoza zakresu.
@@ -39,7 +41,11 @@ pub async fn prepare_targets(
                     plan.unresolved
                         .push((domain, "brak adresów IP".to_string()));
                 }
-                Ok(ips) => networks.extend(ips.into_iter().map(single_address_network)),
+                Ok(ips) => {
+                    plan.hostnames
+                        .extend(ips.iter().map(|ip| (*ip, domain.clone())));
+                    networks.extend(ips.into_iter().map(single_address_network));
+                }
                 Err(reason) => plan.unresolved.push((domain, reason)),
             },
             Err(error) => plan.invalid.push((input.clone(), error.to_string())),
@@ -98,6 +104,10 @@ mod tests {
 
         assert_eq!(plan.networks, vec!["10.0.0.0/24".parse::<IpNet>().unwrap()]);
         assert_eq!(plan.address_count, 256);
+        assert_eq!(
+            plan.hostnames,
+            vec![("10.0.0.5".parse().unwrap(), "app.lab.local".to_string())]
+        );
     }
 
     #[tokio::test]
