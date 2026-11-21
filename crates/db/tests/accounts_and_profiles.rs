@@ -6,7 +6,8 @@ mod common;
 use chrono::{TimeDelta, Utc};
 use common::TestDatabase;
 use dscan_core::models::{
-    Cookie, Host, HttpHeader, HttpInfo, Protocol, Service, ServiceState, Target, TargetKind,
+    Cookie, Detection, Evidence, EvidenceKind, Host, HttpHeader, HttpInfo, Protocol, Service,
+    ServiceState, Target, TargetKind,
 };
 use dscan_crypto::{Cipher, hash_token};
 use dscan_db::*;
@@ -220,5 +221,46 @@ async fn http_info_is_saved_with_encrypted_headers_and_cookies() {
         .open(&cipher(), &columns::HTTP_INFO_HEADERS)
         .unwrap();
     assert_eq!(opened[0].value, "tajny-serwer");
+    db.drop().await;
+}
+
+#[tokio::test]
+async fn detections_and_fingerprints_are_saved() {
+    let Some(db) = TestDatabase::create().await else {
+        return;
+    };
+    let run = create_scan_run(&db.pool, "test", 1, &[]).await.unwrap();
+    let mut host = Host::new("10.0.0.5".parse().unwrap(), Utc::now());
+    let mut web = Service::new(80, Protocol::Tcp, ServiceState::Open);
+    web.product = Some("nginx".into());
+    web.detections = vec![Detection::from_evidence(
+        "nginx".into(),
+        Some("1.24.0".into()),
+        vec![Evidence {
+            kind: EvidenceKind::Header,
+            description: "nagłówek server".into(),
+            weight: 90,
+        }],
+    )];
+    host.services = vec![web];
+
+    save_scan_results(&db.pool, &cipher(), run.run_id, &[host])
+        .await
+        .unwrap();
+
+    let (technology, version, confidence, evidence): (String, Option<String>, i16, String) =
+        sqlx::query_as("SELECT technology, version, confidence, evidence::text FROM detections")
+            .fetch_one(&db.pool)
+            .await
+            .unwrap();
+    assert_eq!(
+        (technology.as_str(), version.as_deref(), confidence),
+        ("nginx", Some("1.24.0"), 90)
+    );
+    assert!(evidence.contains("nagłówek server"));
+
+    let fingerprints = run_fingerprints(&db.pool, run.run_id).await.unwrap();
+    assert_eq!(fingerprints.len(), 1);
+    assert_eq!(fingerprints.values().next().unwrap().len(), 64);
     db.drop().await;
 }

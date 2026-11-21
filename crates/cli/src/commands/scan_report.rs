@@ -45,13 +45,21 @@ pub fn format_summary(summary: &ScanJobSummary) -> String {
     } else {
         String::new()
     };
-    format!(
+    let mut text = format!(
         "Przebieg #{} zakończony ({}) w {}: {} podgrup{failed}. Wyniki zapisano w bazie.\n",
         summary.run_id,
         summary.status.as_str(),
         format_duration(summary.duration),
         summary.subgroups
-    )
+    );
+    if let Some(comparison) = &summary.comparison {
+        text.push_str(&crate::commands::diff::format_changes(
+            comparison.previous_run_id,
+            summary.run_id,
+            &comparison.changes,
+        ));
+    }
+    text
 }
 
 /// Wynik skanu: hosty z usługami i podsumowanie.
@@ -69,6 +77,18 @@ pub fn format_hosts(hosts: &[Host]) -> String {
             let _ = writeln!(text, "  {}", format_service(service));
             if let Some(http) = &service.http {
                 let _ = writeln!(text, "      {}", format_http(http));
+            }
+            for detection in &service.detections {
+                let version = detection
+                    .version
+                    .as_deref()
+                    .map(|v| format!(" {v}"))
+                    .unwrap_or_default();
+                let _ = writeln!(
+                    text,
+                    "      ⚑ {}{version} ({}%)",
+                    detection.technology, detection.confidence
+                );
             }
         }
     }
@@ -232,6 +252,7 @@ mod tests {
             subgroups: 4,
             failed_subgroups: 1,
             hosts: Vec::new(),
+            comparison: None,
         };
         assert_eq!(
             format_summary(&summary),

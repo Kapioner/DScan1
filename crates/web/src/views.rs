@@ -69,7 +69,61 @@ impl ScanRow {
 pub struct TargetsPage {
     pub user: UserBar,
     pub menu: Vec<MenuItem>,
+    pub section: TargetsSection,
+}
+
+/// Sekcja celów (tabela, komunikat, raport importu) — część strony i odpowiedź htmx.
+#[derive(Template)]
+#[template(path = "targets_section.html")]
+pub struct TargetsSection {
     pub targets: Vec<dscan_db::StoredTarget>,
+    pub can_edit: bool,
+    pub notice: Option<Notice>,
+    pub report: Option<ImportReportView>,
+}
+
+/// Komunikat po akcji (sukces albo błąd).
+pub struct Notice {
+    pub ok: bool,
+    pub text: String,
+}
+
+impl Notice {
+    pub fn ok(text: impl Into<String>) -> Self {
+        Notice {
+            ok: true,
+            text: text.into(),
+        }
+    }
+
+    pub fn error(text: impl Into<String>) -> Self {
+        Notice {
+            ok: false,
+            text: text.into(),
+        }
+    }
+}
+
+/// Raport z wgrania pliku z celami.
+pub struct ImportReportView {
+    pub file_name: String,
+    pub accepted: usize,
+    pub rejected: Vec<dscan_integrations::RejectedRow>,
+    pub dry_run: bool,
+    /// (nowe, już istniejące) — gdy cele zapisano.
+    pub saved: Option<(u64, u64)>,
+}
+
+impl ImportReportView {
+    pub fn new(file_name: &str, import: &dscan_integrations::TargetImport, dry_run: bool) -> Self {
+        ImportReportView {
+            file_name: file_name.to_string(),
+            accepted: import.accepted.len(),
+            rejected: import.rejected.clone(),
+            dry_run,
+            saved: None,
+        }
+    }
 }
 
 #[derive(Template)]

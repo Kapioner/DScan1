@@ -1,4 +1,4 @@
-# Testowanie DScan w Neovimie (zadania 1–25 planu)
+# Testowanie DScan w Neovimie (zadania 1–30 planu)
 
 Aplikacja: **DScan** (*Defect Scan*), binarka `dscan`.
 
@@ -348,6 +348,66 @@ Zmiana i usunięcie: `curl -X PUT … /api/v1/targets/<id> -d '{"group":"prod","
 6. Bez przeglądarki: `:!curl -sI localhost:8080/ | grep -iE "^HTTP|^location"` → `HTTP/1.1 303 See Other`, `location: /login`;
    nagłówki: `:!curl -sI localhost:8080/login | grep -iE "content-security|x-frame"`.
 7. Testy: `:!cargo test -q -p dscan-web 2>&1 | grep "test result"` → `ok`.
+
+## 25. Formularz celów w UI (F3)
+
+Zaloguj się w przeglądarce (<http://127.0.0.1:8080/>, dane z `.env`) i otwórz „Cele”.
+1. „Dodaj cel”: wpisz `10.30.0.9/24`, grupa `lab` → komunikat „Dodano cel 10.30.0.0/24.” i nowy wiersz w tabeli
+   (bez przeładowania strony). Ponownie ten sam → „Cel 10.30.0.0/24 już istnieje.”; `zły cel` → komunikat o błędzie.
+2. „Wgraj plik”: wybierz `docs/examples/cele.csv`, zaznacz „tylko sprawdź” → „Poprawne cele: 3, odrzucone wiersze: 3”
+   i tabela odrzuconych wierszy 5, 6, 7 z powodami; „Tryb „tylko sprawdź” — nic nie zapisano.”
+3. To samo bez zaznaczenia → „Zapisano: … nowych, … już istniało.”
+4. „Usuń” przy celu → okno potwierdzenia → „Usunięto cel.”
+5. Rola tylko do odczytu nie widzi formularzy ani przycisków „Usuń”.
+6. Testy: `:!cargo test -q -p dscan-web 2>&1 | grep "test result"` → `ok`.
+
+## 26. Lokalny DefectDojo (D4)
+
+Wymaga Dockera i ok. 2 GB miejsca; pierwszy start trwa kilka minut.
+1. W terminalu (`:tabnew | terminal`): `./scripts/defectdojo-setup.sh` →
+   `Gotowe: http://127.0.0.1:8081 …`, `Produkt #1 „DScan lab”, engagement #1 …`.
+2. `:e .env` → `DSCAN_DEFECTDOJO_URL`, `DSCAN_DEFECTDOJO_TOKEN`, `DSCAN_DEFECTDOJO_PRODUCT_ID`, `DSCAN_DEFECTDOJO_ENGAGEMENT_ID`.
+3. Token działa (w terminalu): `set -a; . ./.env; set +a; curl -s -H "Authorization: Token $DSCAN_DEFECTDOJO_TOKEN" $DSCAN_DEFECTDOJO_URL/api/v2/engagements/ | head -c 300`.
+4. W przeglądarce <http://127.0.0.1:8081> (admin / `DEFECTDOJO_ADMIN_PASSWORD`) → produkt „DScan lab”.
+5. Ponowne uruchomienie skryptu nie tworzy duplikatów (używa istniejącego produktu i engagementu).
+6. Zatrzymanie: `./scripts/defectdojo-setup.sh stop`. Przy błędzie „429 Too Many Requests” (limit Docker Hub)
+   dopisz do `.env` `DEFECTDOJO_REGISTRY=registry.defectdojo.com` i uruchom ponownie.
+
+## 27. Porównanie przebiegów (M1)
+
+1. Uruchom w terminalu dodatkowy serwer WWW: `python3 -m http.server 8000 --bind 127.0.0.1` (port 8000 jest w `allowed_ports`).
+2. `:!./run.sh scan 127.0.0.1 --quiet` → na końcu `Zmiany #A → #B: …` z `+ 127.0.0.1:8000/tcp  nowa`
+   (przy pierwszym skanie po aktualizacji pozostałe usługi mogą być „zmienione” — wcześniejsze przebiegi nie miały odcisków).
+3. Zatrzymaj serwer z punktu 1 (`Ctrl+C` w terminalu) i powtórz skan → `- 127.0.0.1:8000/tcp  zniknęła`, inne bez zmian.
+4. `:!./run.sh diff A B` (numery z punktów 2–3) → ten sam raport; `:!./run.sh diff 1 999999` → `nie ma przebiegu`.
+5. Zmiany w bazie: `:!docker compose exec -T postgres psql -U dscan -d dscan -c "SELECT current_run_id, ip, port, kind FROM changes ORDER BY id DESC LIMIT 5"`.
+6. Testy: `:!cargo test -q -p dscan-core compare 2>&1 | grep "test result"` → `ok`.
+
+## 28. Silnik sygnatur (H5)
+
+1. `:!./run.sh sig list` → tabela sygnatur (nginx, Apache, PHP, WordPress, Joomla, Drupal, Panel logowania, DScan).
+2. `:e crates/fingerprint/signatures/default.yaml` — format sygnatur (matchery, wagi, wersja).
+3. Strona „WordPress” do testu (w terminalu):
+   ```
+   mkdir -p /tmp/www && echo '<title>Blog</title><meta name="generator" content="WordPress 6.4.2" /><link href="/wp-content/a.css">' > /tmp/www/index.html
+   cd /tmp/www && python3 -m http.server 8000 --bind 127.0.0.1
+   ```
+   Z pierwszej karty: `:!./run.sh sig test WordPress --host http://127.0.0.1:8000/` →
+   `WordPress 6.4.2 — pewność 90%` i lista dowodów (+50, +40).
+4. `:!./run.sh sig test '*' --host http://127.0.0.1:8080/` (serwer DScan) → „Panel logowania” i „DScan” z dowodami.
+5. Poza zakresem: `:!./run.sh sig test WordPress --host http://8.8.8.8/` → odmowa.
+6. Po `./run.sh scan 127.0.0.1` detekcje są pod usługami (`⚑ WordPress 6.4.2 (90%)`) i w bazie:
+   `:!docker compose exec -T postgres psql -U dscan -d dscan -c "SELECT technology, version, confidence FROM detections ORDER BY id DESC LIMIT 5"`.
+7. Testy: `:!cargo test -q -p dscan-fingerprint signatures 2>&1 | grep "test result"` → `ok`.
+
+## 29. Bezpieczne sondowanie ścieżek (H6)
+
+1. Przy działającym serwerze z sekcji 28 (`python3 -m http.server` wypisuje każde zapytanie) uruchom
+   `:!./run.sh sig test '*' --host http://127.0.0.1:8000/` i spójrz na terminal serwera →
+   wyłącznie `GET` na `/`, `/login`, `/admin`, `/version` i ścieżki z sygnatur (np. `/wp-login.php`) — żadnych `POST`.
+2. Limit: `:!DSCAN_HTTP__MAX_PROBES_PER_SERVICE=2 ./run.sh sig test '*' --host http://127.0.0.1:8000/` → `(sondy: 2)`.
+3. Niebezpieczna ścieżka w konfiguracji: `:!DSCAN_HTTP__PROBE_PATHS='["/../etc"]' ./run.sh config validate` → błąd `niedozwolona ścieżka`.
+4. Testy: `:!cargo test -q -p dscan-fingerprint probe 2>&1 | grep "test result"` → `ok`.
 
 ## Na koniec
 

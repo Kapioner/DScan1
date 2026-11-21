@@ -167,6 +167,10 @@ pub struct HttpSettings {
     /// Ile bajtów treści odpowiedzi czytać (wystarczy na tytuł strony).
     pub max_body_bytes: usize,
     pub user_agent: String,
+    /// Ścieżki sondowane zapytaniem GET na każdej usłudze WWW (dochodzą ścieżki z sygnatur).
+    pub probe_paths: Vec<String>,
+    /// Najwyżej tyle sondowanych ścieżek na jedną usługę.
+    pub max_probes_per_service: u32,
 }
 
 impl Default for HttpSettings {
@@ -180,6 +184,8 @@ impl Default for HttpSettings {
                 "DScan/{} (skaner bezpieczeństwa)",
                 env!("CARGO_PKG_VERSION")
             ),
+            probe_paths: vec!["/login".into(), "/admin".into(), "/version".into()],
+            max_probes_per_service: 10,
         }
     }
 }

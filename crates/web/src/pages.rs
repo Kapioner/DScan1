@@ -8,6 +8,7 @@ use dscan_api::{ApiError, AppState};
 
 use crate::menu_for;
 use crate::session::WebUser;
+use crate::views::TargetsSection;
 use crate::views::{
     DashboardPage, ForbiddenPage, ProfileRow, ProfilesPage, ScanRow, ScansTable, TargetsPage,
     UserBar, UsersPage,
@@ -55,10 +56,16 @@ pub async fn targets(
     WebUser(user): WebUser,
 ) -> Result<Html<String>, ApiError> {
     let targets = dscan_db::list_targets(&state.db, &state.cipher, None).await?;
+    let section = TargetsSection {
+        targets,
+        can_edit: user.has(permissions::TARGETS_WRITE),
+        notice: None,
+        report: None,
+    };
     render(&TargetsPage {
         menu: menu_for(&user, "/targets"),
         user: user_bar(&user),
-        targets,
+        section,
     })
 }
 

@@ -1,6 +1,7 @@
-//! Zapis wyników HTTP (zadania H1, H2) w paczkach, z szyfrowaniem nagłówków i ciasteczek.
+//! Zapis wyników usług WWW w paczkach: informacje HTTP (H1, H2) z szyfrowaniem nagłówków
+//! i ciasteczek oraz detekcje technologii (H5).
 
-use dscan_core::models::HttpInfo;
+use dscan_core::models::{Detection, HttpInfo};
 use dscan_crypto::Cipher;
 use sqlx::{PgConnection, Postgres, QueryBuilder};
 
@@ -11,6 +12,9 @@ use crate::{DbError, Encrypted};
 /// Wpisów HTTP w jednym INSERT (8 parametrów na wiersz).
 pub const HTTP_INFO_PER_INSERT: usize = 1000;
 const _: () = assert!(HTTP_INFO_PER_INSERT * 8 <= POSTGRES_MAX_PARAMETERS);
+/// Detekcji w jednym INSERT (5 parametrów na wiersz).
+pub const DETECTIONS_PER_INSERT: usize = 1000;
+const _: () = assert!(DETECTIONS_PER_INSERT * 5 <= POSTGRES_MAX_PARAMETERS);
 
 /// Jeden INSERT dla paczki wyników HTTP. Nagłówki i ciasteczka są szyfrowane,
 /// łańcuch przekierowań zapisujemy jako JSON.
@@ -46,6 +50,36 @@ pub(crate) async fn insert_http_info(
         },
     );
 
+    query
+        .build()
+        .execute(&mut *connection)
+        .await
+        .map(|_| ())
+        .map_err(DbError::Query)
+}
+
+/// Detekcje technologii (dowody jako JSON) dla paczki usług.
+pub(crate) async fn insert_detections(
+    connection: &mut PgConnection,
+    rows: &[(i64, &Detection)],
+) -> Result<(), DbError> {
+    let mut prepared = Vec::with_capacity(rows.len());
+    for (service_id, detection) in rows {
+        let evidence = serde_json::to_string(&detection.evidence)
+            .map_err(|error| DbError::Serialization(error.to_string()))?;
+        prepared.push((*service_id, *detection, evidence));
+    }
+    let mut query: QueryBuilder<Postgres> = QueryBuilder::new(
+        "INSERT INTO detections (service_id, technology, version, confidence, evidence) ",
+    );
+    query.push_values(prepared, |mut row, (service_id, detection, evidence)| {
+        row.push_bind(service_id)
+            .push_bind(detection.technology.clone())
+            .push_bind(detection.version.clone())
+            .push_bind(i16::from(detection.confidence))
+            .push_bind(evidence)
+            .push_unseparated("::jsonb");
+    });
     query
         .build()
         .execute(&mut *connection)

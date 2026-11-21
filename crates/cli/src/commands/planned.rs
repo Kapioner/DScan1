@@ -4,7 +4,7 @@
 
 use std::path::PathBuf;
 
-use clap::{Args, Subcommand, ValueEnum};
+use clap::{Args, ValueEnum};
 
 use super::{Command, Context};
 use crate::error::CliError;
@@ -44,48 +44,5 @@ pub struct ExportArgs {
 impl Command for ExportArgs {
     async fn execute(&self, _context: &Context) -> Result<(), CliError> {
         not_implemented("export", "I3, C5")
-    }
-}
-
-#[derive(Debug, Args)]
-pub struct DiffArgs {
-    /// Numer starszego przebiegu.
-    #[arg(value_name = "PRZEBIEG_A")]
-    pub previous_run: i64,
-    /// Numer nowszego przebiegu.
-    #[arg(value_name = "PRZEBIEG_B")]
-    pub current_run: i64,
-}
-
-impl Command for DiffArgs {
-    async fn execute(&self, _context: &Context) -> Result<(), CliError> {
-        not_implemented("diff", "M1, C5")
-    }
-}
-
-#[derive(Debug, Args)]
-pub struct SigArgs {
-    #[command(subcommand)]
-    pub action: SigAction,
-}
-
-#[derive(Debug, Subcommand)]
-pub enum SigAction {
-    /// Wyświetla sygnatury.
-    List,
-    /// Testuje sygnaturę na wybranym hoście.
-    Test {
-        /// Nazwa sygnatury.
-        #[arg(value_name = "SYGNATURA")]
-        signature: String,
-        /// Adres hosta do testu.
-        #[arg(long, value_name = "HOST")]
-        host: String,
-    },
-}
-
-impl Command for SigArgs {
-    async fn execute(&self, _context: &Context) -> Result<(), CliError> {
-        not_implemented("sig", "H5, C5")
     }
 }

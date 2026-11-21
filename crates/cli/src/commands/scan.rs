@@ -7,7 +7,8 @@ use dscan_engine::{
     RateSettings, ScanJobSettings, ScanJobSummary, ScanObserver, ScanProgress, SubgroupReport,
     WebFingerprintScanner, nmap_scanner, rate_per_process, run_scan_job,
 };
-use dscan_fingerprint::{HttpFetcher, HttpOptions, HttpRateLimiter};
+use dscan_fingerprint::signatures::SignatureSet;
+use dscan_fingerprint::{HttpFetcher, HttpOptions, HttpRateLimiter, WebAnalysis};
 use dscan_scanner::nmap::{NmapProfile, ports_argument};
 use dscan_scanner::pool::SubgroupScanner;
 use ipnet::IpNet;
@@ -95,7 +96,9 @@ impl Command for ScanArgs {
         // Fingerprinting HTTP ma sens tylko po skanie usług (discovery nie zna portów).
         let summary = if self.mode == ScanMode::Services && config.settings.http.enabled {
             let fetcher = Arc::new(build_fetcher(&config)?);
-            job.run(WebFingerprintScanner::new(nmap, fetcher)).await?
+            let analysis = Arc::new(build_analysis(&config)?);
+            job.run(WebFingerprintScanner::new(nmap, fetcher, analysis))
+                .await?
         } else {
             job.run(nmap).await?
         };
@@ -133,8 +136,19 @@ impl Job<'_> {
     }
 }
 
+/// Sygnatury (wbudowane) i ścieżki do sondowania z `[http]`.
+fn build_analysis(config: &AppConfig) -> Result<WebAnalysis, CliError> {
+    let signatures = SignatureSet::builtin().map_err(|error| CliError::Http(error.to_string()))?;
+    let http = &config.settings.http;
+    Ok(WebAnalysis::new(
+        signatures,
+        &http.probe_paths,
+        http.max_probes_per_service as usize,
+    ))
+}
+
 /// Klient HTTP z limitami z konfiguracji (`[http]` i `[limits]`).
-fn build_fetcher(config: &AppConfig) -> Result<HttpFetcher, CliError> {
+pub fn build_fetcher(config: &AppConfig) -> Result<HttpFetcher, CliError> {
     let http = &config.settings.http;
     let limits = &config.settings.limits;
     let options = HttpOptions {

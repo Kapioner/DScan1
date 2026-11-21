@@ -3,6 +3,7 @@
 //! Łączenie z bazą, migracje, szyfrowane kolumny ([`Encrypted`]), rotacja klucza,
 //! użytkownicy i sesje, cele, profile skanów, przebiegi skanów i wsadowy zapis wyników. Zapytania do kolejnych tabel dochodzą razem z funkcjami, które ich potrzebują.
 
+mod changes;
 pub mod columns;
 mod encrypted;
 mod error;
@@ -19,6 +20,7 @@ mod target_crud;
 mod targets;
 mod users;
 
+pub use changes::{list_changes, previous_completed_run, run_fingerprints, save_changes};
 pub use columns::{ENCRYPTED_COLUMNS, EncryptedColumn};
 pub use encrypted::Encrypted;
 pub use error::DbError;

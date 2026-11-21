@@ -19,6 +19,7 @@ pub enum ConfigError {
     MissingEncryptionKey,
     MissingDatabaseUrl,
     InvalidSubgroupSize(u32),
+    InvalidProbePath(String),
     /// Nie udało się zamienić konfiguracji na tekst TOML (`config show`).
     Render(String),
 }
@@ -56,6 +57,10 @@ impl fmt::Display for ConfigError {
             ConfigError::InvalidSubgroupSize(size) => write!(
                 f,
                 "limits.subgroup_size = {size}: wymagana potęga dwójki od 1 do 65536 (np. 256)"
+            ),
+            ConfigError::InvalidProbePath(path) => write!(
+                f,
+                "http.probe_paths: niedozwolona ścieżka '{path}' (wymagana zwykła ścieżka od /, bez .., ? i #)"
             ),
             ConfigError::Render(reason) => {
                 write!(f, "nie można wypisać konfiguracji: {reason}")

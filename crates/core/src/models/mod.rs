@@ -1,6 +1,7 @@
 //! Struktury danych opisujące cele, wyniki skanów i zmiany między przebiegami.
 
 mod change;
+mod compare;
 mod detection;
 mod host;
 mod http;
@@ -10,6 +11,7 @@ mod service;
 mod target;
 
 pub use change::{Change, ChangeKind};
+pub use compare::{compare_runs, fingerprint_input, service_fingerprint};
 pub use detection::{Detection, Evidence, EvidenceKind, MAX_CONFIDENCE, cap_confidence};
 pub use host::{Host, HostStatus};
 pub use http::{Cookie, HttpHeader, HttpInfo, Redirect};
