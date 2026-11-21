@@ -1,4 +1,4 @@
-use sztygar_core::models::parse_port_range;
+use dscan_core::models::parse_port_range;
 
 use crate::{ConfigError, Settings, parse_clock_time};
 

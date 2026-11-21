@@ -1,10 +1,10 @@
-# Przykładowa konfiguracja Sztygara.
-# Skopiuj do `sztygar.toml` (plik lokalny, ignorowany przez git) i uzupełnij.
+# Przykładowa konfiguracja DScan.
+# Skopiuj do `dscan.toml` (plik lokalny, ignorowany przez git) i uzupełnij.
 #
-# Kolejność ważności: wartości domyślne < ten plik < zmienne SZTYGAR_<SEKCJA>__<POLE>
-# np. SZTYGAR_LIMITS__NMAP_MAX_RATE=50
+# Kolejność ważności: wartości domyślne < ten plik < zmienne DSCAN_<SEKCJA>__<POLE>
+# np. DSCAN_LIMITS__NMAP_MAX_RATE=50
 #
-# Klucz szyfrowania NIE należy do tego pliku — tylko zmienna SZTYGAR_ENCRYPTION_KEY
+# Klucz szyfrowania NIE należy do tego pliku — tylko zmienna DSCAN_ENCRYPTION_KEY
 # (64 znaki hex; wygeneruj: openssl rand -hex 32).
 
 # --- Środowisko testowe od organizatora (D3) --------------------------------

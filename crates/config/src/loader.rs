@@ -5,13 +5,13 @@ use figment::providers::{Env, Format, Serialized, Toml};
 
 use crate::{ConfigError, ENCRYPTION_KEY_ENV, EncryptionKey, Settings, validate_settings};
 
-/// Prefiks zmiennych środowiskowych, np. `SZTYGAR_LIMITS__NMAP_MAX_RATE`.
-pub const ENV_PREFIX: &str = "SZTYGAR_";
+/// Prefiks zmiennych środowiskowych, np. `DSCAN_LIMITS__NMAP_MAX_RATE`.
+pub const ENV_PREFIX: &str = "DSCAN_";
 
-/// Separator sekcji w nazwie zmiennej: `SZTYGAR_<SEKCJA>__<POLE>`.
+/// Separator sekcji w nazwie zmiennej: `DSCAN_<SEKCJA>__<POLE>`.
 const ENV_SECTION_SEPARATOR: &str = "__";
 
-/// Zmienne z prefiksem `SZTYGAR_`, które nie są polami [`Settings`]
+/// Zmienne z prefiksem `DSCAN_`, które nie są polami [`Settings`]
 /// (bez prefiksu, bo tak porównuje je figment).
 const ENV_KEYS_OUTSIDE_SETTINGS: [&str; 1] = ["ENCRYPTION_KEY"];
 
@@ -35,12 +35,12 @@ impl AppConfig {
 /// Wczytuje konfigurację z wybranych źródeł (wzorzec Builder).
 ///
 /// ```no_run
-/// use sztygar_config::ConfigLoader;
+/// use dscan_config::ConfigLoader;
 ///
 /// let config = ConfigLoader::new()
-///     .optional_file("sztygar.toml")
+///     .optional_file("dscan.toml")
 ///     .load()?;
-/// # Ok::<(), sztygar_config::ConfigError>(())
+/// # Ok::<(), dscan_config::ConfigError>(())
 /// ```
 #[derive(Debug, Clone)]
 pub struct ConfigLoader {

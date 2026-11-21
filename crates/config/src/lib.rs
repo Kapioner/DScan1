@@ -1,9 +1,9 @@
-//! Konfiguracja aplikacji Sztygar.
+//! Konfiguracja aplikacji DScan.
 //!
 //! Źródła (każde kolejne nadpisuje poprzednie):
 //! 1. wartości domyślne ([`Settings::default`]),
-//! 2. plik TOML (np. `sztygar.toml`),
-//! 3. zmienne środowiskowe `SZTYGAR_<SEKCJA>__<POLE>`, np. `SZTYGAR_LIMITS__NMAP_MAX_RATE=50`.
+//! 2. plik TOML (np. `dscan.toml`),
+//! 3. zmienne środowiskowe `DSCAN_<SEKCJA>__<POLE>`, np. `DSCAN_LIMITS__NMAP_MAX_RATE=50`.
 //!
 //! Klucz szyfrowania jest odczytywany **wyłącznie** ze zmiennej
 //! [`ENCRYPTION_KEY_ENV`] — nie da się go wpisać do pliku TOML.

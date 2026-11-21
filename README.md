@@ -1,42 +1,57 @@
-# Sztygar
+# DScan
 
 Narzędzie do skanowania i inwentaryzacji usług sieciowych, napisane w Rust
-i uruchamiane natywnie na hoście. Binarka: `sztygar`.
+i uruchamiane natywnie na hoście. Binarka: `dscan`.
 
-> Nazwa: *sztygar* to górniczy nadzorca w kopalni, czyli ktoś, kto zna każdy chodnik.
-> Sprawdzone kolizje (2026-11): brak crate'a `sztygar` na crates.io; na GitHubie
-> tylko jedno niezwiązane repozytorium (aplikacja React). Nazwa `dscan` była zajęta.
+> Nazwa: **DScan** = *Defect Scan*.
+> Uwaga: crate o nazwie `dscan` istnieje już na crates.io, a na GitHubie są inne
+> projekty o tej nazwie. Nie przeszkadza to w budowaniu i używaniu narzędzia;
+> przy ewentualnej publikacji na crates.io trzeba by użyć innej nazwy pakietu.
 
 ## Struktura workspace
 
 | Crate | Katalog | Odpowiedzialność |
 |---|---|---|
-| `sztygar-core` | `crates/core` | Model domeny: `Target`, `Host`, `Service`, `HttpInfo`, `Detection`, `ScanRun`, `Change` (serde) |
-| `sztygar-config` | `crates/config` | Konfiguracja: TOML + zmienne `SZTYGAR_*`, walidacja, klucz szyfrowania z env |
-| `sztygar-scanner` | `crates/scanner` | Skaner (nmap, podgrupy, limity), *w przygotowaniu* |
-| `sztygar-fingerprint` | `crates/fingerprint` | Fingerprinting HTTP/TLS i sygnatury, *w przygotowaniu* |
-| `sztygar-api` | `crates/api` | REST API (axum) + RBAC, *w przygotowaniu* |
-| `sztygar-web` | `crates/web` | UI (askama + htmx), *w przygotowaniu* |
-| `sztygar` | `crates/cli` | Binarka `sztygar` |
+| `dscan-core` | `crates/core` | Model domeny: `Target`, `Host`, `Service`, `HttpInfo`, `Detection`, `ScanRun`, `Change` (serde) |
+| `dscan-config` | `crates/config` | Konfiguracja: TOML + zmienne `DSCAN_*`, walidacja, klucz szyfrowania z env |
+| `dscan-scanner` | `crates/scanner` | Skaner (nmap, podgrupy, limity), *w przygotowaniu* |
+| `dscan-fingerprint` | `crates/fingerprint` | Fingerprinting HTTP/TLS i sygnatury, *w przygotowaniu* |
+| `dscan-api` | `crates/api` | REST API (axum) + RBAC, *w przygotowaniu* |
+| `dscan-web` | `crates/web` | UI (askama + htmx), *w przygotowaniu* |
+| `dscan` | `crates/cli` | Binarka `dscan` |
 
-## Uruchomienie
+## Uruchomienie (jedna komenda)
 
 ```bash
-cp sztygar.example.toml sztygar.toml     # i uzupełnij wartości od organizatora
-export SZTYGAR_ENCRYPTION_KEY=$(openssl rand -hex 32)
-cargo run --release
+./run.sh
 ```
 
-Na razie program wypisuje efektywną konfigurację (`sztygar [PLIK]`); podkomendy pojawią się w zadaniu C2.
+Skrypt przy pierwszym uruchomieniu tworzy `dscan.toml` (kopia `dscan.example.toml`)
+i generuje klucz szyfrowania w `.env`. Potem za każdym razem wczytuje `.env`,
+buduje wersję release (przyrostowo, więc szybko) i uruchamia binarkę.
+Argumenty przekazuje dalej: `./run.sh inny.toml`.
+
+> Plik `.env` z kluczem jest jedyną kopią klucza. Bez niego nie odczytasz zaszyfrowanych danych,
+> więc zrób jego kopię zapasową. Oba pliki (`dscan.toml`, `.env`) są w `.gitignore`.
+
+Wymagania: Rust (stable) z `cargo` oraz `bash` (Linux/macOS; na Windows przez WSL lub Git Bash).
+
+Ręcznie, bez skryptu:
+
+```bash
+cargo run --release -- dscan.toml
+```
+
+Na razie program wypisuje efektywną konfigurację; podkomendy pojawią się w zadaniu C2.
 
 ## Konfiguracja
 
 Kolejność ważności: **wartości domyślne < plik TOML < zmienne środowiskowe**.
 
-- Plik: `sztygar.toml` w bieżącym katalogu (lub ścieżka podana jako argument). Wszystkie pola opisuje [`sztygar.example.toml`](sztygar.example.toml).
-- Zmienne: `SZTYGAR_<SEKCJA>__<POLE>`, np. `SZTYGAR_LIMITS__NMAP_MAX_RATE=50`,
-  `SZTYGAR_SCOPE__ALLOWED_PORTS='["22","80"]'`.
-- **Klucz szyfrowania** podaje się wyłącznie przez `SZTYGAR_ENCRYPTION_KEY` (64 znaki hex). Wpis w TOML jest odrzucany, a klucz nigdy nie jest wypisywany.
+- Plik: `dscan.toml` w bieżącym katalogu (lub ścieżka podana jako argument). Wszystkie pola opisuje [`dscan.example.toml`](dscan.example.toml).
+- Zmienne: `DSCAN_<SEKCJA>__<POLE>`, np. `DSCAN_LIMITS__NMAP_MAX_RATE=50`,
+  `DSCAN_SCOPE__ALLOWED_PORTS='["22","80"]'`.
+- **Klucz szyfrowania** podaje się wyłącznie przez `DSCAN_ENCRYPTION_KEY` (64 znaki hex). Wpis w TOML jest odrzucany, a klucz nigdy nie jest wypisywany.
 - Nieznane pola (literówki) kończą się błędem.
 
 | Sekcja | Zawartość |
@@ -49,7 +64,7 @@ Kolejność ważności: **wartości domyślne < plik TOML < zmienne środowiskow
 ### Środowisko testowe (D3)
 
 Wartości w sekcji `[scope]` pliku przykładowego są **zastępcze**. Przed pierwszym
-skanem wpisz do `sztygar.toml` adresację kontenerów laboratorium, dozwolone porty
+skanem wpisz do `dscan.toml` adresację kontenerów laboratorium, dozwolone porty
 i limity ruchu z regulaminu organizatora.
 
 ## Weryfikacja (to samo robi CI)

@@ -5,18 +5,18 @@
 //! stąd wyłączenie lintu o dużym typie błędu — tylko w tym pliku testowym.
 #![allow(clippy::result_large_err)]
 
+use dscan_config::{ConfigLoader, ENCRYPTION_KEY_ENV};
 use figment::Jail;
-use sztygar_config::{ConfigLoader, ENCRYPTION_KEY_ENV};
 
 const VALID_KEY: &str = "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f";
 
 #[test]
 fn env_overrides_toml_file() {
     Jail::expect_with(|jail| {
-        jail.create_file("sztygar.toml", "[limits]\nnmap_max_rate = 25")?;
-        jail.set_env("SZTYGAR_LIMITS__NMAP_MAX_RATE", "50");
+        jail.create_file("dscan.toml", "[limits]\nnmap_max_rate = 25")?;
+        jail.set_env("DSCAN_LIMITS__NMAP_MAX_RATE", "50");
 
-        let config = ConfigLoader::new().file("sztygar.toml").load().unwrap();
+        let config = ConfigLoader::new().file("dscan.toml").load().unwrap();
 
         assert_eq!(config.settings.limits.nmap_max_rate, 50);
         Ok(())
@@ -49,7 +49,7 @@ fn invalid_encryption_key_in_env_is_an_error() {
 #[test]
 fn env_list_value_is_parsed() {
     Jail::expect_with(|jail| {
-        jail.set_env("SZTYGAR_SCOPE__ALLOWED_PORTS", r#"["22","80-90"]"#);
+        jail.set_env("DSCAN_SCOPE__ALLOWED_PORTS", r#"["22","80-90"]"#);
 
         let config = ConfigLoader::new().load().unwrap();
 

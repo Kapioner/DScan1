@@ -1,6 +1,6 @@
 [package]
-name = "sztygar-config"
-description = "Konfiguracja Sztygara: plik TOML + zmienne środowiskowe SZTYGAR_* (figment)."
+name = "dscan-config"
+description = "Konfiguracja DScan: plik TOML + zmienne środowiskowe DSCAN_* (figment)."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -8,7 +8,7 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
-sztygar-core.workspace = true
+dscan-core.workspace = true
 serde.workspace = true
 chrono.workspace = true
 ipnet.workspace = true

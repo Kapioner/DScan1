@@ -1,7 +1,7 @@
 use std::fmt;
 use std::path::PathBuf;
 
-use sztygar_core::models::PortRangeError;
+use dscan_core::models::PortRangeError;
 
 /// Błędy wczytywania i walidacji konfiguracji.
 #[derive(Debug)]

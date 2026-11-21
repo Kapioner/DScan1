@@ -23,6 +23,6 @@ rustc-ice-*.txt
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
 
-# Lokalna konfiguracja i sekrety Sztygara
-/sztygar.toml
+# Lokalna konfiguracja i sekrety DScan
+/dscan.toml
 .env

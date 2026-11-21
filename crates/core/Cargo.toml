@@ -1,6 +1,6 @@
 [package]
-name = "sztygar-core"
-description = "Wspólny model domeny Sztygara (Target, Host, Service, HttpInfo, Detection, ScanRun, Change)."
+name = "dscan-core"
+description = "Wspólny model domeny DScan (Target, Host, Service, HttpInfo, Detection, ScanRun, Change)."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

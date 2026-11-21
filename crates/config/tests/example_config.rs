@@ -2,10 +2,10 @@
 
 use std::path::PathBuf;
 
-use sztygar_config::ConfigLoader;
+use dscan_config::ConfigLoader;
 
 fn example_config_path() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../sztygar.example.toml")
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../dscan.example.toml")
 }
 
 #[test]

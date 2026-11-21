@@ -11,8 +11,8 @@ repository = "https://github.com/Kapioner/DScan"
 
 [workspace.dependencies]
 # Crate'y wewnętrzne
-sztygar-core = { path = "crates/core" }
-sztygar-config = { path = "crates/config" }
+dscan-core = { path = "crates/core" }
+dscan-config = { path = "crates/config" }
 
 # Zależności zewnętrzne (wersje w jednym miejscu dla całego workspace)
 serde = { version = "1", features = ["derive"] }
