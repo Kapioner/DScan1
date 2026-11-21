@@ -5,6 +5,9 @@ use crate::ConfigError;
 /// Zmienna środowiskowa z kluczem szyfrowania (64 znaki hex = 32 bajty, AES-256).
 pub const ENCRYPTION_KEY_ENV: &str = "DSCAN_ENCRYPTION_KEY";
 
+/// Nowy klucz używany tylko przez `dscan keys rotate`.
+pub const NEW_ENCRYPTION_KEY_ENV: &str = "DSCAN_NEW_ENCRYPTION_KEY";
+
 /// Zmienna środowiskowa z adresem bazy, np. `postgres://dscan:haslo@127.0.0.1:5433/dscan`.
 pub const DATABASE_URL_ENV: &str = "DSCAN_DATABASE_URL";
 

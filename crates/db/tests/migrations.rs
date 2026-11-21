@@ -1,12 +1,10 @@
-//! Testy na prawdziwej bazie PostgreSQL. Uruchamiają się tylko, gdy ustawiona jest
-//! zmienna `DSCAN_TEST_DATABASE_URL` (CI ustawia ją automatycznie).
-//! Baza testowa jest czyszczona — nie wskazuj tu bazy z danymi!
+// Plik testowy: unwrap() w funkcjach pomocniczych jest tu dozwolony.
+#![allow(clippy::unwrap_used)]
 
-use std::time::Duration;
+mod common;
 
-use dscan_db::{PoolOptions, check_connection, connect, migration_status, run_migrations};
-
-const TEST_DB_ENV: &str = "DSCAN_TEST_DATABASE_URL";
+use common::TestDatabase;
+use dscan_db::{check_connection, migration_status, run_migrations};
 
 const EXPECTED_TABLES: [&str; 13] = [
     "targets",
@@ -24,58 +22,39 @@ const EXPECTED_TABLES: [&str; 13] = [
     "audit_log",
 ];
 
-fn test_database_url() -> Option<String> {
-    let url = std::env::var(TEST_DB_ENV).ok();
-    if url.is_none() {
-        eprintln!("pomijam test: brak zmiennej {TEST_DB_ENV}");
-    }
-    url
-}
-
-fn options() -> PoolOptions {
-    PoolOptions {
-        max_connections: 2,
-        connect_timeout: Duration::from_secs(5),
-    }
-}
-
 #[tokio::test]
 async fn migrations_create_all_tables_and_are_idempotent() {
-    let Some(url) = test_database_url() else {
+    let Some(db) = TestDatabase::create().await else {
         return;
     };
-    let pool = connect(&url, options()).await.unwrap();
-    check_connection(&pool).await.unwrap();
-
-    run_migrations(&pool).await.unwrap();
+    check_connection(&db.pool).await.unwrap();
     // Drugie uruchomienie nie może nic zepsuć.
-    run_migrations(&pool).await.unwrap();
+    run_migrations(&db.pool).await.unwrap();
 
     for table in EXPECTED_TABLES {
         let exists: bool = sqlx::query_scalar("SELECT to_regclass($1) IS NOT NULL")
-            .bind(format!("public.{table}"))
-            .fetch_one(&pool)
+            .bind(table)
+            .fetch_one(&db.pool)
             .await
             .unwrap();
         assert!(exists, "brak tabeli {table}");
     }
 
-    let status = migration_status(&pool).await.unwrap();
+    let status = migration_status(&db.pool).await.unwrap();
     assert!(status.iter().all(|migration| migration.applied));
+    db.drop().await;
 }
 
 #[tokio::test]
 async fn built_in_roles_are_seeded() {
-    let Some(url) = test_database_url() else {
+    let Some(db) = TestDatabase::create().await else {
         return;
     };
-    let pool = connect(&url, options()).await.unwrap();
-    run_migrations(&pool).await.unwrap();
-
     let count: i64 = sqlx::query_scalar("SELECT count(*) FROM roles WHERE built_in")
-        .fetch_one(&pool)
+        .fetch_one(&db.pool)
         .await
         .unwrap();
 
     assert_eq!(count, 4);
+    db.drop().await;
 }

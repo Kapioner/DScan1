@@ -1,0 +1,7 @@
+target,group,note
+127.0.0.1,lokalne,maszyna deweloperska
+10.10.0.0/24,lab,sieć kontenerów organizatora
+app.lab.local,lab,
+zły cel,lab,
+127.0.0.1,lokalne,duplikat
+10.10.0.7/24,lab,ta sama sieć po normalizacji

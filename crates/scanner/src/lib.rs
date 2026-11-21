@@ -1,4 +1,11 @@
-//! Skaner sieci: parsowanie celów, wrapper nmap, podgrupy i pula workerów, ograniczanie tempa.
+//! Skaner DScan.
 //!
-//! Crate utworzony w etapie D1 (struktura workspace). Implementacja pojawi się
-//! w kolejnych zadaniach planu.
+//! - [`targets`]: parsowanie i walidacja celów (IP, CIDR, domeny), deduplikacja,
+//!   kontrola zakresu i strumieniowe rozwijanie adresów (zadanie S2),
+//! - [`nmap`]: uruchamianie nmap i parsowanie jego wyniku XML (zadanie S3).
+
+mod error;
+pub mod nmap;
+pub mod targets;
+
+pub use error::ScannerError;

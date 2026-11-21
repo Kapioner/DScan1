@@ -3,8 +3,13 @@
 
 pub mod config;
 pub mod db;
+pub mod import;
+pub mod keys;
 pub mod planned;
+pub mod scan;
 pub mod serve;
+pub mod targets;
+pub mod user;
 
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
@@ -12,7 +17,8 @@ use std::time::Duration;
 
 use clap::Args;
 use dscan_config::{AppConfig, CliOverrides, ConfigLoader, DatabaseSettings};
-use dscan_db::PoolOptions;
+use dscan_crypto::Cipher;
+use dscan_db::{PgPool, PoolOptions};
 
 use crate::cli::Commands;
 use crate::error::CliError;
@@ -97,6 +103,20 @@ pub fn pool_options(settings: &DatabaseSettings) -> PoolOptions {
         max_connections: settings.max_connections,
         connect_timeout: Duration::from_secs(settings.connect_timeout_seconds),
     }
+}
+
+/// Szyfr z klucza `DSCAN_ENCRYPTION_KEY`. Polecenia administracyjne wymagają klucza (C6) —
+/// kto go nie zna, nie powinien zmieniać danych bezpośrednio w bazie.
+pub fn cipher_from_config(config: &AppConfig) -> Result<Cipher, CliError> {
+    let key = config.require_encryption_key()?;
+    Ok(Cipher::new(key.as_bytes()))
+}
+
+/// Łączy się z bazą wskazaną w `DSCAN_DATABASE_URL`.
+pub async fn connect_database(config: &AppConfig) -> Result<PgPool, CliError> {
+    let url = config.require_database_url()?;
+    let options = pool_options(&config.settings.database);
+    Ok(dscan_db::connect(url.expose(), options).await?)
 }
 
 impl Command for Commands {

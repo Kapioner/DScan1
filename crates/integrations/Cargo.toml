@@ -1,0 +1,18 @@
+[package]
+name = "dscan-integrations"
+description = "Integracje DScan: import celów z CSV/JSON (dalej: import wyników, eksport, DefectDojo)."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+dscan-core.workspace = true
+dscan-scanner.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+csv.workspace = true
+
+[lints]
+workspace = true

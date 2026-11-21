@@ -15,6 +15,10 @@ dscan-core = { path = "crates/core" }
 dscan-config = { path = "crates/config" }
 dscan-db = { path = "crates/db" }
 dscan-api = { path = "crates/api" }
+dscan-crypto = { path = "crates/crypto" }
+dscan-auth = { path = "crates/auth" }
+dscan-scanner = { path = "crates/scanner" }
+dscan-integrations = { path = "crates/integrations" }
 
 # Zależności zewnętrzne (wersje w jednym miejscu dla całego workspace)
 serde = { version = "1", features = ["derive"] }
@@ -24,7 +28,7 @@ figment = { version = "0.10", features = ["toml", "env"] }
 serde_json = "1"
 toml = "0.8"
 clap = { version = "4", features = ["derive", "env"] }
-tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "signal", "time"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "signal", "time", "process", "io-util"] }
 axum = "0.8"
 tower = { version = "0.5", features = ["util"] }
 tower-http = { version = "0.6", features = ["trace", "limit"] }
@@ -33,6 +37,14 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 utoipa = "5"
 sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "tls-rustls", "postgres", "migrate", "macros", "chrono"] }
 http-body-util = "0.1"
+aes-gcm = "0.10"
+argon2 = "0.5"
+# Włącza bezpieczne źródło losowości (OsRng) dla soli haseł.
+password-hash = { version = "0.5", features = ["getrandom"] }
+quick-xml = { version = "0.37", features = ["serialize", "overlapped-lists"] }
+csv = "1"
+hickory-resolver = "0.24"
+rpassword = "7"
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

@@ -11,10 +11,19 @@ repository.workspace = true
 dscan-config.workspace = true
 dscan-db.workspace = true
 dscan-api.workspace = true
+dscan-core.workspace = true
+dscan-crypto.workspace = true
+dscan-auth.workspace = true
+dscan-scanner.workspace = true
+dscan-integrations.workspace = true
+rpassword.workspace = true
 clap.workspace = true
 tokio.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
+
+[dev-dependencies]
+chrono.workspace = true
 
 [lints]
 workspace = true

@@ -7,10 +7,13 @@ use clap::{Parser, Subcommand};
 
 use crate::commands::config::ConfigArgs;
 use crate::commands::db::DbArgs;
-use crate::commands::planned::{
-    DiffArgs, ExportArgs, ImportArgs, KeysArgs, ScanArgs, SigArgs, TargetsArgs, UserArgs,
-};
+use crate::commands::import::ImportArgs;
+use crate::commands::keys::KeysArgs;
+use crate::commands::planned::{DiffArgs, ExportArgs, SigArgs};
+use crate::commands::scan::ScanArgs;
 use crate::commands::serve::ServeArgs;
+use crate::commands::targets::TargetsArgs;
+use crate::commands::user::UserArgs;
 
 /// DScan (Defect Scan): skanowanie i inwentaryzacja usług sieciowych.
 #[derive(Debug, Parser)]
@@ -29,7 +32,7 @@ pub struct Cli {
 pub enum Commands {
     /// Uruchamia serwer API (wykonuje też migracje bazy).
     Serve(ServeArgs),
-    /// Uruchamia skan podanych celów.
+    /// Skanuje podane cele programem nmap (tylko cele z [scope]).
     Scan(ScanArgs),
     /// Zarządza listą celów skanowania.
     Targets(TargetsArgs),

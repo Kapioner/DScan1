@@ -3,7 +3,7 @@ use dscan_api::{AppState, build_router};
 use dscan_config::{AppConfig, collect_warnings};
 use tokio::net::TcpListener;
 
-use super::{Command, Context, OverrideArgs, pool_options};
+use super::{Command, Context, OverrideArgs, cipher_from_config, connect_database};
 use crate::error::CliError;
 use crate::logging::init_logging;
 
@@ -19,9 +19,11 @@ impl Command for ServeArgs {
         let config = context.load_config(self.overrides.to_overrides())?;
         log_warnings(&config);
 
+        // Serwer zapisuje dane wrażliwe, więc bez klucza szyfrowania nie startuje.
+        cipher_from_config(&config)?;
         let url = config.require_database_url()?;
         tracing::info!("łączenie z bazą {}", url.masked());
-        let pool = dscan_db::connect(url.expose(), pool_options(&config.settings.database)).await?;
+        let pool = connect_database(&config).await?;
         dscan_db::run_migrations(&pool).await?;
         tracing::info!("schemat bazy aktualny");
 

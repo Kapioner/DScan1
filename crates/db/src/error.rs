@@ -1,5 +1,7 @@
 use std::fmt;
 
+use dscan_crypto::CryptoError;
+
 /// Błędy warstwy bazy danych.
 #[derive(Debug)]
 pub enum DbError {
@@ -7,6 +9,16 @@ pub enum DbError {
     Connect(sqlx::Error),
     Migrate(sqlx::migrate::MigrateError),
     Query(sqlx::Error),
+    /// Szyfrowanie lub odszyfrowanie pola wrażliwego nie powiodło się.
+    Crypto {
+        context: String,
+        source: CryptoError,
+    },
+    /// Wartość pola wrażliwego nie dała się zamienić na JSON lub z JSON.
+    Serialization(String),
+    UserExists(String),
+    /// W bazie brakuje wbudowanej roli (np. nie wykonano migracji).
+    MissingRole(&'static str),
 }
 
 impl fmt::Display for DbError {
@@ -15,6 +27,12 @@ impl fmt::Display for DbError {
             DbError::Connect(error) => write!(f, "nie można połączyć się z bazą danych: {error}"),
             DbError::Migrate(error) => write!(f, "błąd migracji bazy danych: {error}"),
             DbError::Query(error) => write!(f, "błąd zapytania do bazy danych: {error}"),
+            DbError::Crypto { context, source } => write!(f, "pole {context}: {source}"),
+            DbError::Serialization(reason) => write!(f, "błąd serializacji pola: {reason}"),
+            DbError::UserExists(name) => write!(f, "użytkownik '{name}' już istnieje"),
+            DbError::MissingRole(name) => {
+                write!(f, "brak roli '{name}' w bazie — wykonaj: dscan db migrate")
+            }
         }
     }
 }
