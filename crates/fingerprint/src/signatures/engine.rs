@@ -43,6 +43,20 @@ impl SignatureSet {
         Ok(SignatureSet { signatures })
     }
 
+    /// Jedna sygnatura w YAML (mapa, nie lista) — edytor sygnatur (F8).
+    pub fn from_single_yaml(text: &str) -> Result<SignatureSet, SignatureError> {
+        let definition: SignatureDef =
+            serde_yaml::from_str(text).map_err(|error| SignatureError::Yaml(error.to_string()))?;
+        Ok(SignatureSet {
+            signatures: vec![compile_signature(definition)?],
+        })
+    }
+
+    /// Dołącza sygnatury z innego zestawu.
+    pub fn extend(&mut self, other: SignatureSet) {
+        self.signatures.extend(other.signatures);
+    }
+
     /// Wbudowane sygnatury uzupełnione o sygnatury z dodatkowego pliku YAML (np. od organizatora).
     pub fn builtin_with(extra_yaml: Option<&str>) -> Result<SignatureSet, SignatureError> {
         let mut set = Self::builtin()?;
@@ -162,6 +176,7 @@ mod tests {
             tls_verified: None,
             certificate: None,
             favicon: None,
+            simhash: None,
         }
     }
 

@@ -5,13 +5,13 @@ use std::net::IpAddr;
 
 use chrono::{DateTime, Utc};
 use dscan_core::models::{
-    CertificateInfo, Detection, Evidence, Host, HostStatus, HttpInfo, Protocol, Service,
-    ServiceState,
+    CertificateInfo, Detection, Evidence, Host, HostStatus, HttpHeader, HttpInfo, Protocol,
+    Service, ServiceState,
 };
 
 use dscan_crypto::Cipher;
 
-use crate::columns::HTTP_INFO_CERTIFICATE;
+use crate::columns::{HTTP_INFO_CERTIFICATE, HTTP_INFO_HEADERS};
 use crate::{DbError, Encrypted, PgPool};
 
 type HostRow = (
@@ -41,6 +41,8 @@ type HttpRow = (
     Option<bool>,
     Option<String>,
     Option<Vec<u8>>,
+    Vec<u8>,
+    Option<i64>,
 );
 type DetectionRow = (i64, String, Option<String>, i16, String);
 
@@ -79,7 +81,7 @@ async fn load_hosts(
     .await
     .map_err(DbError::Query)?;
     let http: Vec<HttpRow> = sqlx::query_as(
-        "SELECT i.service_id, i.url, i.status_code, i.title, i.tls_verified, i.favicon::text, i.certificate FROM http_info i \
+        "SELECT i.service_id, i.url, i.status_code, i.title, i.tls_verified, i.favicon::text, i.certificate, i.headers, i.simhash FROM http_info i \
          JOIN services s ON s.id = i.service_id JOIN hosts h ON h.id = s.host_id WHERE h.scan_run_id = $1",
     )
     .bind(run_id)
@@ -109,7 +111,15 @@ fn assemble(
     let mut http_by_service: HashMap<i64, HttpInfo> = http
         .into_iter()
         .map(
-            |(id, url, status, title, tls_verified, favicon, certificate)| {
+            |(id, url, status, title, tls_verified, favicon, certificate, headers, simhash)| {
+                // Nagłówki (poufne) tylko z kluczem — widok hosta i dowody dla DefectDojo.
+                let headers = cipher
+                    .and_then(|cipher| {
+                        Encrypted::<Vec<HttpHeader>>::from_bytes(headers)
+                            .open(cipher, &HTTP_INFO_HEADERS)
+                            .ok()
+                    })
+                    .unwrap_or_default();
                 // Certyfikat odszyfrowujemy tylko na żądanie (z kluczem); uszkodzony pomijamy.
                 let certificate = cipher.zip(certificate).and_then(|(cipher, bytes)| {
                     Encrypted::<CertificateInfo>::from_bytes(bytes)
@@ -121,12 +131,13 @@ fn assemble(
                     url,
                     status_code,
                     title,
-                    headers: Vec::new(),
+                    headers,
                     cookies: Vec::new(),
                     redirect_chain: Vec::new(),
                     tls_verified,
                     certificate,
                     favicon: favicon.and_then(|json| serde_json::from_str(&json).ok()),
+                    simhash,
                 };
                 (id, info)
             },

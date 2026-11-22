@@ -90,7 +90,12 @@ fn back(message: &str) -> Response {
     Redirect::to(&format!("/profiles?msg={encoded}")).into_response()
 }
 
-async fn save(state: &AppState, id: Option<i64>, form: ProfileForm) -> Result<Response, ApiError> {
+async fn save(
+    state: &AppState,
+    user: &dscan_api::auth::CurrentUser,
+    id: Option<i64>,
+    form: ProfileForm,
+) -> Result<Response, ApiError> {
     let input = match to_input(form) {
         Ok(input) => input,
         Err(message) => return Ok(back(&message)),
@@ -104,6 +109,18 @@ async fn save(state: &AppState, id: Option<i64>, form: ProfileForm) -> Result<Re
         Some(id) => dscan_db::update_profile(&state.db, id, &data).await?,
         None => dscan_db::create_profile(&state.db, &data).await?,
     };
+    if let ProfileSaved::Saved(profile) = &saved {
+        let action = if id.is_some() { "update" } else { "create" };
+        dscan_api::audit::record(
+            state,
+            user,
+            action,
+            "profile",
+            profile.id,
+            &profile.data.name,
+        )
+        .await;
+    }
     Ok(back(match saved {
         ProfileSaved::Saved(_) => "Zapisano profil.",
         ProfileSaved::NameTaken => "Profil o tej nazwie już istnieje.",
@@ -117,7 +134,7 @@ pub async fn create_profile(
     Form(form): Form<ProfileForm>,
 ) -> Result<Response, ApiError> {
     user.require(permissions::TARGETS_WRITE)?;
-    save(&state, None, form).await
+    save(&state, &user, None, form).await
 }
 
 pub async fn update_profile(
@@ -127,7 +144,7 @@ pub async fn update_profile(
     Form(form): Form<ProfileForm>,
 ) -> Result<Response, ApiError> {
     user.require(permissions::TARGETS_WRITE)?;
-    save(&state, Some(id), form).await
+    save(&state, &user, Some(id), form).await
 }
 
 pub async fn delete_profile(
@@ -137,6 +154,9 @@ pub async fn delete_profile(
 ) -> Result<Response, ApiError> {
     user.require(permissions::TARGETS_WRITE)?;
     let deleted = dscan_db::delete_profile(&state.db, id).await?;
+    if deleted {
+        dscan_api::audit::record(&state, &user, "delete", "profile", id, "").await;
+    }
     Ok(back(if deleted {
         "Usunięto profil."
     } else {

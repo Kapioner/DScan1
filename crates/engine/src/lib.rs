@@ -7,7 +7,9 @@
 //! - [`WebFingerprintScanner`] — dekorator dodający fingerprinting HTTP (H1, H2).
 
 pub mod adaptive;
+pub mod clusters;
 mod comparison;
+pub mod custom_signatures;
 mod dashboard;
 mod error;
 mod import;
@@ -18,8 +20,10 @@ mod progress;
 mod retry;
 mod running;
 pub mod scheduler;
+pub mod scoring;
 mod service;
 mod setup;
+pub mod signature_test;
 mod web;
 pub mod windows;
 

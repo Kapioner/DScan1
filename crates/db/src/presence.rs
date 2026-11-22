@@ -143,3 +143,42 @@ async fn save(pool: &PgPool, run_id: i64, rows: &[(Presence, bool)]) -> Result<(
     }
     transaction.commit().await.map_err(DbError::Query)
 }
+
+/// Historia odpowiedzi adresu z czasem startu przebiegu (M2, M5), od najstarszej.
+pub async fn presence_history(
+    pool: &PgPool,
+    ip: IpAddr,
+) -> Result<Vec<(DateTime<Utc>, bool)>, DbError> {
+    sqlx::query_as(
+        "SELECT r.started_at, h.responded FROM host_responses h JOIN scan_runs r ON r.id = h.scan_run_id \
+         WHERE h.ip = $1 ORDER BY r.started_at",
+    )
+    .bind(ip)
+    .fetch_all(pool)
+    .await
+    .map_err(DbError::Query)
+}
+
+/// Historie odpowiedzi wszystkich adresów (lista hostów, M5) — najwyżej `per_host` ostatnich.
+pub async fn presence_histories(
+    pool: &PgPool,
+    per_host: i64,
+) -> Result<std::collections::HashMap<IpAddr, Vec<(DateTime<Utc>, bool)>>, DbError> {
+    let rows: Vec<(IpAddr, DateTime<Utc>, bool)> = sqlx::query_as(
+        "SELECT ip, started_at, responded FROM ( \
+           SELECT h.ip, r.started_at, h.responded, \
+                  row_number() OVER (PARTITION BY h.ip ORDER BY r.started_at DESC) AS n \
+           FROM host_responses h JOIN scan_runs r ON r.id = h.scan_run_id) t \
+         WHERE n <= $1 ORDER BY ip, started_at",
+    )
+    .bind(per_host)
+    .fetch_all(pool)
+    .await
+    .map_err(DbError::Query)?;
+    let mut map: std::collections::HashMap<IpAddr, Vec<(DateTime<Utc>, bool)>> =
+        std::collections::HashMap::new();
+    for (ip, at, responded) in rows {
+        map.entry(ip).or_default().push((at, responded));
+    }
+    Ok(map)
+}

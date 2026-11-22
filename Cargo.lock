@@ -469,6 +469,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "clap_complete"
+version = "4.6.12"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6a35200383f20018d41c14d1ab19c1727c697f544492143f7d93aa39f0187848"
+dependencies = [
+ "clap",
+]
+
+[[package]]
 name = "clap_derive"
 version = "4.6.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -485,6 +494,16 @@ name = "clap_lex"
 version = "1.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e0921b3876b3a1df8a1c9f912e7f94342458022c2e84288015893d83c4d62a79"
+
+[[package]]
+name = "clap_mangen"
+version = "0.2.33"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7e30ffc187e2e3aeafcd1c6e2aa416e29739454c0ccaa419226d5ecd181f2d78"
+dependencies = [
+ "clap",
+ "roff",
+]
 
 [[package]]
 name = "colorchoice"
@@ -715,6 +734,8 @@ version = "0.1.0"
 dependencies = [
  "chrono",
  "clap",
+ "clap_complete",
+ "clap_mangen",
  "dscan-api",
  "dscan-auth",
  "dscan-config",
@@ -732,6 +753,7 @@ dependencies = [
  "serde",
  "serde_json",
  "tokio",
+ "toml",
  "tracing",
  "tracing-subscriber",
 ]
@@ -859,8 +881,10 @@ version = "0.1.0"
 dependencies = [
  "chrono",
  "csv",
+ "dscan-config",
  "dscan-core",
  "dscan-scanner",
+ "reqwest",
  "serde",
  "serde_json",
 ]
@@ -886,11 +910,13 @@ dependencies = [
  "axum",
  "chrono",
  "dscan-api",
+ "dscan-auth",
  "dscan-config",
  "dscan-core",
  "dscan-crypto",
  "dscan-db",
  "dscan-engine",
+ "dscan-fingerprint",
  "dscan-integrations",
  "dscan-scanner",
  "http-body-util",
@@ -2513,6 +2539,7 @@ dependencies = [
  "base64 0.22.1",
  "bytes",
  "futures-core",
+ "futures-util",
  "http",
  "http-body",
  "http-body-util",
@@ -2521,6 +2548,7 @@ dependencies = [
  "hyper-util",
  "js-sys",
  "log",
+ "mime_guess",
  "percent-encoding",
  "pin-project-lite",
  "quinn",
@@ -2561,6 +2589,12 @@ dependencies = [
  "untrusted",
  "windows-sys 0.52.0",
 ]
+
+[[package]]
+name = "roff"
+version = "1.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "323c417e1d9665a65b263ec744ba09030cfb277e9daa0b018a4ab62e57bc8189"
 
 [[package]]
 name = "rpassword"

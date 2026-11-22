@@ -21,6 +21,8 @@ pub struct AppState {
     pub auth: AuthConfig,
     /// Usługa skanów (start/stop/wznowienie, import); `None` w testach bez skanera.
     pub scans: Option<Arc<ScanService>>,
+    /// Klient DefectDojo (I4, I5); `None`, gdy integracja wyłączona.
+    pub defectdojo: Option<Arc<dscan_integrations::defectdojo::DefectDojoClient>>,
 }
 
 impl AppState {
@@ -30,12 +32,22 @@ impl AppState {
             cipher,
             auth,
             scans: None,
+            defectdojo: None,
         }
     }
 
     /// Dołącza usługę skanów (serwer).
     pub fn with_scans(mut self, scans: Arc<ScanService>) -> Self {
         self.scans = Some(scans);
+        self
+    }
+
+    /// Dołącza klienta DefectDojo.
+    pub fn with_defectdojo(
+        mut self,
+        client: Arc<dscan_integrations::defectdojo::DefectDojoClient>,
+    ) -> Self {
+        self.defectdojo = Some(client);
         self
     }
 

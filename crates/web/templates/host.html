@@ -2,7 +2,22 @@
 {% block title %}Host {{ ip }}{% endblock %}
 {% block content %}
 <p><a href="/hosts?run={{ run }}">← Hosty</a></p>
+{% if let Some(msg) = message %}<p class="notice" role="status">{{ msg }}</p>{% endif %}
 <h1>Host <code>{{ ip }}</code> <small class="muted">przebieg #{{ run }} · stan: {{ status }}</small></h1>
+<section class="card">
+  <h2>Tagi</h2>
+  <p>{% for t in tags %}<span class="badge">{{ t.1 }} <small>({{ t.2 }})</small></span>{% if can_edit %}
+    <form method="post" action="/ui/hosts/{{ ip }}/tags/{{ t.0 }}/delete" class="inline"><input type="hidden" name="run" value="{{ run }}"><button type="submit" class="link danger" aria-label="Usuń tag {{ t.1 }}">×</button></form>{% endif %}
+  {% endfor %}{% if tags.is_empty() %}<span class="muted">Brak tagów.</span>{% endif %}</p>
+  {% if can_edit %}
+  <form method="post" action="/ui/hosts/{{ ip }}/tags" class="inline-form compact">
+    <input type="hidden" name="run" value="{{ run }}">
+    <input name="tag" placeholder="nowy tag" required maxlength="40" aria-label="Tag">
+    <select name="service" aria-label="Zakres"><option value="">cały host</option>{% for k in service_keys %}<option value="{{ k }}">{{ k }}</option>{% endfor %}</select>
+    <button type="submit">Dodaj tag</button>
+  </form>
+  {% endif %}
+</section>
 <section class="card">
   <h2>Host</h2>
   <table class="fields">
@@ -21,16 +36,24 @@
   {% if !s.detections.is_empty() %}
   <h3>Technologie</h3>
   <table>
-    <thead><tr><th>Technologia</th><th>Pewność</th><th>Dowody</th></tr></thead>
+    <thead><tr>{% if can_export %}<th></th>{% endif %}<th>Technologia</th><th>Pewność</th><th>Dowody</th></tr></thead>
     <tbody>
       {% for d in s.detections %}
-      <tr><td>{{ d.technology }}</td><td><progress max="100" value="{{ d.confidence }}"></progress> {{ d.confidence }}%</td><td>{{ d.evidence }}</td></tr>
+      <tr>{% if can_export %}<td><input type="checkbox" form="dojo-form" name="item" value="{{ s.port }}/{{ s.protocol }}={{ d.name }}" aria-label="Wyślij {{ d.name }}"></td>{% endif %}<td>{{ d.technology }}</td><td><progress max="100" value="{{ d.confidence }}"></progress> {{ d.confidence }}%</td><td>{{ d.evidence }}</td></tr>
       {% endfor %}
     </tbody>
   </table>
   {% endif %}
 </section>
 {% endfor %}
+{% if can_export %}
+<section class="card">
+  <form id="dojo-form" method="post" action="/ui/hosts/{{ ip }}/dojo">
+    <input type="hidden" name="run" value="{{ run }}">
+    <button type="submit">Wyślij zaznaczone obserwacje do DefectDojo</button>
+  </form>
+</section>
+{% endif %}
 <section class="card">
   <h2>Historia zmian</h2>
   {% if changes.is_empty() %}<p class="muted">Brak zapisanych zmian.</p>{% else %}
@@ -39,6 +62,9 @@
     <tbody>{% for c in changes %}<tr class="{{ c.css }}"><td>#{{ c.run }}</td><td>{{ c.address }}</td><td>{{ c.label }}</td></tr>{% endfor %}</tbody>
   </table>
   {% endif %}
+  <h3>Dostępność w godzinach doby</h3>
+  <p>Klasa: <strong>{{ stability }}</strong></p>
+  <div class="hours" role="img" aria-label="Mapa dostępności w godzinach">{% for c in hours %}<span class="hour {{ c.css }}" title="{{ c.title }}">{{ c.hour }}</span>{% endfor %}</div>
   <h3>Odpowiedzi w przebiegach</h3>
   <p>{% for h in history %}<span class="badge {% if h.ok %}ok{% else %}warn{% endif %}">#{{ h.run }} {% if h.ok %}odpowiedział{% else %}brak odpowiedzi{% endif %}</span> {% endfor %}</p>
 </section>

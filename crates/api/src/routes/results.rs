@@ -116,6 +116,9 @@ pub async fn set_override(
         Some(user.0.id),
     )
     .await?;
+    // Wartość poprawki bywa poufna — w dzienniku tylko adres i nazwa pola.
+    let address = format!("{}:{:?} {}", input.ip, input.port, field.as_str());
+    crate::audit::record(&state, &user, "set", "override", &input.ip, &address).await;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -135,6 +138,8 @@ pub async fn delete_override(
         &address.field,
     )?;
     if dscan_db::delete_override(&state.db, target, field).await? {
+        let address = format!("{}:{:?} {}", address.ip, address.port, field.as_str());
+        crate::audit::record(&state, &user, "delete", "override", &address, "").await;
         Ok(StatusCode::NO_CONTENT)
     } else {
         Err(ApiError::NotFound)

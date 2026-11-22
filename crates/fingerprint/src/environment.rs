@@ -187,6 +187,7 @@ mod tests {
             tls_verified: None,
             certificate: None,
             favicon: None,
+            simhash: None,
         }
     }
 

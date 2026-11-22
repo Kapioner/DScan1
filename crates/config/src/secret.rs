@@ -15,6 +15,60 @@ pub const NEW_ENCRYPTION_KEY_ENV: &str = "DSCAN_NEW_ENCRYPTION_KEY";
 /// Zmienna środowiskowa z adresem bazy, np. `postgres://dscan:haslo@127.0.0.1:5433/dscan`.
 pub const DATABASE_URL_ENV: &str = "DSCAN_DATABASE_URL";
 
+/// Identyfikator bieżącego klucza (1–255) zapisywany w każdym rekordzie (B6).
+pub const ENCRYPTION_KEY_ID_ENV: &str = "DSCAN_ENCRYPTION_KEY_ID";
+/// Poprzednie klucze do odczytu: `id:hex,id:hex` (B6), do czasu `dscan keys reencrypt`.
+pub const PREVIOUS_KEYS_ENV: &str = "DSCAN_PREVIOUS_ENCRYPTION_KEYS";
+
+/// Odczytuje `DSCAN_PREVIOUS_ENCRYPTION_KEYS` (`1:abcd…,2:ef01…`).
+pub fn parse_previous_keys(value: &str) -> Result<Vec<(u8, EncryptionKey)>, ConfigError> {
+    value
+        .split(',')
+        .map(str::trim)
+        .filter(|part| !part.is_empty())
+        .map(|part| {
+            let (id, hex) = part.split_once(':').ok_or_else(|| {
+                ConfigError::InvalidEncryptionKey(format!(
+                    "{PREVIOUS_KEYS_ENV}: oczekiwano id:klucz"
+                ))
+            })?;
+            let id: u8 = id.trim().parse().map_err(|_| {
+                ConfigError::InvalidEncryptionKey(format!(
+                    "{PREVIOUS_KEYS_ENV}: zły identyfikator {id}"
+                ))
+            })?;
+            Ok((id, EncryptionKey::from_hex(hex.trim())?))
+        })
+        .collect()
+}
+
+/// Token API DefectDojo (I4, I5) — tylko ze zmiennej środowiskowej.
+pub const DEFECTDOJO_TOKEN_ENV: &str = "DSCAN_DEFECTDOJO_TOKEN";
+
+/// Token API DefectDojo; w logach i `Debug` zamaskowany.
+#[derive(Clone, PartialEq, Eq)]
+pub struct ApiToken(String);
+
+impl ApiToken {
+    /// `None` dla pustej wartości.
+    pub fn from_value(value: Option<&str>) -> Option<Self> {
+        value
+            .map(str::trim)
+            .filter(|v| !v.is_empty())
+            .map(|v| ApiToken(v.to_string()))
+    }
+
+    pub fn expose(&self) -> &str {
+        &self.0
+    }
+}
+
+impl fmt::Debug for ApiToken {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "ApiToken(***)")
+    }
+}
+
 /// Długość klucza AES-256 w bajtach.
 pub const ENCRYPTION_KEY_LEN: usize = 32;
 

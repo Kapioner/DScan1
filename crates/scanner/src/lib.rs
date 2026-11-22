@@ -10,6 +10,7 @@ mod error;
 pub mod nmap;
 pub mod pool;
 pub mod rate;
+pub mod safety;
 pub mod subgroups;
 pub mod targets;
 

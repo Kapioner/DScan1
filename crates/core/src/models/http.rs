@@ -57,6 +57,9 @@ pub struct HttpInfo {
     /// Hash favicony (H4).
     #[serde(default)]
     pub favicon: Option<Favicon>,
+    /// SimHash tytułu, nagłówków i struktury HTML (M4) — bity u64 zapisane jako i64.
+    #[serde(default)]
+    pub simhash: Option<i64>,
 }
 
 impl HttpInfo {
@@ -92,6 +95,7 @@ mod tests {
             tls_verified: None,
             certificate: None,
             favicon: None,
+            simhash: None,
         }
     }
 

@@ -1,14 +1,11 @@
 //! Sygnatury technologii przez API (C5: `dscan sig` jako klient API).
 
-use std::sync::Arc;
-
 use axum::Json;
 use axum::extract::State;
 use dscan_core::models::Detection;
-use dscan_engine::{build_analysis, build_fetcher, load_signatures};
-use dscan_fingerprint::signatures::WebEvidence;
-use dscan_fingerprint::{fetch_favicon, probe_paths, to_http_info};
-use dscan_scanner::targets::{is_in_scope, single_address_network};
+use dscan_engine::load_signatures;
+use dscan_engine::signature_test::test_signature_on;
+use dscan_fingerprint::signatures::SignatureSet;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
@@ -46,6 +43,8 @@ pub struct SignatureTestRequest {
     pub signature: String,
     /// Adres usługi z IP hosta, np. `http://10.0.0.5:80/` (host w `[scope]`).
     pub url: String,
+    /// Sygnatura z edytora do sprawdzenia przed zapisem (F8).
+    pub yaml: Option<String>,
 }
 
 #[derive(Debug, Serialize, ToSchema)]
@@ -88,8 +87,8 @@ pub struct SignatureTestResponse {
     pub detections: Vec<DetectionView>,
 }
 
-/// Odpytuje usługę tak jak skan i zwraca pasujące detekcje. Wymaga `targets:write`
-/// (wysyła żądania do sieci).
+/// Odpytuje usługę tak jak skan i zwraca pasujące detekcje. Z polem `yaml` testuje
+/// sygnaturę z edytora przed zapisem (F8). Wymaga `targets:write` (wysyła żądania do sieci).
 #[utoipa::path(post, path = "/api/v1/signatures/test", tag = "sygnatury", request_body = SignatureTestRequest,
     responses((status = 200, body = SignatureTestResponse), (status = 400, body = crate::ErrorBody)))]
 pub async fn test_signature(
@@ -97,78 +96,123 @@ pub async fn test_signature(
     Json(input): Json<SignatureTestRequest>,
 ) -> Result<Json<SignatureTestResponse>, ApiError> {
     let settings = state.scan_service()?.settings();
-    let ip = host_ip(&input.url).ok_or_else(|| {
-        ApiError::BadRequest(format!("adres {} musi zawierać IP hosta", input.url))
-    })?;
-    if !is_in_scope(
-        &single_address_network(ip),
-        &settings.scope.allowed_networks,
-    ) {
-        return Err(ApiError::BadRequest(format!(
-            "{ip} jest poza zakresem [scope]"
-        )));
-    }
-    let analysis = build_analysis(settings, &[])?;
-    let fetcher = Arc::new(build_fetcher(settings)?);
-    let response = fetcher
-        .fetch(&input.url, ip)
-        .await
-        .map_err(|e| ApiError::BadRequest(e.to_string()))?;
-    let mut info = to_http_info(&response);
-    let body = String::from_utf8_lossy(&response.body);
-    info.favicon = fetch_favicon(&fetcher, &info.url, ip, &body).await;
-    let probes = probe_paths(
-        &fetcher,
-        &input.url,
-        ip,
-        &analysis.probe_paths,
-        analysis.max_probes,
-    )
-    .await;
-    let evidence = WebEvidence {
-        info: &info,
-        body: &body,
-        probes: &probes,
-        favicon_hash: info.favicon.as_ref().map(|f| f.mmh3),
+    let candidate = match input.yaml.as_deref() {
+        Some(yaml) => Some(
+            SignatureSet::from_single_yaml(yaml)
+                .map_err(|e| ApiError::BadRequest(e.to_string()))?,
+        ),
+        None => None,
     };
-    let detections = analysis
-        .analyze(&evidence, &[])
-        .into_iter()
-        .filter(|d| input.signature == "*" || d.technology.eq_ignore_ascii_case(&input.signature))
-        .map(DetectionView::from)
-        .collect();
+    let result = test_signature_on(settings, candidate, &input.signature, &input.url).await?;
     Ok(Json(SignatureTestResponse {
-        status_code: info.status_code,
-        url: info.url,
-        probes: probes.len(),
-        detections,
+        status_code: result.info.status_code,
+        url: result.info.url,
+        probes: result.probes,
+        detections: result
+            .detections
+            .into_iter()
+            .map(DetectionView::from)
+            .collect(),
     }))
 }
 
-/// IP z adresu URL (`http://10.0.0.5:80/` → 10.0.0.5, `http://[::1]/` → ::1).
-pub fn host_ip(url: &str) -> Option<std::net::IpAddr> {
-    let rest = url.split_once("://")?.1;
-    let host = rest.split('/').next()?;
-    if let Some(v6) = host.strip_prefix('[') {
-        return v6.split(']').next()?.parse().ok();
-    }
-    host.rsplit_once(':')
-        .map_or(host, |(name, _)| name)
-        .parse()
-        .ok()
+#[derive(Debug, Serialize, ToSchema)]
+pub struct CustomSignatureView {
+    pub id: i64,
+    pub name: String,
+    pub category: Option<String>,
+    pub yaml: String,
+    pub enabled: bool,
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+/// Własne sygnatury z edytora.
+#[utoipa::path(get, path = "/api/v1/signatures/custom", tag = "sygnatury", responses((status = 200, body = [CustomSignatureView])))]
+pub async fn list_custom(
+    State(state): State<AppState>,
+) -> Result<Json<Vec<CustomSignatureView>>, ApiError> {
+    let list = dscan_db::list_custom_signatures(&state.db).await?;
+    Ok(Json(
+        list.into_iter()
+            .map(|s| CustomSignatureView {
+                id: s.id,
+                name: s.name,
+                category: s.category,
+                yaml: s.definition_yaml,
+                enabled: s.enabled,
+            })
+            .collect(),
+    ))
+}
 
-    #[test]
-    fn host_ip_is_read_from_url() {
-        assert_eq!(
-            host_ip("http://10.0.0.5:80/").unwrap().to_string(),
-            "10.0.0.5"
-        );
-        assert_eq!(host_ip("http://[::1]:8080/").unwrap().to_string(), "::1");
-        assert_eq!(host_ip("http://example.com/"), None);
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct CustomSignatureInput {
+    /// `None` = nowa sygnatura.
+    pub id: Option<i64>,
+    /// YAML jednej sygnatury (`name`, `category`, `condition`, `matchers`, `version`).
+    pub yaml: String,
+    #[serde(default = "enabled")]
+    pub enabled: bool,
+}
+
+fn enabled() -> bool {
+    true
+}
+
+/// Sprawdza YAML i zapisuje sygnaturę; nazwa i kategoria pochodzą z definicji.
+pub async fn save_signature(
+    state: &AppState,
+    input: &CustomSignatureInput,
+) -> Result<i64, ApiError> {
+    let set = SignatureSet::from_single_yaml(&input.yaml)
+        .map_err(|e| ApiError::BadRequest(e.to_string()))?;
+    let (name, category, _) = set
+        .summaries()
+        .into_iter()
+        .next()
+        .ok_or_else(|| ApiError::BadRequest("pusta sygnatura".into()))?;
+    let id = dscan_db::save_custom_signature(
+        &state.db,
+        input.id,
+        &name,
+        category.as_deref(),
+        &input.yaml,
+        input.enabled,
+    )
+    .await?
+    .ok_or_else(|| {
+        ApiError::Conflict(format!(
+            "sygnatura „{name}” już istnieje albo nie ma takiego rekordu"
+        ))
+    })?;
+    dscan_engine::custom_signatures::refresh_custom_signatures(&state.db).await?;
+    Ok(id)
+}
+
+/// Dodaje lub zmienia własną sygnaturę (od razu działa w kolejnych skanach).
+#[utoipa::path(post, path = "/api/v1/signatures/custom", tag = "sygnatury", request_body = CustomSignatureInput,
+    responses((status = 200, body = i64), (status = 400, body = crate::ErrorBody), (status = 409, body = crate::ErrorBody)))]
+pub async fn save_custom(
+    State(state): State<AppState>,
+    user: crate::auth::CurrentUser,
+    Json(input): Json<CustomSignatureInput>,
+) -> Result<Json<i64>, ApiError> {
+    let id = save_signature(&state, &input).await?;
+    crate::audit::record(&state, &user, "save", "signature", id, "").await;
+    Ok(Json(id))
+}
+
+/// Usuwa własną sygnaturę.
+#[utoipa::path(delete, path = "/api/v1/signatures/custom/{id}", tag = "sygnatury", params(("id" = i64, Path)),
+    responses((status = 204), (status = 404, body = crate::ErrorBody)))]
+pub async fn delete_custom(
+    State(state): State<AppState>,
+    user: crate::auth::CurrentUser,
+    axum::extract::Path(id): axum::extract::Path<i64>,
+) -> Result<axum::http::StatusCode, ApiError> {
+    if !dscan_db::delete_custom_signature(&state.db, id).await? {
+        return Err(ApiError::NotFound);
     }
+    dscan_engine::custom_signatures::refresh_custom_signatures(&state.db).await?;
+    crate::audit::record(&state, &user, "delete", "signature", id, "").await;
+    Ok(axum::http::StatusCode::NO_CONTENT)
 }

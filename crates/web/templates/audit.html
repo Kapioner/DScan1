@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Dziennik audytu{% endblock %}
+{% block content %}
+<h1>Dziennik audytu</h1>
+<section class="card">
+  <form method="get" action="/audit" class="inline-form">
+    <label>Obiekt <input name="entity" value="{{ entity }}" placeholder="user, role, target, profile, override, scan"></label>
+    <button type="submit">Filtruj</button>
+  </form>
+  {% if entries.is_empty() %}<p class="muted">Brak wpisów.</p>{% else %}
+  <table>
+    <thead><tr><th>Kiedy (UTC)</th><th>Kto</th><th>Akcja</th><th>Obiekt</th><th>Id</th><th>Szczegóły</th></tr></thead>
+    <tbody>{% for e in entries %}<tr><td>{{ e.at }}</td><td>{{ e.user }}</td><td>{{ e.action }}</td><td>{{ e.entity }}</td><td>{{ e.entity_id }}</td><td>{{ e.details }}</td></tr>{% endfor %}</tbody>
+  </table>
+  {% endif %}
+</section>
+{% endblock %}

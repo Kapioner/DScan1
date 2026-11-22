@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Sygnatury{% endblock %}
+{% block content %}
+<h1>Sygnatury</h1>
+{% if let Some(msg) = message %}<p class="notice" role="status">{{ msg }}</p>{% endif %}
+{% if can_edit %}
+<section class="card">
+  <h2>{% if editing_id.is_some() %}Edycja sygnatury{% else %}Nowa sygnatura{% endif %}</h2>
+  <p class="muted">YAML jednej sygnatury: <code>name</code>, <code>category</code>, <code>condition</code> (any/all), <code>matchers</code>
+    (header, cookie, body, favicon, path) z wagami, opcjonalnie <code>version</code>. Najpierw przetestuj na hoście z zakresu, potem zapisz.</p>
+  <form method="post" action="/ui/signatures">
+    <input type="hidden" name="id" value="{% if let Some(id) = editing_id %}{{ id }}{% endif %}">
+    <textarea name="yaml" rows="10" class="code" aria-label="Definicja YAML">{{ yaml }}</textarea>
+    <div class="inline-form">
+      <label>Testuj na adresie <input name="url" placeholder="http://10.0.0.5:8080/"></label>
+      <button type="button" hx-post="/ui/signatures/test" hx-include="closest form" hx-target="#signature-test">Testuj</button>
+      <label class="checkbox"><input type="checkbox" name="enabled" value="on"{% if enabled %} checked{% endif %}> włączona</label>
+      <button type="submit">Zapisz</button>
+    </div>
+  </form>
+  <div id="signature-test"></div>
+</section>
+{% endif %}
+<section class="card">
+  <h2>Wszystkie sygnatury ({{ rows.len() }})</h2>
+  <table>
+    <thead><tr><th>Nazwa</th><th>Kategoria</th><th>Matchery</th><th>Źródło</th>{% if can_edit %}<th></th>{% endif %}</tr></thead>
+    <tbody>
+      {% for r in rows %}
+      <tr>
+        <td>{{ r.name }}</td><td>{{ r.category }}</td><td>{{ r.matchers }}</td>
+        <td>{% if let Some(_id) = r.custom_id %}własna{% if !r.enabled %} <span class="badge warn">wyłączona</span>{% endif %}{% else %}wbudowana / plik{% endif %}</td>
+        {% if can_edit %}<td>{% if let Some(id) = r.custom_id %}<a href="/signatures?edit={{ id }}">Edytuj</a>
+          <form method="post" action="/ui/signatures/{{ id }}/delete" class="inline"><button type="submit" class="link danger">Usuń</button></form>{% endif %}</td>{% endif %}
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}

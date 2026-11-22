@@ -37,6 +37,8 @@ pub enum CliError {
     NoTargetsInScope,
     MissingNewKey(&'static str),
     SameKey,
+    /// Nie błąd: polecenie wykryło zmiany (kod wyjścia 2, C7).
+    ChangesDetected(usize),
     /// Brak zapisanego tokenu albo sesja wygasła — trzeba `dscan login`.
     NotLoggedIn,
     /// Serwer API odpowiedział błędem.
@@ -78,6 +80,7 @@ impl fmt::Display for CliError {
                 "brak nowego klucza — ustaw zmienną {variable} (wygeneruj: dscan keys generate)"
             ),
             CliError::SameKey => write!(f, "nowy klucz jest taki sam jak obecny"),
+            CliError::ChangesDetected(count) => write!(f, "wykryto zmiany: {count}"),
             CliError::NotLoggedIn => write!(
                 f,
                 "brak ważnej sesji — zaloguj się: dscan login --user NAZWA (albo użyj --local)"

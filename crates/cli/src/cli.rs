@@ -8,6 +8,8 @@ use clap::{Parser, Subcommand};
 use crate::commands::config::ConfigArgs;
 use crate::commands::db::DbArgs;
 use crate::commands::diff::DiffArgs;
+use crate::commands::docs::{CompletionsArgs, DocsArgs};
+use crate::commands::dojo::DojoArgs;
 use crate::commands::evaluate::EvaluateArgs;
 use crate::commands::export::ExportArgs;
 use crate::commands::import::ImportArgs;
@@ -57,6 +59,12 @@ pub enum Commands {
     Db(DbArgs),
     /// Zarządza kluczami szyfrowania.
     Keys(KeysArgs),
+    /// Generuje dokumentację CLI (markdown albo strona man).
+    Docs(DocsArgs),
+    /// Wypisuje skrypt autouzupełniania dla powłoki (bash, zsh, fish…).
+    Completions(CompletionsArgs),
+    /// Wysyła wyniki i obserwacje do DefectDojo.
+    Dojo(DojoArgs),
     /// Mierzy trafność wykrywania względem wyników referencyjnych.
     Evaluate(EvaluateArgs),
     /// Loguje do serwera API i zapisuje token w pliku użytkownika.
@@ -74,9 +82,26 @@ mod tests {
     use super::*;
     use clap::CommandFactory;
 
-    const ALL_SUBCOMMANDS: [&str; 16] = [
-        "serve", "scan", "targets", "import", "export", "diff", "sig", "user", "config", "db",
-        "keys", "login", "logout", "stop", "resume", "evaluate",
+    const ALL_SUBCOMMANDS: [&str; 19] = [
+        "serve",
+        "scan",
+        "targets",
+        "import",
+        "export",
+        "diff",
+        "sig",
+        "user",
+        "config",
+        "db",
+        "keys",
+        "login",
+        "logout",
+        "stop",
+        "resume",
+        "evaluate",
+        "dojo",
+        "docs",
+        "completions",
     ];
 
     #[test]

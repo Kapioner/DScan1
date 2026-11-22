@@ -73,6 +73,15 @@ pub async fn start_scan(
         other => other?,
     };
     let plan = &started.plan;
+    crate::audit::record(
+        &state,
+        &user,
+        "start",
+        "scan",
+        started.run_id,
+        &plan.address_count.to_string(),
+    )
+    .await;
     Ok((
         StatusCode::ACCEPTED,
         Json(StartScanResponse {

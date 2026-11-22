@@ -1,5 +1,6 @@
 //! Struktury danych opisujące cele, wyniki skanów i zmiany między przebiegami.
 
+mod availability;
 mod certificate;
 mod change;
 mod compare;
@@ -13,6 +14,9 @@ mod scan_run;
 mod service;
 mod target;
 
+pub use availability::{
+    HourStat, MIN_SAMPLES, Stability, classify_stability, format_hours, hourly_profile,
+};
 pub use certificate::CertificateInfo;
 pub use change::{Change, ChangeKind};
 pub use compare::{compare_runs, fingerprint_input, service_fingerprint};

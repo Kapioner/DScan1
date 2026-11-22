@@ -56,6 +56,16 @@ pub struct FindingView {
     pub category: String,
 }
 
+/// Usługa z oceną „ciekawości” (M3) i uzasadnieniem.
+#[derive(Debug, Serialize, ToSchema)]
+pub struct InterestView {
+    pub ip: String,
+    pub port: u16,
+    pub protocol: String,
+    pub score: u32,
+    pub reasons: Vec<String>,
+}
+
 #[derive(Debug, Serialize, ToSchema)]
 pub struct TechnologyCount {
     pub technology: String,
@@ -68,6 +78,7 @@ pub struct DashboardView {
     /// Skany trwające i wstrzymane (postęp, czas, prognoza).
     pub active_runs: Vec<RunState>,
     pub findings: Vec<FindingView>,
+    pub interesting: Vec<InterestView>,
     pub changes: Vec<ChangeView>,
     pub technologies: Vec<TechnologyCount>,
     pub hosts: usize,
@@ -79,7 +90,9 @@ pub struct DashboardView {
 /// Dane dashboardu w jednym żądaniu.
 #[utoipa::path(get, path = "/api/v1/dashboard", tag = "dashboard", responses((status = 200, body = DashboardView)))]
 pub async fn dashboard(State(state): State<AppState>) -> Result<Json<DashboardView>, ApiError> {
-    let data = dscan_engine::load_dashboard(&state.db, state.scan_service()?.settings()).await?;
+    let data =
+        dscan_engine::load_dashboard(&state.db, &state.cipher, state.scan_service()?.settings())
+            .await?;
     let now = Utc::now();
     Ok(Json(DashboardView {
         latest_run: data.latest.as_ref().map(|run| RunState::from_run(run, now)),
@@ -97,6 +110,21 @@ pub async fn dashboard(State(state): State<AppState>) -> Result<Json<DashboardVi
                 protocol: f.protocol,
                 title: f.title,
                 category: f.category,
+            })
+            .collect(),
+        interesting: data
+            .interesting
+            .into_iter()
+            .map(|i| InterestView {
+                ip: i.ip,
+                port: i.port,
+                protocol: i.protocol,
+                score: i.score,
+                reasons: i
+                    .reasons
+                    .into_iter()
+                    .map(|(r, w)| format!("{r} (+{w})"))
+                    .collect(),
             })
             .collect(),
         changes: data.changes.iter().map(ChangeView::from).collect(),

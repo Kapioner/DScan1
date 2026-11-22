@@ -67,3 +67,23 @@ table.fields th { text-align: left; width: 140px; color: var(--muted); font-weig
 .inline-form.compact { gap: 6px; }
 .checkbox { flex-direction: row !important; align-items: center; }
 details summary { cursor: pointer; color: var(--accent); }
+textarea.code { width: 100%; font-family: ui-monospace, monospace; font-size: 0.9em; }
+form.inline { display: inline; }
+.hours { display: grid; grid-template-columns: repeat(24, 1fr); gap: 2px; margin: 8px 0 16px; }
+.hour { text-align: center; font-size: 0.75em; padding: 6px 0; border-radius: 3px; border: 1px solid var(--border); }
+.hour-up { background: color-mix(in srgb, var(--ok) 45%, transparent); }
+.hour-mixed { background: color-mix(in srgb, var(--warn) 45%, transparent); }
+.hour-down { background: color-mix(in srgb, var(--error) 35%, transparent); }
+.hour-none { color: var(--muted); }
+svg.chart { width: 100%; height: auto; max-width: 760px; }
+svg.chart .grid { stroke: var(--border); stroke-width: 1; }
+svg.chart .axis { fill: var(--muted); font-size: 11px; }
+svg.chart .line { fill: none; stroke-width: 2.5; }
+svg.chart .series-a, .legend.series-a { stroke: var(--accent); fill: var(--accent); color: var(--accent); }
+svg.chart .series-b, .legend.series-b { stroke: var(--ok); fill: var(--ok); color: var(--ok); }
+svg.chart .line.series-a, svg.chart .line.series-b { fill: none; }
+svg.chart .heat-0 { fill: var(--border); }
+svg.chart .heat-1 { fill: color-mix(in srgb, var(--accent) 25%, var(--card)); }
+svg.chart .heat-2 { fill: color-mix(in srgb, var(--accent) 50%, var(--card)); }
+svg.chart .heat-3 { fill: color-mix(in srgb, var(--accent) 75%, var(--card)); }
+svg.chart .heat-4 { fill: var(--accent); }

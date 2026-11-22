@@ -72,5 +72,12 @@ pub async fn edit_result(
         )
         .await?;
     }
+    let action = if !form.reset.is_empty() || value.is_empty() {
+        "delete"
+    } else {
+        "set"
+    };
+    let address = format!("{ip}:{} {}", form.port, field.as_str());
+    dscan_api::audit::record(&state, &user, action, "override", ip, &address).await;
     Ok(Redirect::to(&format!("/hosts/{ip}?run={}", form.run)).into_response())
 }

@@ -40,6 +40,7 @@ impl NmapCommand {
 
     /// Uruchamia nmap z argumentami, podaje cele przez stdin i zwraca XML ze stdout.
     pub async fn run(&self, args: &[String], targets: &[IpNet]) -> Result<String, ScannerError> {
+        crate::safety::check_nmap_args(args)?;
         let mut child = Command::new(&self.binary)
             .args(args)
             .stdin(Stdio::piped())
@@ -114,7 +115,23 @@ mod tests {
     #[tokio::test]
     async fn missing_binary_is_reported() {
         let command = NmapCommand::new("/nie/ma/takiego/nmap");
-        let result = command.run(&[], &[]).await;
+        let args = vec![
+            "-sn".to_string(),
+            "--max-rate".to_string(),
+            "10".to_string(),
+        ];
+        let result = command.run(&args, &[]).await;
         assert!(matches!(result, Err(ScannerError::NmapNotFound)));
+        // Zabezpieczenia (Q5) działają, zanim proces w ogóle zostanie uruchomiony.
+        let unsafe_args = vec![
+            "--script".to_string(),
+            "vuln".to_string(),
+            "--max-rate".to_string(),
+            "10".to_string(),
+        ];
+        assert!(matches!(
+            command.run(&unsafe_args, &[]).await,
+            Err(ScannerError::Forbidden(_))
+        ));
     }
 }

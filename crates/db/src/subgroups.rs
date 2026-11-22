@@ -115,3 +115,25 @@ async fn add_progress(
     .map(|_| ())
     .map_err(DbError::Query)
 }
+
+/// Odszyfrowane surowe wyniki nmap ukończonych podgrup przebiegu (do DefectDojo, I4).
+pub async fn run_raw_xml(
+    pool: &PgPool,
+    cipher: &Cipher,
+    run_id: i64,
+) -> Result<Vec<String>, DbError> {
+    let rows: Vec<(Vec<u8>,)> = sqlx::query_as(
+        "SELECT raw_nmap_xml FROM subgroups WHERE scan_run_id = $1 AND status = 'completed' \
+         AND raw_nmap_xml IS NOT NULL ORDER BY sequence_no",
+    )
+    .bind(run_id)
+    .fetch_all(pool)
+    .await
+    .map_err(DbError::Query)?;
+    rows.into_iter()
+        .map(|(bytes,)| {
+            Encrypted::<String>::from_bytes(bytes).open(cipher, &SUBGROUPS_RAW_NMAP_XML)
+        })
+        .filter(|xml| xml.as_ref().map_or(true, |text| !text.trim().is_empty()))
+        .collect()
+}

@@ -37,6 +37,7 @@ pub fn to_http_info(response: &RawResponse) -> HttpInfo {
         tls_verified: response.tls_verified,
         certificate: None,
         favicon: None,
+        simhash: None,
     }
 }
 

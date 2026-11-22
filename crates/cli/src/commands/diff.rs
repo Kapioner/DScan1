@@ -3,6 +3,7 @@ use std::fmt::Write;
 use clap::Args;
 use dscan_core::models::Change;
 
+use super::output::OutputFormat;
 use super::{Command, Context};
 use crate::client::commands::diff_via_api;
 use crate::error::CliError;
@@ -15,12 +16,15 @@ pub struct DiffArgs {
     /// Numer nowszego przebiegu.
     #[arg(value_name = "PRZEBIEG_B")]
     pub current_run: i64,
+    /// Format wyniku. Kod wyjścia: 0 — brak zmian, 2 — są zmiany, 1 — błąd.
+    #[arg(long, value_enum, default_value_t)]
+    pub output: OutputFormat,
 }
 
 impl Command for DiffArgs {
     /// Porównanie dwóch dowolnych przebiegów (M1) przez API — liczone na bieżąco, bez zapisu.
     async fn execute(&self, _context: &Context) -> Result<(), CliError> {
-        diff_via_api(self.previous_run, self.current_run).await
+        diff_via_api(self.previous_run, self.current_run, self.output).await
     }
 }
 

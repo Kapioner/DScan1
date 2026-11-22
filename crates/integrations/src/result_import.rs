@@ -10,7 +10,7 @@ use dscan_core::models::{Host, Protocol, Service, ServiceState};
 use dscan_scanner::nmap::{map_port_state, map_protocol, parse_nmap_xml, to_hosts};
 use serde::Deserialize;
 
-use crate::ImportError;
+use crate::{ImportError, PassiveSource};
 
 /// Format pliku z wynikami.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -18,6 +18,10 @@ pub enum ResultFormat {
     NmapXml,
     Json,
     Csv,
+    /// Źródło pasywne (I6): eksport Shodana (JSON w liniach).
+    Shodan,
+    /// Źródło pasywne (I6): wynik masscan `-oJ`.
+    Masscan,
 }
 
 /// Wczytane wyniki: hosty i (dla nmap) surowy XML do zachowania.
@@ -48,6 +52,8 @@ pub fn parse_result_format(name: &str) -> Option<ResultFormat> {
         "nmap-xml" | "xml" => Some(ResultFormat::NmapXml),
         "json" => Some(ResultFormat::Json),
         "csv" => Some(ResultFormat::Csv),
+        "shodan" | "shodan-jsonl" => Some(ResultFormat::Shodan),
+        "masscan" | "masscan-json" => Some(ResultFormat::Masscan),
         _ => None,
     }
 }
@@ -73,6 +79,14 @@ pub fn parse_results(content: &str, format: ResultFormat) -> Result<ParsedResult
         }
         ResultFormat::Csv => Ok(ParsedResults {
             hosts: hosts_from_csv(content)?,
+            raw_xml: None,
+        }),
+        ResultFormat::Shodan => Ok(ParsedResults {
+            hosts: crate::ShodanJsonl.parse(content)?,
+            raw_xml: None,
+        }),
+        ResultFormat::Masscan => Ok(ParsedResults {
+            hosts: crate::MasscanJson.parse(content)?,
             raw_xml: None,
         }),
     }
@@ -198,5 +212,32 @@ mod tests {
         let parsed = parse_results(xml, ResultFormat::NmapXml).unwrap();
         assert_eq!(parsed.hosts.len(), 1);
         assert_eq!(parsed.raw_xml.as_deref(), Some(xml));
+    }
+
+    #[test]
+    fn demo_backup_data_parses() {
+        let first = parse_results(
+            include_str!("../../../docs/demo/przebieg-1.xml"),
+            ResultFormat::NmapXml,
+        )
+        .unwrap();
+        let second = parse_results(
+            include_str!("../../../docs/demo/przebieg-2.xml"),
+            ResultFormat::NmapXml,
+        )
+        .unwrap();
+        let reference = parse_results(
+            include_str!("../../../docs/demo/referencja.csv"),
+            ResultFormat::Csv,
+        )
+        .unwrap();
+        assert_eq!((first.hosts.len(), second.hosts.len()), (7, 7));
+        assert!(
+            second
+                .hosts
+                .iter()
+                .any(|h| h.services.iter().any(|s| s.port == 2222))
+        );
+        assert_eq!(reference.hosts.len(), 8);
     }
 }

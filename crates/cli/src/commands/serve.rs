@@ -3,8 +3,11 @@ use dscan_api::{AppState, AuthConfig, build_router_with};
 use dscan_auth::{hash_password, validate_password_strength, validate_username};
 use dscan_config::{AppConfig, collect_warnings};
 use dscan_db::PgPool;
+use std::sync::Arc;
+
 use dscan_engine::ScanService;
 use dscan_engine::scheduler::run_scheduler;
+use dscan_integrations::defectdojo::DefectDojoClient;
 use tokio::net::TcpListener;
 
 use super::{Command, Context, OverrideArgs, cipher_from_config, connect_database};
@@ -54,14 +57,50 @@ impl Command for ServeArgs {
                 "wstrzymano przerwane przebiegi: {orphaned} (wznowienie: dscan resume ID)"
             );
         }
+        match dscan_engine::custom_signatures::refresh_custom_signatures(&pool).await {
+            Ok(0) => {}
+            Ok(count) => tracing::info!("własne sygnatury z edytora: {count}"),
+            Err(error) => tracing::warn!("własne sygnatury: {error}"),
+        }
         let scans = ScanService::new(pool.clone(), cipher.clone(), config.settings.clone());
         // Harmonogram profili z bazy (S8): sprawdza co minutę okna i częstotliwość.
         tokio::spawn(run_scheduler(scans.clone()));
-        let state = AppState::new(pool, cipher, auth).with_scans(scans);
+        let mut state = AppState::new(pool, cipher, auth).with_scans(scans.clone());
+        let dojo = &config.settings.defectdojo;
+        match DefectDojoClient::from_config(dojo, config.defectdojo_token.as_ref()) {
+            Ok(Some(client)) => {
+                tracing::info!("DefectDojo: {} (produkt „{}”)", dojo.url, dojo.product_name);
+                state = state.with_defectdojo(Arc::new(client));
+                if dojo.auto_import {
+                    tokio::spawn(auto_import(state.clone(), scans.subscribe_completed()));
+                }
+            }
+            Ok(None) if dojo.enabled => {
+                tracing::warn!("DefectDojo włączone, ale brak DSCAN_DEFECTDOJO_TOKEN")
+            }
+            Ok(None) => {}
+            Err(error) => tracing::warn!("{error}"),
+        }
         let router = build_router_with(state, server.max_body_bytes, dscan_web::web_routes());
         dscan_api::serve(listener, router)
             .await
             .map_err(CliError::Server)
+    }
+}
+
+/// I4: po każdym udanym przebiegu wysyła surowy XML nmap do DefectDojo.
+async fn auto_import(state: AppState, mut completed: tokio::sync::broadcast::Receiver<i64>) {
+    while let Ok(run_id) = completed.recv().await {
+        let Some(client) = state.defectdojo.clone() else {
+            return;
+        };
+        match dscan_api::defectdojo_import_run(&state, &client, run_id).await {
+            Ok(response) => tracing::info!(
+                "DefectDojo: przebieg #{run_id} → test {:?}",
+                response.test_id
+            ),
+            Err(error) => tracing::warn!("DefectDojo: przebieg #{run_id}: {error:?}"),
+        }
     }
 }
 

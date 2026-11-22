@@ -1,7 +1,7 @@
 use axum::Router;
 use axum::http::{HeaderName, HeaderValue};
 use axum::middleware::from_fn_with_state;
-use axum::routing::{get, post};
+use axum::routing::{get, post, put};
 use tower_http::limit::RequestBodyLimitLayer;
 use tower_http::set_header::SetResponseHeaderLayer;
 use tower_http::trace::{DefaultMakeSpan, DefaultOnResponse, TraceLayer};
@@ -89,7 +89,33 @@ fn api_routes() -> Router<AppState> {
         .route("/api/v1/exports/{kind}", get(export))
         .route("/api/v1/signatures", get(list_signatures))
         .route("/api/v1/signatures/test", post(test_signature))
+        .route(
+            "/api/v1/signatures/custom",
+            get(crate::routes::signatures::list_custom)
+                .post(crate::routes::signatures::save_custom),
+        )
+        .route(
+            "/api/v1/signatures/custom/{id}",
+            axum::routing::delete(crate::routes::signatures::delete_custom),
+        )
         .route("/api/v1/dashboard", get(dashboard))
+        .route(
+            "/api/v1/hosts/{ip}/availability",
+            get(crate::routes::availability::availability),
+        )
+        .route(
+            "/api/v1/tags",
+            get(crate::routes::tags::list_tags).post(crate::routes::tags::add_tag),
+        )
+        .route(
+            "/api/v1/tags/{id}",
+            axum::routing::delete(crate::routes::tags::delete_tag),
+        )
+        .route(
+            "/api/v1/scans/{id}/clusters",
+            get(crate::routes::tags::run_clusters),
+        )
+        .route("/api/v1/search", get(crate::routes::search::search))
         .route("/api/v1/scans/{id}", get(get_scan))
         .route("/api/v1/scans/{id}/hosts", get(run_hosts))
         .route(
@@ -98,7 +124,39 @@ fn api_routes() -> Router<AppState> {
                 .put(set_override)
                 .delete(delete_override),
         )
-        .route("/api/v1/users", get(list_users))
+        .route(
+            "/api/v1/users",
+            get(list_users).post(crate::routes::accounts::create_user),
+        )
+        .route(
+            "/api/v1/users/{id}",
+            put(crate::routes::accounts::update_user),
+        )
+        .route(
+            "/api/v1/users/{id}/password",
+            put(crate::routes::accounts::set_password),
+        )
+        .route(
+            "/api/v1/accounts",
+            get(crate::routes::accounts::list_accounts),
+        )
+        .route(
+            "/api/v1/roles",
+            get(crate::routes::accounts::list_roles).post(crate::routes::accounts::create_role),
+        )
+        .route(
+            "/api/v1/roles/{id}",
+            put(crate::routes::accounts::update_role).delete(crate::routes::accounts::delete_role),
+        )
+        .route(
+            "/api/v1/defectdojo/import",
+            post(crate::routes::defectdojo::dojo_import),
+        )
+        .route(
+            "/api/v1/defectdojo/findings",
+            post(crate::routes::defectdojo::dojo_findings),
+        )
+        .route("/api/v1/audit", get(crate::routes::audit_log::audit_log))
         .route("/api/openapi.json", get(openapi_json))
 }
 

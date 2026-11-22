@@ -4,10 +4,13 @@
 pub mod config;
 pub mod db;
 pub mod diff;
+pub mod docs;
+pub mod dojo;
 pub mod evaluate;
 pub mod export;
 pub mod import;
 pub mod keys;
+pub mod output;
 pub mod run_control;
 pub mod scan;
 pub mod scan_plan;
@@ -114,9 +117,33 @@ pub fn pool_options(settings: &DatabaseSettings) -> PoolOptions {
 
 /// Szyfr z klucza `DSCAN_ENCRYPTION_KEY`. Polecenia administracyjne wymagają klucza (C6) —
 /// kto go nie zna, nie powinien zmieniać danych bezpośrednio w bazie.
+///
+/// Stopniowa rotacja (B6): `DSCAN_ENCRYPTION_KEY_ID` to identyfikator bieżącego klucza
+/// zapisywany w rekordach, a `DSCAN_PREVIOUS_ENCRYPTION_KEYS` (`id:hex,…`) — stare klucze
+/// do odczytu, dopóki `dscan keys reencrypt` nie przeszyfruje wszystkich rekordów.
 pub fn cipher_from_config(config: &AppConfig) -> Result<Cipher, CliError> {
     let key = config.require_encryption_key()?;
-    Ok(Cipher::new(key.as_bytes()))
+    let key_id = match std::env::var(dscan_config::ENCRYPTION_KEY_ID_ENV) {
+        Ok(text) if !text.trim().is_empty() => text
+            .trim()
+            .parse::<u8>()
+            .ok()
+            .filter(|id| *id > 0)
+            .ok_or_else(|| {
+                dscan_config::ConfigError::InvalidEncryptionKey(format!(
+                    "{}: liczba 1–255",
+                    dscan_config::ENCRYPTION_KEY_ID_ENV
+                ))
+            })?,
+        _ => 1,
+    };
+    let mut cipher = Cipher::new(key.as_bytes()).with_key_id(key_id);
+    if let Ok(previous) = std::env::var(dscan_config::PREVIOUS_KEYS_ENV) {
+        for (id, old) in dscan_config::parse_previous_keys(&previous)? {
+            cipher = cipher.with_previous_key(id, old.as_bytes());
+        }
+    }
+    Ok(cipher)
 }
 
 /// Łączy się z bazą wskazaną w `DSCAN_DATABASE_URL`.
@@ -140,6 +167,9 @@ impl Command for Commands {
             Commands::Config(args) => args.execute(context).await,
             Commands::Db(args) => args.execute(context).await,
             Commands::Keys(args) => args.execute(context).await,
+            Commands::Docs(args) => args.execute(context).await,
+            Commands::Completions(args) => args.execute(context).await,
+            Commands::Dojo(args) => args.execute(context).await,
             Commands::Evaluate(args) => args.execute(context).await,
             Commands::Login(args) => args.execute(context).await,
             Commands::Logout(args) => args.execute(context).await,

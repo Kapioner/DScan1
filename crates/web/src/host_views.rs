@@ -38,18 +38,51 @@ pub struct ResponseEntry {
     pub ok: bool,
 }
 
+/// Komórka mapy dostępności w godzinach (M2).
+pub struct HourCell {
+    pub hour: u32,
+    /// `hour-up`, `hour-mixed`, `hour-down`, `hour-none`.
+    pub css: &'static str,
+    pub title: String,
+}
+
+/// 24 komórki profilu godzinowego.
+pub fn hour_cells(history: &[(chrono::DateTime<chrono::Utc>, bool)]) -> Vec<HourCell> {
+    dscan_core::models::hourly_profile(history)
+        .iter()
+        .enumerate()
+        .map(|(hour, stat)| {
+            let css = match stat.rate() {
+                None => "hour-none",
+                Some(r) if r >= 0.85 => "hour-up",
+                Some(r) if r <= 0.15 => "hour-down",
+                Some(_) => "hour-mixed",
+            };
+            HourCell {
+                hour: hour as u32,
+                css,
+                title: format!("{hour}:00 — odpowiedzi {}/{}", stat.responded, stat.total),
+            }
+        })
+        .collect()
+}
+
 /// Wiersz listy hostów.
 pub struct HostRow {
     pub ip: String,
     pub hostname: String,
     pub status: &'static str,
+    /// Klasa stabilności (M5).
+    pub stability: String,
     pub ports: String,
     pub technologies: String,
     pub edited: bool,
+    /// Tagi hosta i jego usług (F11).
+    pub tags: String,
 }
 
 impl HostRow {
-    pub fn new(host: &Host, presence: &HashMap<IpAddr, HostStatus>) -> Self {
+    pub fn new(host: &Host, presence: &HashMap<IpAddr, HostStatus>, stability: String) -> Self {
         let mut technologies: Vec<String> = host
             .services
             .iter()
@@ -62,6 +95,7 @@ impl HostRow {
             ip: host.ip.to_string(),
             hostname: host.hostnames.first().cloned().unwrap_or_default(),
             status: status_label(presence.get(&host.ip).copied()),
+            stability,
             ports: host
                 .services
                 .iter()
@@ -71,6 +105,7 @@ impl HostRow {
             technologies: technologies.join(", "),
             edited: !host.edited_fields.is_empty()
                 || host.services.iter().any(|s| !s.edited_fields.is_empty()),
+            tags: String::new(),
         }
     }
 }
@@ -160,7 +195,7 @@ mod tests {
         service.detections = vec![Detection::from_evidence("nginx".into(), None, Vec::new())];
         host.services.push(service);
         let presence = HashMap::from([(host.ip, HostStatus::Unstable)]);
-        let row = HostRow::new(&host, &presence);
+        let row = HostRow::new(&host, &presence, "stabilny".into());
         assert_eq!(
             (row.status, row.ports.as_str(), row.edited),
             ("niestabilny", "80/tcp", true)

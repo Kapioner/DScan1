@@ -291,6 +291,13 @@ Wartości w sekcji `[scope]` pliku przykładowego są **zastępcze**. Przed pier
 skanem wpisz do `dscan.toml` adresację kontenerów laboratorium, dozwolone porty
 i limity ruchu z regulaminu organizatora.
 
+## Dokumentacja
+
+- [`docs/architektura.md`](docs/architektura.md) — architektura, uruchomienie, konfiguracja, format sygnatur, szyfrowanie, role
+- [`docs/cli.md`](docs/cli.md) — wszystkie polecenia (generowane: `dscan docs`)
+- [`docs/bezpieczenstwo-skanera.md`](docs/bezpieczenstwo-skanera.md), [`docs/klasyfikacja-danych.md`](docs/klasyfikacja-danych.md)
+- [`docs/prezentacja.md`](docs/prezentacja.md) — slajdy (Marp), demo: `scripts/demo.sh`
+
 ## Struktura workspace
 
 | Crate | Katalog | Odpowiedzialność |

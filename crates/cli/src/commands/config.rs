@@ -18,6 +18,15 @@ pub enum ConfigAction {
     Show(OverrideArgs),
     /// Sprawdza konfigurację i wypisuje ostrzeżenia.
     Validate(OverrideArgs),
+    /// Tworzy skomentowany dscan.toml ze wszystkimi parametrami.
+    Init {
+        /// Ścieżka pliku.
+        #[arg(default_value = "dscan.toml", value_name = "PLIK")]
+        path: std::path::PathBuf,
+        /// Nadpisz istniejący plik.
+        #[arg(long)]
+        force: bool,
+    },
 }
 
 impl Command for ConfigArgs {
@@ -27,6 +36,13 @@ impl Command for ConfigArgs {
                 let config = context.load_config(overrides.to_overrides())?;
                 println!("# Źródło: {}", context.config_source());
                 print!("{}", render_effective_config(&config)?);
+            }
+            ConfigAction::Init { path, force } => {
+                super::docs::write_config(path, *force)?;
+                println!(
+                    "Utworzono {} — uzupełnij [scope] danymi od organizatora.",
+                    path.display()
+                );
             }
             ConfigAction::Validate(overrides) => {
                 let config = context.load_config(overrides.to_overrides())?;

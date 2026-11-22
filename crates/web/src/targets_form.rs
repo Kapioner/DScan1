@@ -63,7 +63,18 @@ pub async fn add_target(
     let notice = match build_target(form) {
         Err(message) => Notice::error(message),
         Ok(target) => match dscan_db::create_target(&state.db, &state.cipher, &target).await? {
-            Some(created) => Notice::ok(format!("Dodano cel {}.", created.value)),
+            Some(created) => {
+                dscan_api::audit::record(
+                    &state,
+                    &user,
+                    "create",
+                    "target",
+                    created.id,
+                    &created.value,
+                )
+                .await;
+                Notice::ok(format!("Dodano cel {}.", created.value))
+            }
             None => Notice::error(format!("Cel {} już istnieje.", target.kind)),
         },
     };
@@ -110,6 +121,8 @@ pub async fn import_file(
     if !upload.dry_run {
         let summary = dscan_db::insert_targets(&state.db, &state.cipher, &import.accepted).await?;
         report.saved = Some((summary.inserted, summary.already_present));
+        let details = format!("{}: {} nowych", upload.file_name, summary.inserted);
+        dscan_api::audit::record(&state, &user, "import", "target", "", &details).await;
     }
     section(&state, &user, None, Some(report)).await
 }
@@ -124,6 +137,7 @@ pub async fn delete_target(
         return forbidden(&state, &user).await;
     }
     let notice = if dscan_db::delete_target(&state.db, id).await? {
+        dscan_api::audit::record(&state, &user, "delete", "target", id, "").await;
         Notice::ok("Usunięto cel.")
     } else {
         Notice::error("Cel już nie istnieje.")

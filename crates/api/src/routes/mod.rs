@@ -1,6 +1,10 @@
 //! Handlery endpointów, po jednym pliku na obszar.
 
+pub mod accounts;
+pub mod audit_log;
+pub mod availability;
 pub mod dashboard;
+pub mod defectdojo;
 pub mod exports;
 pub mod health;
 pub mod imports;
@@ -8,7 +12,9 @@ pub mod profiles;
 pub mod results;
 pub mod scan_control;
 pub mod scans;
+pub mod search;
 pub mod signatures;
+pub mod tags;
 pub mod targets;
 pub mod users;
 pub mod validation;
