@@ -480,25 +480,14 @@ else
 fi
 if [ "$OPT_DEMO" = 0 ]; then
     info "Pominięto dane demo (--no-demo)"
-elif [ "$(server_run_count)" -gt 0 ]; then
-    ok "Dane demo już są na serwerze (przebiegi importu: $(server_run_count))"
 else
-    import_first() { ./run.sh import --kind results docs/demo/przebieg-1.xml | tee "$STATE_DIR/demo-1.txt"; }
-    import_second() { ./run.sh import --kind results docs/demo/przebieg-2.xml | tee "$STATE_DIR/demo-2.txt"; }
-    run "Import przebiegu demo 1 (nmap XML)" import_first
-    run "Import przebiegu demo 2 - porównanie z pierwszym" import_second
-    for f in "$STATE_DIR/demo-1.txt" "$STATE_DIR/demo-2.txt"; do
-        grep -E '^Przebieg #|^Poza zakresem' "$f" | sed 's/^/        /' || true
-    done
+    load_demo() { ./scripts/demo.sh | tee "$STATE_DIR/demo.txt"; }
+    run "Dane demo, konta ról, ocena trafności, eksport (scripts/demo.sh)" load_demo
     [ "$(server_run_count)" -gt 0 ] || fail "Import demo nie utworzył przebiegów - sprawdź [scope] w dscan.toml i $LOG_FILE."
-    info "Zmiany wykryte między przebiegami demo:"
-    grep -E '^ *[-+~] ' "$STATE_DIR/demo-2.txt" | head -n 10 | sed 's/^/      /' || true
-fi
-if ./run.sh evaluate docs/demo/referencja.csv > "$STATE_DIR/evaluate.txt" 2>&1; then
-    ok "Ocena trafności względem docs/demo/referencja.csv:"
-    grep -E '^Przebieg|^  (hosty|usługi) ' "$STATE_DIR/evaluate.txt" | head -n 6 | sed 's/^/        /' || true
-else
-    warn "Ocena trafności niedostępna (szczegóły: $STATE_DIR/evaluate.txt)"
+    ok "Przebiegi demo na serwerze: $(server_run_count)"
+    grep -E '^ *[-+~] ' "$STATE_DIR/demo.txt" | head -n 8 | sed 's/^/      /' || true
+    grep -E '^Przebieg|^  (hosty|usługi) ' "$STATE_DIR/demo.txt" | tail -n 6 | sed 's/^/      /' || true
+    ok "Konta ról: demo-operator, demo-modyfikacja, demo-odczyt (hasło: DSCAN_DEMO_PASSWORD w .env)"
 fi
 
 # ===== 9. (opcjonalnie) Laboratorium =========================================================
@@ -565,6 +554,8 @@ cat << EOF
   ${B}Interfejs WWW:${N}  http://127.0.0.1:${PORT}/
   ${B}Login:${N}          ${ADMIN_USER}
   ${B}Hasło:${N}          ${ADMIN_PASS}   ${DIM}(też w .env: DSCAN_ADMIN_PASSWORD)${N}
+  ${B}Konta ról:${N}      demo-operator, demo-modyfikacja, demo-odczyt / $(env_value DSCAN_DEMO_PASSWORD)
+  ${B}Wymagania:${N}      hacknation.md - jak sprawdzić każde wymaganie zadania
 
   ${B}Zobacz w przeglądarce:${N} Pulpit · Hosty · Porównanie · W czasie
 

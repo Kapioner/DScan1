@@ -26,7 +26,7 @@ git clone https://github.com/Kapioner/DScan1.git DScan && cd DScan && ./install.
 5. kompilację z paskiem postępu i utworzenie `.env` z sekretami,
 6. start PostgreSQL i serwera DScan w tle,
 7. logowanie administratora w CLI,
-8. załadowanie danych demo i ocenę trafności.
+8. załadowanie danych demo, konta ról, ocenę trafności (`scripts/demo.sh`).
 
 Na końcu wypisuje adres interfejsu WWW, login i hasło. Log: `.dscan-install/install.log`.
 
@@ -81,10 +81,13 @@ Docker Desktop. Windows: `wsl --install -d Ubuntu`, Docker Desktop z *WSL integr
 | login i hasło | `grep -E '^DSCAN_ADMIN_(USERNAME\|PASSWORD)=' .env` |
 | interfejs WWW | adres z `[server] listen` w `dscan.toml` (domyślnie http://127.0.0.1:9080/) |
 | token CLI | `./run.sh login --user admin` |
-| dane demo | `./run.sh import --kind results docs/demo/przebieg-1.xml` i `przebieg-2.xml` |
-| ocena trafności | `./run.sh evaluate docs/demo/referencja.csv --details` |
+| dane demo, konta ról, ocena, eksport | `scripts/demo.sh` (serwer musi działać) |
+| demo + skan na żywo usług w Dockerze | `scripts/demo.sh --uslugi` (zatrzymanie: `scripts/demo.sh --stop`) |
+| ręczny import demo | `./run.sh import --kind results docs/demo/przebieg-1.xml`, potem `przebieg-2.xml` |
 
 Dane demo to dwa przebiegi ze zmianą (nowy SSH, inna wersja nginx, brak MySQL, nowa kamera).
+Konta ról: `demo-operator`, `demo-modyfikacja`, `demo-odczyt`, hasło `DSCAN_DEMO_PASSWORD` w `.env`.
+Sprawdzanie wymagań zadania krok po kroku: `hacknation.md`.
 Widoki: **Pulpit**, **Hosty**, **Porównanie**, **W czasie**.
 
 ## 5. Laboratorium
