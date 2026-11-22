@@ -1,4 +1,4 @@
-# Modyfikacja na potrzeby analizy: środowisko bez IPv6 — NPM musi słuchać tylko na IPv4.
+# Modyfikacja na potrzeby analizy: środowisko bez IPv6 - NPM musi słuchać tylko na IPv4.
 services:
   nginx-proxy-manager:
     environment:

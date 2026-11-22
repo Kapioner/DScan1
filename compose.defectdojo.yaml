@@ -1,4 +1,4 @@
-# Lokalny DefectDojo do testów integracji (zadanie D4) — na podstawie oficjalnego
+# Lokalny DefectDojo do testów integracji (zadanie D4) - na podstawie oficjalnego
 # docker-compose.yml DefectDojo 3.5.202. Uruchamiaj skryptem: ./scripts/defectdojo-setup.sh
 #
 # Działa obok DScan, ale jako osobny projekt (własna baza, własne wolumeny).

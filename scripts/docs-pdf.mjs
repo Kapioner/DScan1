@@ -55,7 +55,7 @@ section.slide:last-child { break-after: auto; }
 `;
 
 const titles = {
-  "INSTRUKCJA-JURY": "Instrukcja dla jury",
+  uruchomienie: "Instrukcja uruchomienia",
   architektura: "Architektura",
   cli: "Polecenia CLI",
   "analiza-skutecznosci": "Skuteczność na laboratorium",
@@ -97,7 +97,7 @@ const browser = await chromium.launch();
 const page = await browser.newPage();
 for (const name of names) {
   const html = `<!doctype html><html lang="pl"><head><meta charset="utf-8">
-<title>DScan — ${titles[name] ?? name}</title><style>${css}${name === "prezentacja" ? "@page { size: A4 landscape; margin: 18mm; }" : ""}</style></head><body>${render(name)}</body></html>`;
+<title>DScan - ${titles[name] ?? name}</title><style>${css}${name === "prezentacja" ? "@page { size: A4 landscape; margin: 18mm; }" : ""}</style></head><body>${render(name)}</body></html>`;
   const file = join(tmp, `${name}.html`);
   writeFileSync(file, html);
   await page.goto(pathToFileURL(file).href, { waitUntil: "load" });
@@ -108,7 +108,7 @@ for (const name of names) {
     displayHeaderFooter: name !== "prezentacja",
     headerTemplate: "<span></span>",
     footerTemplate: `<div style="font-size:7pt;color:#8a94a3;width:100%;text-align:center;">
-      DScan — ${titles[name] ?? name} · <span class="pageNumber"></span>/<span class="totalPages"></span></div>`,
+      DScan - ${titles[name] ?? name} · <span class="pageNumber"></span>/<span class="totalPages"></span></div>`,
   });
   console.log(`docs/pdf/${name}.pdf`);
 }

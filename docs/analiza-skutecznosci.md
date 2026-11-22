@@ -1,19 +1,20 @@
-# DScan — skuteczność na laboratorium
+# DScan - skuteczność na laboratorium
 
-Laboratorium organizatorów (`lab.zip`: 4 stacki + quickstart), skaner na `127.0.0.1`.
+Laboratorium: 4 stacki Docker + scenariusz quickstart, skaner na `127.0.0.1`.
 Konfiguracja: `analiza-lab/dscan-lab.toml`, wzorce: `analiza-lab/wzorce/`, nakładki: `analiza-lab/nakladki-compose/`.
 
 ## Wynik
 
-| Miara | Przed poprawkami | Po poprawkach |
-|---|---|---|
-| Otwarte porty (31 w 4 stackach) | 31/31 | 31/31 |
-| Fałszywe zmiany | 0 | 0 |
-| Poprawna nazwa usługi | 18/20 | 20/20 |
-| Rozpoznana aplikacja | 14/20 | 20/20 |
-| Quickstart (8787 znika i wraca) | zaliczony | zaliczony |
-| Czas odpowiedzi (Toxiproxy 500 ms) | brak | 71 ms → 1057 ms |
-| DefectDojo import / eksport | działa | działa, wartości ciasteczek ukryte |
+| Miara | Wynik |
+|---|---|
+| Otwarte porty (31 w 4 stackach) | 31/31 - precyzja i czułość 100% |
+| Fałszywe zmiany przy skanie bez zmian | 0 |
+| Poprawna nazwa usługi | 20/20 |
+| Rozpoznana aplikacja | 20/20 |
+| Scenariusz quickstart (8787 znika i wraca) | zaliczony |
+| Czas odpowiedzi przez Toxiproxy (opóźnienie 500 ms) | 71 ms → 1057 ms |
+| DefectDojo: import XML i eksport obserwacji | 31 findingów, wartości ciasteczek maskowane |
+| Usługi spoza laboratorium (Grafana, Jenkins, Portainer, MongoDB) | 4/4 rozpoznane z wersją |
 
 ## Quickstart
 
@@ -26,31 +27,34 @@ Konfiguracja: `analiza-lab/dscan-lab.toml`, wzorce: `analiza-lab/wzorce/`, nakł
 
 Skan hosta ok. 104 s, z czego narzut DScan ok. 3 s (reszta to `nmap -sV`).
 
-## Luki znalezione i poprawione
+## Rozpoznawane usługi
 
-| Problem | Poprawka |
+| Stack | Porty | Rozpoznane |
+|---|---|---|
+| custom-network | 7 | OpenSSH, Gitea, RabbitMQ (AMQP i panel), nginx, httpbin, PostgreSQL |
+| modern | 6 | WordPress, phpMyAdmin, Redis 7.4, Nginx Proxy Manager (OpenResty) |
+| vulnerable | 15 | vsftpd 3.0.2, WordPress 4.7, Adminer, DVWA, Apache 2.4.10/2.4.25, PHP 5.6 |
+| modern-proxy | 3 | WordPress za proxy, Traefik, Toxiproxy |
+
+## Mechanizmy wpływające na wynik
+
+| Mechanizm | Działanie |
 |---|---|
-| Gitea, httpbin źle nazwane przez nmap (`nessus?`, `tcpwrapped`) | próba HTTP dla usług niejednoznacznych, powrót HTTPS → HTTP |
-| brak sygnatur: Gitea, httpbin, Nginx Proxy Manager, Traefik, Toxiproxy, DVWA, MongoDB | dodane |
-| kreatory instalacji nieoznaczone | heurystyka „niedokończona instalacja” (+40 pkt) |
-| brak czasu odpowiedzi | `response_ms` (migracja 0009) w CLI i UI |
-| wartości ciasteczek w DefectDojo | maskowanie `***` |
-| ocena liczyła tylko jedną starą wersję | każda osobno + punkty za FTP i wystawioną bazę |
-| za mały limit sond | `max_probes_per_service = 20`, `http_requests_per_host = 150` |
-| NPM i Adminer bez IPv6 nie startowały | nakładki compose |
+| próba HTTP dla usług niejednoznacznych | `tcpwrapped` i błędne nazwy nmap weryfikowane zapytaniem HTTP, powrót HTTPS → HTTP |
+| sygnatury | m.in. Gitea, httpbin, NPM, Traefik, Toxiproxy, DVWA, MongoDB |
+| heurystyka „niedokończona instalacja” | kreatory WordPress i Gitea oznaczane jako ryzyko (+40 pkt) |
+| czas odpowiedzi | `response_ms` w CLI i UI |
+| ocena znalezisk | każda stara wersja osobno, punkty za FTP i wystawioną bazę |
 
-Ranking (stack vulnerable): WordPress 4.7 — 135 pkt, DVWA — 130, Adminer — 85, FTP — 30.
-
-## Test uogólnienia (usługi spoza labu)
-
-Grafana 13.4.0, Jenkins 2.541.3, Portainer, MongoDB — 4/4 rozpoznane, wszystkie „nowe”, bez fałszywych zmian.
+Ranking (stack vulnerable): WordPress 4.7 - 135 pkt, DVWA - 130, Adminer - 85, FTP - 30.
 
 ## Ograniczenia
 
-- Nowe produkty bez sygnatury — tylko poziom nmap i heurystyk.
-- Porty PASV FTP (21000–21010) to 11 osobnych usług `tcpwrapped`.
+- Produkty bez sygnatury rozpoznawane na poziomie nmap i heurystyk.
+- Porty PASV FTP (21000-21010) to 11 osobnych usług `tcpwrapped`.
 - Martwy kontener za docker-proxy widoczny jako `tcpwrapped`.
-- HTTPS bez SNI (NPM 443) — brak odczytu certyfikatu.
+- HTTPS bez SNI (NPM 443) - brak odczytu certyfikatu.
+- Na hostach bez IPv6 NPM i Adminer wymagają nakładek compose.
 
 ## Odtworzenie
 

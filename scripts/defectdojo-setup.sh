@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Lokalny DefectDojo do testów integracji (zadanie D4) — jedną komendą:
+# Lokalny DefectDojo do testów integracji (zadanie D4) - jedną komendą:
 #
 #   ./scripts/defectdojo-setup.sh          uruchamia DefectDojo i przygotowuje dane testowe
 #   ./scripts/defectdojo-setup.sh stop     zatrzymuje kontenery (dane zostają)
@@ -7,7 +7,7 @@
 # Przy pierwszym uruchomieniu dopisuje do .env sekrety DefectDojo, a po starcie:
 #   - pobiera token API administratora      → DSCAN_DEFECTDOJO_TOKEN
 #   - tworzy produkt „DScan lab”            → DSCAN_DEFECTDOJO_PRODUCT_ID
-#   - tworzy engagement „DScan — testy”     → DSCAN_DEFECTDOJO_ENGAGEMENT_ID
+#   - tworzy engagement „DScan - testy”     → DSCAN_DEFECTDOJO_ENGAGEMENT_ID
 # Pierwszy start (pobranie obrazów, migracje DefectDojo) trwa kilka minut.
 set -euo pipefail
 
@@ -16,7 +16,7 @@ cd "$(dirname "$0")/.."
 ENV_FILE=".env"
 COMPOSE=(docker compose -f compose.defectdojo.yaml --env-file "$ENV_FILE")
 PRODUCT_NAME="DScan lab"
-ENGAGEMENT_NAME="DScan — testy"
+ENGAGEMENT_NAME="DScan - testy"
 
 log() {
     echo "[defectdojo] $*" >&2
@@ -63,7 +63,7 @@ wait_for_api() {
         fi
         sleep 5
     done
-    log "DefectDojo nie odpowiada — sprawdź: docker compose -f compose.defectdojo.yaml logs initializer"
+    log "DefectDojo nie odpowiada - sprawdź: docker compose -f compose.defectdojo.yaml logs initializer"
     exit 1
 }
 
@@ -83,7 +83,7 @@ fetch_token() {
             echo "$token"
             return 0
         fi
-        sleep 5   # konto admina tworzy initializer — może jeszcze nie istnieć
+        sleep 5   # konto admina tworzy initializer - może jeszcze nie istnieć
     done
     log "Nie udało się pobrać tokenu API."
     exit 1

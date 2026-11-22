@@ -1,10 +1,10 @@
-# DScan — bezpieczeństwo skanera
+# DScan - bezpieczeństwo skanera
 
 DScan wykrywa usługi, nie atakuje ich. Zasady są wymuszone w kodzie.
 
 | Zasada | Kod |
 |---|---|
-| nmap tylko `-sn` / `-sV`; bez NSE (`--script`, `-sC`, `-A`) — brak exploitów, brute force, logowania | `crates/scanner/src/safety.rs` (`check_nmap_args`) |
+| nmap tylko `-sn` / `-sV`; bez NSE (`--script`, `-sC`, `-A`) - brak exploitów, brute force, logowania | `crates/scanner/src/safety.rs` (`check_nmap_args`) |
 | bez fałszowania źródła i omijania zapór (`-S`, `-D`, `--spoof-mac`, `-f`, `--data`, `--badsum`) | jw. |
 | zawsze `--max-rate`, dzielony między procesy i ograniczony `max_bandwidth_kbps` | `crates/engine/src/options.rs` |
 | tylko sieci z `[scope] allowed_networks`; sieć częściowo poza zakresem pomijana | `crates/scanner/src/targets` |

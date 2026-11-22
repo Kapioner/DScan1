@@ -30,5 +30,5 @@ min_confidence = 30
 enabled = true
 url = "http://127.0.0.1:8180"
 product_name = "DScan lab"
-engagement_name = "DScan — testy"
+engagement_name = "DScan - testy"
 auto_import = false

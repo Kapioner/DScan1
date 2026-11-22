@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="docs/img/logo.png" alt="DScan — Smart Scanning" width="220">
+  <img src="docs/img/logo.png" alt="DScan - Smart Scanning" width="220">
 </p>
 
-<h1 align="center">DScan — Defect Scan</h1>
+<h1 align="center">DScan - Defect Scan</h1>
 
 <p align="center">
   Skanowanie i inwentaryzacja usług sieciowych z wykrywaniem zmian.<br>
@@ -10,10 +10,13 @@
 </p>
 
 <p align="center">
-  <a href="docs/pdf/INSTRUKCJA-JURY.pdf"><b>Instrukcja dla jury (PDF)</b></a> ·
+  <a href="docs/pdf/uruchomienie.pdf"><b>Instrukcja uruchomienia (PDF)</b></a> ·
   <a href="#szybki-start">Szybki start</a> ·
   <a href="#dokumentacja">Dokumentacja</a>
 </p>
+
+> **Dla jury:** uruchamiajcie DScan w środowisku Linux - najpierw `./install.sh` (instalacja i pierwsze
+> uruchomienie z danymi demo), kolejne starty przez `./run.sh`.
 
 ---
 
@@ -22,7 +25,7 @@
 | Obszar | Co daje DScan |
 |---|---|
 | **Wykrywanie** | nmap (`-sn`/`-sV`) w równoległych podgrupach CIDR, łączny limit tempa, postęp i prognoza czasu |
-| **Technologie** | HTTP/HTTPS, certyfikaty TLS, favicon, ok. 50 sygnatur YAML z pewnością 0–100 i dowodami |
+| **Technologie** | HTTP/HTTPS, certyfikaty TLS, favicon, ok. 50 sygnatur YAML z pewnością 0-100 i dowodami |
 | **Zmiany** | usługa **nowa / zniknęła / zmieniona** między przebiegami; kod wyjścia `2` = zmiany |
 | **Znaleziska** | ranking: panele admina, CI/CD, kamery IoT, środowiska testowe, stare wersje |
 | **Harmonogram** | profile, okna czasowe, wstrzymanie i wznowienie od niedokończonych podgrup |
@@ -30,7 +33,7 @@
 | **Import / eksport** | cele CSV/JSON, wyniki nmap XML/JSON/CSV, eksport z filtrami, DefectDojo |
 | **Bezpieczeństwo** | tylko dozwolone sieci i porty, bez NSE, AES-256-GCM dla danych poufnych, RBAC i audyt |
 
-Na laboratorium organizatorów: **31/31 portów, 100% precyzji i czułości, 0 fałszywych zmian**.
+Na laboratorium testowym: **31/31 portów, 100% precyzji i czułości, 0 fałszywych zmian**.
 
 ## Szybki start
 
@@ -38,28 +41,29 @@ Na laboratorium organizatorów: **31/31 portów, 100% precyzji i czułości, 0 f
 git clone https://github.com/Kapioner/DScan1.git DScan && cd DScan && ./install.sh
 ```
 
-`install.sh` z paskiem postępu: instaluje brakujące narzędzia (Git, kompilator C, nmap, Docker, Rust ≥ 1.85),
-kompiluje DScan, uruchamia PostgreSQL i serwer w tle, loguje administratora i ładuje dane demo.
-Na końcu wypisuje **http://127.0.0.1:9080/**, login i hasło.
+`install.sh` (Linux) pokazuje postęp każdego kroku: instaluje brakujące narzędzia (Git, kompilator C, nmap,
+Docker, Rust ≥ 1.85), kompiluje DScan, uruchamia PostgreSQL i serwer w tle, loguje administratora i ładuje
+dane demo. Na końcu wypisuje adres interfejsu WWW (domyślnie http://127.0.0.1:9080/), login i hasło.
 
 | Opcja | Działanie |
 |---|---|
 | `--lab lab.zip` | scenariusz laboratorium (znikająca usługa 8787) |
 | `--dojo` | lokalny DefectDojo z integracją |
 | `--no-install` / `--no-demo` | bez instalacji pakietów / bez danych demo |
-| `--keep-config` | zostawia własny `dscan.toml` (domyślnie zastępowany konfiguracją dla jury, kopia w `dscan.toml.bak`) |
+| `--force-config` | zastępuje istniejący `dscan.toml` konfiguracją lokalną (kopia: `dscan.toml.bak`) |
 | `--stop` | zatrzymanie serwera i bazy |
 
-Ręcznie (wymaga Rust, Docker, nmap):
+Kolejne uruchomienia (wymaga Rust, Docker, nmap):
 
 ```bash
-cp docs/jury/dscan.toml dscan.toml && ./run.sh
+./run.sh
 ```
 
-`run.sh` tworzy `.env` (klucz szyfrowania, hasło bazy, konto admina; 600), startuje PostgreSQL w Dockerze,
-buduje release i uruchamia `dscan serve`. Hasło admina: `grep DSCAN_ADMIN_ .env`.
+`run.sh` wypisuje kroki `[1/4]`-`[4/4]`: konfiguracja (`dscan.toml` z `docs/konfiguracja/dscan.toml`, `.env`
+z sekretami), baza PostgreSQL w Dockerze, kompilacja z postępem (pomijana bez zmian w kodzie), start serwera
+z adresem WWW. Login i hasło: `grep DSCAN_ADMIN_ .env`.
 
-> `.env` zawiera jedyną kopię klucza szyfrowania — zrób kopię zapasową.
+> `.env` zawiera jedyną kopię klucza szyfrowania - zrób kopię zapasową.
 
 ## Użycie
 
@@ -70,7 +74,7 @@ buduje release i uruchamia `dscan serve`. Hasło admina: `grep DSCAN_ADMIN_ .env
 | Polecenie | Wynik |
 |---|---|
 | `./run.sh scan 127.0.0.1` | skan z fingerprintingiem i listą zmian |
-| `./run.sh scan 10.0.0.0/24 --dry-run` | plan: adresy, podgrupy, czas — bez pakietów |
+| `./run.sh scan 10.0.0.0/24 --dry-run` | plan: adresy, podgrupy, czas - bez pakietów |
 | `./run.sh import --kind results wynik.xml` | import wyników nmap |
 | `./run.sh export services --format csv --technology nginx` | eksport z filtrem |
 | `./run.sh diff 1 2` | porównanie przebiegów |
@@ -119,7 +123,7 @@ CI: fmt, clippy, ok. 400 testów, `cargo audit`, obraz Docker. Wytyczne: [`.clau
 
 | Dokument | PDF | Źródło |
 |---|---|---|
-| Instrukcja dla jury | [PDF](docs/pdf/INSTRUKCJA-JURY.pdf) | [md](docs/INSTRUKCJA-JURY.md) |
+| Instrukcja uruchomienia | [PDF](docs/pdf/uruchomienie.pdf) | [md](docs/uruchomienie.md) |
 | Architektura | [PDF](docs/pdf/architektura.pdf) | [md](docs/architektura.md) |
 | Polecenia CLI | [PDF](docs/pdf/cli.pdf) | [md](docs/cli.md) |
 | Skuteczność na laboratorium | [PDF](docs/pdf/analiza-skutecznosci.pdf) | [md](docs/analiza-skutecznosci.md) |

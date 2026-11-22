@@ -1,4 +1,4 @@
-# DScan — architektura
+# DScan - architektura
 
 Jedna binarka `dscan` (serwer WWW + REST API + CLI) w Ruście, dane w PostgreSQL.
 
@@ -23,14 +23,14 @@ Jedna binarka `dscan` (serwer WWW + REST API + CLI) w Ruście, dane w PostgreSQL
 | `dscan-core` | modele, porównanie przebiegów, obecność hostów |
 | `dscan-config` | TOML + `DSCAN_*` + flagi, walidacja, profile, sekrety |
 | `dscan-crypto` | AES-256-GCM, HMAC-SHA256 (ślepy indeks), tokeny |
-| `dscan-db` | pula, migracje `0001`–`0009`, zapis wsadowy, rotacja kluczy |
+| `dscan-db` | pula, migracje `0001`-`0009`, zapis wsadowy, rotacja kluczy |
 | `dscan-scanner` | cele i zakres, podgrupy CIDR, pula nmap, parser XML, zabezpieczenia |
 | `dscan-fingerprint` | HTTP(S), TLS, favicon (mmh3), sygnatury YAML, heurystyki, SimHash |
 | `dscan-engine` | przebiegi, harmonogram, import, dashboard, ocena znalezisk, klastry |
 | `dscan-integrations` | import/eksport, DefectDojo, ewaluacja trafności |
 | `dscan-auth` | argon2id, walidacja loginów |
 | `dscan-api` | REST `/api/v1`, RBAC, audyt, OpenAPI |
-| `dscan-web` | interfejs WWW (htmx wkompilowany — działa offline) |
+| `dscan-web` | interfejs WWW (htmx wkompilowany - działa offline) |
 | `dscan` | podkomendy CLI (clap) |
 
 Wzorce: Builder, Command, Strategy, Adapter, Decorator, Observer, Iterator.
@@ -92,5 +92,5 @@ RBAC sprawdza każde żądanie (`crates/api/src/auth/rbac.rs`); trasa spoza tabe
 
 ## Testy
 
-`cargo test --workspace` (z `DSCAN_TEST_DATABASE_URL` — na prawdziwej bazie). CI: fmt, clippy `-D warnings`,
+`cargo test --workspace` (z `DSCAN_TEST_DATABASE_URL` - na prawdziwej bazie). CI: fmt, clippy `-D warnings`,
 ok. 400 testów (RBAC 4 ról, skala /18), `cargo audit`, obraz Docker.

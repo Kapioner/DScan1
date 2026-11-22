@@ -1,4 +1,4 @@
-# DScan — klasyfikacja danych
+# DScan - klasyfikacja danych
 
 Lista kolumn szyfrowanych: `ENCRYPTED_COLUMNS` w `crates/db/src/columns.rs`.
 Test `classification_document_lists_every_encrypted_column` pilnuje zgodności z tym dokumentem.
@@ -42,7 +42,7 @@ Rotacja: `keys rotate` (jedna transakcja) albo `keys reencrypt` partiami (`DSCAN
 |---|---|
 | `hosts.ip`, `services.port/protocol/state` | klucz porównań, indeksy, filtry |
 | `services.name/product/version/cpe` | statystyki technologii (pełny baner szyfrowany) |
-| `services.fingerprint_hash` | skrót — nie da się odtworzyć danych |
+| `services.fingerprint_hash` | skrót - nie da się odtworzyć danych |
 | `http_info.url/status_code/title/redirect_chain/tls_verified` | filtry i listy w UI |
 | `detections.*` | technologie i dowody (bez wartości ciasteczek) |
 | `targets.kind/value/target_group` | porównanie z `[scope]` |
@@ -51,6 +51,6 @@ Rotacja: `keys rotate` (jedna transakcja) albo `keys reencrypt` partiami (`DSCAN
 | `users.password_hash` | haszowane argon2id (jednokierunkowo) |
 | `sessions.token_hash` | tylko SHA-256 tokenu |
 | `host_presence.*`, `host_responses.*` | stan aktywny/nieaktywny |
-| `audit_log.*` | kto, co, kiedy — bez wartości pól poufnych |
+| `audit_log.*` | kto, co, kiedy - bez wartości pól poufnych |
 
 Token CLI: `~/.config/dscan/credentials.json` (0600); `dscan logout` kończy sesję i usuwa plik.

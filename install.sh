@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# DScan — automatyczna instalacja i uruchomienie (odpowiednik docs/INSTRUKCJA-JURY.md).
+# DScan - automatyczna instalacja i uruchomienie (kroki opisane w docs/uruchomienie.md).
 #
 #   ./install.sh                 instalacja narzędzi, kompilacja, start serwera, logowanie, dane demo
-#   ./install.sh --lab lab.zip   dodatkowo scenariusz laboratorium organizatorów (krok 7 instrukcji)
-#   ./install.sh --dojo          dodatkowo lokalny DefectDojo (krok 8 instrukcji)
+#   ./install.sh --lab lab.zip   dodatkowo scenariusz laboratorium (znikająca i powracająca usługa)
+#   ./install.sh --dojo          dodatkowo lokalny DefectDojo
 #   ./install.sh --stop          zatrzymanie serwera DScan i bazy
 #   ./install.sh --help          wszystkie opcje
 #
@@ -26,19 +26,18 @@ OPT_INSTALL=1
 OPT_DEMO=1
 OPT_LAB=""
 OPT_DOJO=0
-OPT_KEEP_CONFIG=0
+OPT_FORCE_CONFIG=0
 OPT_STOP=0
 
 usage() {
     cat << 'EOF'
 Użycie: ./install.sh [opcje]
 
-  --lab PLIK|KATALOG   uruchom scenariusz laboratorium organizatorów (lab.zip albo rozpakowany katalog)
+  --lab PLIK|KATALOG   uruchom scenariusz laboratorium (lab.zip albo rozpakowany katalog)
   --dojo               uruchom lokalny DefectDojo i włącz integrację
   --no-install         nie instaluj pakietów systemowych (tylko sprawdź, czy są)
   --no-demo            nie ładuj zapasowych danych demo
-  --keep-config        zostaw istniejący dscan.toml (domyślnie zastępowany konfiguracją dla jury,
-                       stary trafia do dscan.toml.bak)
+  --force-config       zastąp istniejący dscan.toml konfiguracją lokalną (kopia: dscan.toml.bak)
   --stop               zatrzymaj serwer DScan uruchomiony przez ten skrypt oraz bazę
   -h, --help           ta pomoc
 EOF
@@ -50,8 +49,7 @@ while [ "$#" -gt 0 ]; do
         --dojo) OPT_DOJO=1 ;;
         --no-install) OPT_INSTALL=0 ;;
         --no-demo) OPT_DEMO=0 ;;
-        --keep-config) OPT_KEEP_CONFIG=1 ;;
-        --force-config) ;; # dawna opcja — teraz to zachowanie domyślne
+        --force-config) OPT_FORCE_CONFIG=1 ;;
         --stop) OPT_STOP=1 ;;
         -h | --help) usage; exit 0 ;;
         *) echo "Nieznana opcja: $1" >&2; usage >&2; exit 1 ;;
@@ -109,7 +107,7 @@ elapsed() { # elapsed START → "1 min 05 s"
     if [ "$s" -ge 60 ]; then printf '%d min %02d s' $((s / 60)) $((s % 60)); else printf '%d s' "$s"; fi
 }
 
-# run "opis" polecenie… — wykonuje polecenie z animacją, wyjście trafia do logu.
+# run "opis" polecenie… - wykonuje polecenie z animacją, wyjście trafia do logu.
 run() {
     local label="$1"; shift
     local started pid code=0 i=0
@@ -218,7 +216,7 @@ detect_os
 cat << EOF
 
 ${B}  ____  ____                  ${N}
-${B} |  _ \\/ ___|  ___ __ _ _ __  ${N}   ${B}DScan — instalacja i uruchomienie${N}
+${B} |  _ \\/ ___|  ___ __ _ _ __  ${N}   ${B}DScan - instalacja i uruchomienie${N}
 ${B} | | | \\___ \\ / __/ _\` | '_ \\ ${N}   system: ${OS}, katalog: ${REPO_DIR}
 ${B} | |_| |___) | (_| (_| | | | |${N}   log: ${LOG_FILE}
 ${B} |____/|____/ \\___\\__,_|_| |_|${N}
@@ -232,16 +230,16 @@ case "$OS" in
     macos) ok "System: macOS $(sw_vers -productVersion 2> /dev/null || true)" ;;
     *) fail "Nieobsługiwany system $(uname -s). Na Windows uruchom skrypt w WSL2 (Ubuntu)." ;;
 esac
-[ "$OS" = wsl ] && info "WSL wykryty — Docker powinien pochodzić z Docker Desktop (WSL integration)."
+[ "$OS" = wsl ] && info "WSL wykryty - Docker powinien pochodzić z Docker Desktop (WSL integration)."
 
 free_kb=$(df -Pk . | awk 'NR == 2 {print $4}')
 if [ "${free_kb:-0}" -lt $((6 * 1024 * 1024)) ]; then
-    warn "Wolne miejsce: $((free_kb / 1024 / 1024)) GB — zalecane ok. 6 GB (kompilacja i obrazy)."
+    warn "Wolne miejsce: $((free_kb / 1024 / 1024)) GB - zalecane ok. 6 GB (kompilacja i obrazy)."
 else
     ok "Wolne miejsce: $((free_kb / 1024 / 1024)) GB"
 fi
 if [ -n "$SUDO" ] && ! have sudo; then
-    fail "Brak sudo — uruchom skrypt jako root albo zainstaluj sudo."
+    fail "Brak sudo - uruchom skrypt jako root albo zainstaluj sudo."
 fi
 
 # ===== 2. Instalacja narzędzi ================================================================
@@ -260,7 +258,7 @@ install_linux_packages() {
         ok "Pakiety systemowe już zainstalowane"
         return
     fi
-    have apt-get || fail "Brak apt-get. Zainstaluj ręcznie: ${missing[*]} (instrukcja: docs/INSTRUKCJA-JURY.md)."
+    have apt-get || fail "Brak apt-get. Zainstaluj ręcznie: ${missing[*]} (instrukcja: docs/uruchomienie.md)."
     [ "$OPT_INSTALL" = 1 ] || fail "Brakuje: ${missing[*]} (uruchom bez --no-install)."
     [ -n "$SUDO" ] && info "Może pojawić się pytanie o hasło sudo."
     $SUDO true
@@ -283,7 +281,7 @@ install_docker_linux() {
         [ "$OPT_INSTALL" = 1 ] || fail "Brak Docker Compose v2."
         run "Instalacja Docker Compose v2" bash -c "$SUDO apt-get install -y docker-compose-plugin || $SUDO apt-get install -y docker-compose-v2"
     fi
-    # Usługa Dockera (systemd) — w WSL i kontenerach może jej nie być.
+    # Usługa Dockera (systemd) - w WSL i kontenerach może jej nie być.
     if [ "$OPT_INSTALL" = 1 ] && ! $SUDO docker info > /dev/null 2>&1; then
         info "Uruchamiam usługę Dockera…"
         { $SUDO systemctl enable --now docker || $SUDO service docker start; } >> "$LOG_FILE" 2>&1 \
@@ -297,7 +295,7 @@ install_macos() {
         fail "Zainstaluj narzędzia Xcode (otwarte okno instalatora) i uruchom ./install.sh ponownie."
     fi
     ok "Narzędzia Xcode (kompilator C)"
-    have brew || fail "Brak Homebrew — zainstaluj ze strony https://brew.sh i uruchom ponownie."
+    have brew || fail "Brak Homebrew - zainstaluj ze strony https://brew.sh i uruchom ponownie."
     local missing=()
     have git || missing+=(git)
     have nmap || missing+=(nmap)
@@ -307,7 +305,7 @@ install_macos() {
     else
         ok "git i nmap już zainstalowane"
     fi
-    have docker || fail "Brak Dockera — zainstaluj i uruchom Docker Desktop: https://www.docker.com/products/docker-desktop/"
+    have docker || fail "Brak Dockera - zainstaluj i uruchom Docker Desktop: https://www.docker.com/products/docker-desktop/"
     ok "Docker: $(docker --version | sed 's/Docker version //')"
 }
 
@@ -320,7 +318,7 @@ install_rust() {
             ok "Rust $current"
             return
         fi
-        have rustup || fail "Rust $current jest starszy niż $MIN_RUST, a rustup nie jest dostępny — zaktualizuj Rust."
+        have rustup || fail "Rust $current jest starszy niż $MIN_RUST, a rustup nie jest dostępny - zaktualizuj Rust."
         run "Aktualizacja Rust ($current → stable)" rustup update stable
         rustup default stable >> "$LOG_FILE" 2>&1
     else
@@ -364,43 +362,36 @@ if ! docker info > /dev/null 2>&1; then
             [ -n "$OPT_LAB" ] && args+=(--lab "$OPT_LAB")
             [ "$OPT_DOJO" = 1 ] && args+=(--dojo)
             [ "$OPT_DEMO" = 0 ] && args+=(--no-demo)
-            [ "$OPT_KEEP_CONFIG" = 1 ] && args+=(--keep-config)
+            [ "$OPT_FORCE_CONFIG" = 1 ] && args+=(--force-config)
             exec sg docker -c "$(printf '%q ' "$REPO_DIR/install.sh" --no-install "${args[@]}")"
         fi
         fail "Brak uprawnień do Dockera. Wyloguj się i zaloguj ponownie (grupa docker), potem uruchom ./install.sh."
     fi
-    fail "Docker nie odpowiada — uruchom Docker Desktop / usługę docker i spróbuj ponownie."
+    fail "Docker nie odpowiada - uruchom Docker Desktop / usługę docker i spróbuj ponownie."
 fi
 docker compose version > /dev/null 2>&1 || fail "Brak Docker Compose v2 (polecenie 'docker compose')."
 ok "Docker działa, $(docker compose version --short 2> /dev/null | sed 's/^/Compose v/')"
 
 # ===== 4. Konfiguracja =======================================================================
-step "Konfiguracja (dscan.toml dla jury i .env z sekretami)"
+step "Konfiguracja (dscan.toml i .env z sekretami)"
 
 if [ ! -f dscan.toml ]; then
-    cp docs/jury/dscan.toml dscan.toml
-    ok "Skopiowano docs/jury/dscan.toml → dscan.toml (zakres 127.0.0.0/8 i 172.20.0.0/24, port 9080)"
-elif cmp -s dscan.toml docs/jury/dscan.toml; then
-    ok "dscan.toml = konfiguracja dla jury"
-elif [ "$OPT_KEEP_CONFIG" = 1 ]; then
-    warn "Zostawiam własny dscan.toml (--keep-config) — port i zakres mogą różnić się od instrukcji."
-else
-    # Np. dscan.toml utworzony wcześniej przez ./run.sh z dscan.example.toml (port 8080, okna 22:00–06:00).
-    OLD_PORT="$(server_port)"
+    cp docs/konfiguracja/dscan.toml dscan.toml
+    ok "Utworzono dscan.toml z docs/konfiguracja/dscan.toml (zakres 127.0.0.0/8 i 172.20.0.0/24)"
+elif [ "$OPT_FORCE_CONFIG" = 1 ] || cmp -s dscan.toml dscan.example.toml; then
+    # Niezmieniony plik przykładowy ma okno skanowania 22:00-06:00 i zakres tylko 172.20.0.0/24.
     cp dscan.toml dscan.toml.bak
-    cp docs/jury/dscan.toml dscan.toml
-    ok "Zastąpiono dscan.toml konfiguracją dla jury (poprzedni: dscan.toml.bak, port ${OLD_PORT:-?} → 9080)"
-    if [ -n "$OLD_PORT" ] && [ "$OLD_PORT" != "$(server_port)" ] \
-        && curl -fsS --max-time 2 "http://127.0.0.1:$OLD_PORT/api/v1/health" > /dev/null 2>&1; then
-        warn "Na porcie $OLD_PORT działa stary serwer DScan — zatrzymaj go (Ctrl+C w jego terminalu)."
-    fi
+    cp docs/konfiguracja/dscan.toml dscan.toml
+    ok "Zastąpiono dscan.toml konfiguracją lokalną (poprzedni plik: dscan.toml.bak)"
+else
+    ok "Używam istniejącego dscan.toml (konfiguracja lokalna: --force-config)"
 fi
 PORT="$(server_port)"
 [ -n "$PORT" ] || fail "Nie znaleziono [server] listen w dscan.toml."
 ok "Serwer będzie nasłuchiwał na porcie $PORT"
 
 # ===== 5. Kompilacja =========================================================================
-step "Kompilacja DScan (release — pierwsza trwa kilka minut)"
+step "Kompilacja DScan (release - pierwsza trwa kilka minut)"
 
 compile() {
     local total done_count pct started code=0 pid line
@@ -431,7 +422,7 @@ compile() {
 compile
 # run.sh tworzy .env (klucz szyfrowania, hasło bazy, konto administratora) przy pierwszym wywołaniu.
 run "Utworzenie .env i sprawdzenie konfiguracji" ./run.sh config validate
-ok "Sekrety w .env (uprawnienia 600) — zrób kopię zapasową, zawiera jedyny klucz szyfrowania"
+ok "Sekrety w .env (uprawnienia 600) - zrób kopię zapasową, zawiera jedyny klucz szyfrowania"
 
 # ===== 6. Baza i serwer ======================================================================
 step "Uruchomienie bazy PostgreSQL i serwera DScan"
@@ -454,9 +445,9 @@ start_server() {
     until health_ok; do
         kill -0 "$(cat "$PID_FILE")" 2> /dev/null || {
             tail -n 20 "$SERVER_LOG" | sed 's/^/      │ /'
-            fail "Serwer zakończył działanie — log: $SERVER_LOG"
+            fail "Serwer zakończył działanie - log: $SERVER_LOG"
         }
-        [ $(($(date +%s) - started)) -gt 180 ] && fail "Serwer nie odpowiada po 3 min — log: $SERVER_LOG"
+        [ $(($(date +%s) - started)) -gt 180 ] && fail "Serwer nie odpowiada po 3 min - log: $SERVER_LOG"
         [ "$TTY" = 1 ] && printf '\r      %s%s%s Oczekiwanie na serwer %s(%s)%s ' "$C" "${SPIN[i++ % ${#SPIN[@]}]}" "$N" "$DIM" "$(elapsed "$started")" "$N"
         sleep 0.3
     done
@@ -495,11 +486,11 @@ else
     import_first() { ./run.sh import --kind results docs/demo/przebieg-1.xml | tee "$STATE_DIR/demo-1.txt"; }
     import_second() { ./run.sh import --kind results docs/demo/przebieg-2.xml | tee "$STATE_DIR/demo-2.txt"; }
     run "Import przebiegu demo 1 (nmap XML)" import_first
-    run "Import przebiegu demo 2 — porównanie z pierwszym" import_second
+    run "Import przebiegu demo 2 - porównanie z pierwszym" import_second
     for f in "$STATE_DIR/demo-1.txt" "$STATE_DIR/demo-2.txt"; do
         grep -E '^Przebieg #|^Poza zakresem' "$f" | sed 's/^/        /' || true
     done
-    [ "$(server_run_count)" -gt 0 ] || fail "Import demo nie utworzył przebiegów — sprawdź [scope] w dscan.toml i $LOG_FILE."
+    [ "$(server_run_count)" -gt 0 ] || fail "Import demo nie utworzył przebiegów - sprawdź [scope] w dscan.toml i $LOG_FILE."
     info "Zmiany wykryte między przebiegami demo:"
     grep -E '^ *[-+~] ' "$STATE_DIR/demo-2.txt" | head -n 10 | sed 's/^/      /' || true
 fi
@@ -512,7 +503,7 @@ fi
 
 # ===== 9. (opcjonalnie) Laboratorium =========================================================
 if [ -n "$OPT_LAB" ]; then
-    step "Scenariusz laboratorium organizatorów (znikająca usługa 8787)"
+    step "Scenariusz laboratorium (znikająca usługa 8787)"
     LAB_DIR="$OPT_LAB"
     if [ -f "$OPT_LAB" ]; then
         LAB_DIR="$(cd "$(dirname "$REPO_DIR")" && pwd)/lab"
@@ -526,7 +517,7 @@ if [ -n "$OPT_LAB" ]; then
     lab_scan() { # lab_scan "opis" oczekiwany_kod
         local label="$1" expected="$2" code=0 started
         started=$(date +%s)
-        info "$label — skan trwa ok. 1–2 min…"
+        info "$label - skan trwa ok. 1-2 min…"
         (cd "$LAB_DIR" && "$REPO_DIR/run.sh" scan 127.0.0.1 --quiet) >> "$LOG_FILE" 2>&1 < /dev/null || code=$?
         if [ "$code" = "$expected" ]; then
             ok "$label: kod wyjścia $code (oczekiwany) ${DIM}($(elapsed "$started"))${N}"
@@ -537,18 +528,18 @@ if [ -n "$OPT_LAB" ]; then
         fi
     }
     run "quickstart.sh up" bash -c "cd '$LAB_DIR' && bash quickstart.sh up"
-    lab_scan "Skan 1 — porty 2223, 3001, 5673, 8787, 15673" 2
+    lab_scan "Skan 1 - porty 2223, 3001, 5673, 8787, 15673" 2
     run "quickstart.sh change (zatrzymanie usługi 8787)" bash -c "cd '$LAB_DIR' && bash quickstart.sh change"
-    lab_scan "Skan 2 — 127.0.0.1:8787/tcp zniknęła" 2
+    lab_scan "Skan 2 - 127.0.0.1:8787/tcp zniknęła" 2
     run "quickstart.sh up (przywrócenie 8787)" bash -c "cd '$LAB_DIR' && bash quickstart.sh up"
-    lab_scan "Skan 3 — 127.0.0.1:8787/tcp nowa" 2
-    lab_scan "Skan 4 — brak zmian" 0
-    info "Pozostałe stacki laboratorium: docs/INSTRUKCJA-JURY.md, krok 7b."
+    lab_scan "Skan 3 - 127.0.0.1:8787/tcp nowa" 2
+    lab_scan "Skan 4 - brak zmian" 0
+    info "Pozostałe stacki laboratorium: docs/uruchomienie.md."
 fi
 
 # ===== 10. (opcjonalnie) DefectDojo ==========================================================
 if [ "$OPT_DOJO" = 1 ]; then
-    step "DefectDojo (pierwszy start pobiera obrazy — kilka minut)"
+    step "DefectDojo (pierwszy start pobiera obrazy - kilka minut)"
     run "Uruchomienie DefectDojo i pobranie tokenu API" ./scripts/defectdojo-setup.sh
     if grep -q '^enabled = false' dscan.toml; then
         sed -i.bak '/^\[defectdojo\]/,/^\[/ s/^enabled = false/enabled = true/' dscan.toml && rm -f dscan.toml.bak
@@ -562,7 +553,7 @@ if [ "$OPT_DOJO" = 1 ]; then
         start_server
         run "Ponowne logowanie" login_admin
     else
-        warn "Serwer nie był uruchomiony przez install.sh — zrestartuj go ręcznie, aby włączyć integrację."
+        warn "Serwer nie był uruchomiony przez install.sh - zrestartuj go ręcznie, aby włączyć integrację."
     fi
     ok "DefectDojo: http://127.0.0.1:8180/ (login admin, hasło DEFECTDOJO_ADMIN_PASSWORD w .env)"
 fi
@@ -577,8 +568,7 @@ cat << EOF
 
   ${B}Zobacz w przeglądarce:${N} Pulpit · Hosty · Porównanie · W czasie
 
-  ${Y}${B}Serwer działa w tle — nie uruchamiaj teraz ./run.sh${N} (to drugi serwer na tym samym porcie).
-  Po restarcie komputera: ${B}./install.sh --no-install${N} albo ${B}./run.sh${N} (serwer na pierwszym planie).
+  ${B}Serwer pracuje w tle.${N} Kolejne uruchomienia (np. po restarcie komputera): ${B}./run.sh${N}
 
   ${B}Dalej w terminalu:${N}
     ./run.sh scan 127.0.0.1               skan (kod wyjścia: 0 brak zmian, 2 zmiany, 1 błąd)
