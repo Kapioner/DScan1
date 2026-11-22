@@ -1,0 +1,16 @@
+ip,port,protocol,state,service,product
+127.0.0.1,21,tcp,open,ftp,vsftpd
+127.0.0.1,8088,tcp,open,http,WordPress
+127.0.0.1,8089,tcp,open,http,Adminer
+127.0.0.1,8090,tcp,open,http,DVWA
+127.0.0.1,21000,tcp,open,,
+127.0.0.1,21001,tcp,open,,
+127.0.0.1,21002,tcp,open,,
+127.0.0.1,21003,tcp,open,,
+127.0.0.1,21004,tcp,open,,
+127.0.0.1,21005,tcp,open,,
+127.0.0.1,21006,tcp,open,,
+127.0.0.1,21007,tcp,open,,
+127.0.0.1,21008,tcp,open,,
+127.0.0.1,21009,tcp,open,,
+127.0.0.1,21010,tcp,open,,

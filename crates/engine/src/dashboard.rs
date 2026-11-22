@@ -186,6 +186,7 @@ mod tests {
             certificate: None,
             favicon: None,
             simhash: None,
+            response_ms: None,
         });
         host.services = vec![
             service(80, &["Jenkins", "nginx"]),

@@ -204,6 +204,7 @@ async fn http_info_is_saved_with_encrypted_headers_and_cookies() {
         certificate: None,
         favicon: None,
         simhash: None,
+        response_ms: None,
     });
     host.services = vec![web, Service::new(22, Protocol::Tcp, ServiceState::Open)];
 

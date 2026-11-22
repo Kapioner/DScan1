@@ -124,7 +124,13 @@ pub fn evaluate(found: &[Host], reference: &[Host]) -> Evaluation {
             }
             if let Some(product) = expected.product.as_deref().filter(|p| !p.is_empty()) {
                 evaluation.products.1 += 1;
-                evaluation.products.0 += usize::from(matches(actual.product.as_deref(), product));
+                // Aplikację rozpoznaje nmap (product) albo fingerprinting DScan (detekcje).
+                let recognized = matches(actual.product.as_deref(), product)
+                    || actual
+                        .detections
+                        .iter()
+                        .any(|d| matches(Some(&d.technology), product));
+                evaluation.products.0 += usize::from(recognized);
             }
         }
     }

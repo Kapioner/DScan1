@@ -173,6 +173,7 @@ mod tests {
             certificate: None,
             favicon: None,
             simhash: None,
+            response_ms: None,
         }
     }
 

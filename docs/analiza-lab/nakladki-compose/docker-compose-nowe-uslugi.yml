@@ -1,0 +1,16 @@
+# Wariant testowy: usługi spoza zestawu organizatorów (test uogólnienia, bez strojenia sygnatur).
+name: hacknation-nowe-uslugi
+services:
+  grafana:
+    image: grafana/grafana:latest
+    ports: ["3000:3000"]
+  jenkins:
+    image: jenkins/jenkins:lts-jdk17
+    ports: ["8082:8080"]
+  portainer:
+    image: portainer/portainer-ce:latest
+    command: ["--http-enabled"]
+    ports: ["8083:9000"]
+  mongo:
+    image: mongo:7
+    ports: ["8084:27017"]

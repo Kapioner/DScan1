@@ -38,6 +38,61 @@ pub fn web_scheme(service: &Service) -> Option<WebScheme> {
     }
 }
 
+/// Usługi, których nazwa z nmap na pewno nie oznacza HTTP (nie próbujemy ich odpytywać).
+const NON_WEB_SERVICES: [&str; 22] = [
+    "ssh",
+    "ftp",
+    "ftp-data",
+    "telnet",
+    "smtp",
+    "submission",
+    "domain",
+    "pop3",
+    "imap",
+    "ldap",
+    "mysql",
+    "postgresql",
+    "redis",
+    "amqp",
+    "mongodb",
+    "microsoft-ds",
+    "netbios-ssn",
+    "ms-sql-s",
+    "rdp",
+    "ms-wbt-server",
+    "vnc",
+    "rtsp",
+];
+
+/// Schematy do sprawdzenia dla usługi, od najbardziej prawdopodobnego. Oprócz usług
+/// nazwanych przez nmap „http/https” próbujemy też usług niejednoznacznych (np. `tcpwrapped`,
+/// nierozpoznanych albo rozpoznanych bez produktu — w laboratorium Gitea nmap nazwał „nessus”),
+/// a dla HTTPS zapasowo zwykłe HTTP (np. dashboard Traefika odpowiada na obu).
+pub fn web_candidates(service: &Service) -> Vec<WebScheme> {
+    if service.state != ServiceState::Open || service.protocol != dscan_core::models::Protocol::Tcp
+    {
+        return Vec::new();
+    }
+    match web_scheme(service) {
+        Some(WebScheme::Https) => vec![WebScheme::Https, WebScheme::Http],
+        Some(WebScheme::Http) => vec![WebScheme::Http],
+        None => {
+            let name = service.name.as_deref().unwrap_or("").trim_end_matches('?');
+            let known_other = NON_WEB_SERVICES.contains(&name)
+                || name.starts_with("ssl/") && name != "ssl/unknown";
+            let ambiguous = name.is_empty()
+                || name == "tcpwrapped"
+                || name == "unknown"
+                || service.product.is_none();
+            if !known_other && ambiguous {
+                vec![WebScheme::Http, WebScheme::Https]
+            } else {
+                Vec::new()
+            }
+        }
+    }
+}
+
 /// Adres strony głównej usługi, np. `https://[::1]:8443/`.
 pub fn service_url(ip: IpAddr, port: u16, scheme: WebScheme) -> String {
     let host = match ip {

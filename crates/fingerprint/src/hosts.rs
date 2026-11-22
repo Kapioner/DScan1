@@ -8,7 +8,8 @@ use crate::favicon::fetch_favicon;
 use crate::probe::{merge_probe_paths, probe_paths};
 use crate::signatures::{SignatureSet, WebEvidence};
 use crate::simhash::response_simhash;
-use crate::{HttpFetcher, WebScheme, fetch_certificate, service_url, to_http_info, web_scheme};
+use crate::web_service::web_candidates;
+use crate::{HttpFetcher, WebScheme, fetch_certificate, service_url, to_http_info};
 
 /// Analiza usług WWW: sygnatury, heurystyki, ścieżki do sondowania i próg pewności.
 pub struct WebAnalysis {
@@ -65,6 +66,41 @@ impl WebAnalysis {
     }
 }
 
+/// Technologie, które oznaczają protokół inny niż HTTP, mimo odpowiedzi po HTTP.
+const PROTOCOL_HINTS: [(&str, &str); 1] = [("MongoDB", "mongodb")];
+
+fn protocol_hint(detections: &[Detection]) -> Option<&'static str> {
+    PROTOCOL_HINTS
+        .iter()
+        .find(|(tech, _)| detections.iter().any(|d| d.technology == *tech))
+        .map(|(_, name)| *name)
+}
+
+/// Pierwsza sensowna odpowiedź HTTP spośród kandydatów ([`web_candidates`]). Odpowiedź
+/// 4xx/5xx po HTTPS zostaje tylko wtedy, gdy zwykłe HTTP nie da lepszej.
+async fn first_web_response(
+    fetcher: &HttpFetcher,
+    ip: std::net::IpAddr,
+    service: &dscan_core::models::Service,
+) -> Option<(WebScheme, String, crate::RawResponse)> {
+    let mut fallback = None;
+    for (index, scheme) in web_candidates(service).into_iter().enumerate() {
+        let url = service_url(ip, service.port, scheme);
+        let Ok(response) = fetcher.fetch(&url, ip).await else {
+            continue;
+        };
+        if response.status < 400 {
+            return Some((scheme, url, response));
+        }
+        // Odpowiedź błędu zapamiętujemy tylko z głównego schematu — np. HTTP wysłane na port
+        // HTTPS daje „400 plain HTTP request”, co nic nie mówi o usłudze.
+        if index == 0 {
+            fallback = Some((scheme, url, response));
+        }
+    }
+    fallback
+}
+
 /// Odpytuje każdą otwartą usługę WWW na hostach: strona główna (H1, H2), certyfikat TLS (H3),
 /// sondy ścieżek (H6)
 /// dopasowanie sygnatur (H5) i heurystyki środowisk/paneli (M6) z progiem pewności (H8).
@@ -84,13 +120,15 @@ pub async fn fingerprint_hosts(
         }
         let hostnames = host.hostnames.clone();
         for service in host.services.iter_mut() {
-            let Some(scheme) = web_scheme(service) else {
+            let Some((scheme, url, response)) = first_web_response(fetcher, ip, service).await
+            else {
                 continue;
             };
-            let url = service_url(ip, service.port, scheme);
-            let Ok(response) = fetcher.fetch(&url, ip).await else {
-                continue;
-            };
+            let renamed = service.name.as_deref().is_none_or(|n| !n.contains("http"));
+            if renamed {
+                // nmap nie rozpoznał HTTP — poprawiamy nazwę usługi na podstawie odpowiedzi.
+                service.name = Some(scheme.as_str().to_string());
+            }
             let mut info = to_http_info(&response);
             if scheme == WebScheme::Https {
                 info.certificate = fetch_certificate(ip, service.port, fetcher.timeout())
@@ -115,6 +153,13 @@ pub async fn fingerprint_hosts(
                 favicon_hash: info.favicon.as_ref().map(|favicon| favicon.mmh3),
             };
             service.detections = analysis.analyze(&evidence, &hostnames);
+            if renamed {
+                // Usługa nie-HTTP, która odpowiada komunikatem po HTTP (np. MongoDB na porcie
+                // sterownika) — nazwa protokołu z rozpoznanej technologii.
+                if let Some(protocol) = protocol_hint(&service.detections) {
+                    service.name = Some(protocol.to_string());
+                }
+            }
             service.http = Some(info);
             fetched += 1;
         }

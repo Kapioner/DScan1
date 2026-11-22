@@ -147,7 +147,7 @@ pub async fn observations(
                 http.headers
                     .iter()
                     .take(20)
-                    .map(|h| format!("nagłówek {}: {}", h.name, h.value)),
+                    .map(|h| format!("nagłówek {}: {}", h.name, redact_header(&h.name, &h.value))),
             );
         }
         let title = match &detection.version {
@@ -165,6 +165,28 @@ pub async fn observations(
         });
     }
     Ok(result)
+}
+
+/// Wartości nagłówków z sekretami (ciasteczka sesji, tokeny) nie wychodzą poza DScan —
+/// zostaje nazwa ciasteczka i jego atrybuty, wartość jest zastępowana `***`.
+pub fn redact_header(name: &str, value: &str) -> String {
+    match name.to_ascii_lowercase().as_str() {
+        "set-cookie" | "cookie" => value
+            .split(';')
+            .enumerate()
+            .map(|(i, part)| match part.split_once('=') {
+                Some((key, _)) if i == 0 || name.eq_ignore_ascii_case("cookie") => {
+                    format!("{}=***", key.trim())
+                }
+                _ => part.trim().to_string(),
+            })
+            .collect::<Vec<_>>()
+            .join("; "),
+        "authorization" | "proxy-authorization" | "x-api-key" | "x-auth-token" | "x-csrf-token" => {
+            "***".into()
+        }
+        _ => value.to_string(),
+    }
 }
 
 /// Wysyła zaznaczone obserwacje jako findingi informacyjne z dowodami.
@@ -197,4 +219,19 @@ pub async fn dojo_findings(
     )
     .await;
     Ok(Json(DojoResponse::new(result, list.len())))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn secrets_are_redacted() {
+        assert_eq!(
+            redact_header("Set-Cookie", "PHPSESSID=35hg9r; path=/; HttpOnly"),
+            "PHPSESSID=***; path=/; HttpOnly"
+        );
+        assert_eq!(redact_header("Authorization", "Bearer abc"), "***");
+        assert_eq!(redact_header("Server", "Apache/2.4.25"), "Apache/2.4.25");
+    }
 }

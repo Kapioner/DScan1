@@ -43,6 +43,7 @@ type HttpRow = (
     Option<Vec<u8>>,
     Vec<u8>,
     Option<i64>,
+    Option<i32>,
 );
 type DetectionRow = (i64, String, Option<String>, i16, String);
 
@@ -81,7 +82,7 @@ async fn load_hosts(
     .await
     .map_err(DbError::Query)?;
     let http: Vec<HttpRow> = sqlx::query_as(
-        "SELECT i.service_id, i.url, i.status_code, i.title, i.tls_verified, i.favicon::text, i.certificate, i.headers, i.simhash FROM http_info i \
+        "SELECT i.service_id, i.url, i.status_code, i.title, i.tls_verified, i.favicon::text, i.certificate, i.headers, i.simhash, i.response_ms FROM http_info i \
          JOIN services s ON s.id = i.service_id JOIN hosts h ON h.id = s.host_id WHERE h.scan_run_id = $1",
     )
     .bind(run_id)
@@ -111,7 +112,18 @@ fn assemble(
     let mut http_by_service: HashMap<i64, HttpInfo> = http
         .into_iter()
         .map(
-            |(id, url, status, title, tls_verified, favicon, certificate, headers, simhash)| {
+            |(
+                id,
+                url,
+                status,
+                title,
+                tls_verified,
+                favicon,
+                certificate,
+                headers,
+                simhash,
+                response_ms,
+            )| {
                 // Nagłówki (poufne) tylko z kluczem — widok hosta i dowody dla DefectDojo.
                 let headers = cipher
                     .and_then(|cipher| {
@@ -138,6 +150,7 @@ fn assemble(
                     certificate,
                     favicon: favicon.and_then(|json| serde_json::from_str(&json).ok()),
                     simhash,
+                    response_ms: response_ms.and_then(|ms| u32::try_from(ms).ok()),
                 };
                 (id, info)
             },

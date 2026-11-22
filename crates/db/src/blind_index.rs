@@ -158,6 +158,7 @@ mod tests {
             certificate: None,
             favicon: None,
             simhash: None,
+            response_ms: None,
         };
         let entries = blind_entries(&cipher, &http);
         assert_eq!(entries.len(), 3);

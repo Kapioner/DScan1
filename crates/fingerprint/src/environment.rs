@@ -12,6 +12,7 @@ pub const DEBUG_MODE: &str = "Tryb debugowania";
 pub const DEFAULT_PAGE: &str = "Strona domyślna serwera";
 pub const ADMIN_PANEL: &str = "Panel administracyjny";
 pub const ROBOTS_HINTS: &str = "Wskazówki w robots.txt";
+pub const UNFINISHED_SETUP: &str = "Niedokończona instalacja";
 
 /// Czy detekcja pochodzi z heurystyk M6 (a nie z sygnatury).
 pub fn is_environment_finding(technology: &str) -> bool {
@@ -21,6 +22,7 @@ pub fn is_environment_finding(technology: &str) -> bool {
         DEFAULT_PAGE,
         ADMIN_PANEL,
         ROBOTS_HINTS,
+        UNFINISHED_SETUP,
     ]
     .contains(&technology)
 }
@@ -67,12 +69,14 @@ pub fn environment_findings(
 ) -> Vec<Detection> {
     let mut test_evidence = test_hostname_evidence(hostnames);
     test_evidence.extend(environment_header_evidence(info));
+    test_evidence.extend(test_title_evidence(info));
     let findings = [
         (TEST_ENVIRONMENT, test_evidence),
         (DEBUG_MODE, debug_header_evidence(info)),
         (DEFAULT_PAGE, default_page_evidence(info)),
         (ADMIN_PANEL, panel_title_evidence(info)),
         (ROBOTS_HINTS, robots_evidence(probes)),
+        (UNFINISHED_SETUP, setup_page_evidence(info)),
     ];
     findings
         .into_iter()
@@ -153,6 +157,53 @@ fn default_page_evidence(info: &HttpInfo) -> Vec<Evidence> {
         .collect()
 }
 
+/// Kreatory pierwszego uruchomienia: kto pierwszy otworzy stronę, ten przejmuje aplikację
+/// (np. „WordPress › Installation”, „Installation - Gitea”, `/install.php`, `/setup`).
+const SETUP_WORDS: [&str; 6] = [
+    "installation",
+    "install",
+    "setup wizard",
+    "instalacja",
+    "konfiguracja początkowa",
+    "first run",
+];
+
+fn setup_page_evidence(info: &HttpInfo) -> Vec<Evidence> {
+    let mut found = Vec::new();
+    if let Some(title) = info.title.as_deref() {
+        let lower = title.to_lowercase();
+        if SETUP_WORDS.iter().any(|word| lower.contains(word)) {
+            found.push(evidence(EvidenceKind::Body, format!("tytuł „{title}”"), 70));
+        }
+    }
+    let url = info.url.to_lowercase();
+    if ["/install", "/setup", "/wp-admin/install.php"]
+        .iter()
+        .any(|path| url.contains(path))
+    {
+        found.push(evidence(
+            EvidenceKind::Path,
+            format!("przekierowanie na {}", info.url),
+            30,
+        ));
+    }
+    found
+}
+
+/// Słowa „development/staging…” w tytule strony (np. „DVWA v1.10 *Development*”).
+fn test_title_evidence(info: &HttpInfo) -> Vec<Evidence> {
+    let Some(title) = info.title.as_deref() else {
+        return Vec::new();
+    };
+    let lower = title.to_lowercase();
+    let words: Vec<&str> = lower.split(|c: char| !c.is_alphanumeric()).collect();
+    ["development", "staging", "testing", "sandbox", "preprod"]
+        .iter()
+        .find(|w| words.contains(w))
+        .map(|_| vec![evidence(EvidenceKind::Body, format!("tytuł „{title}”"), 50)])
+        .unwrap_or_default()
+}
+
 fn panel_title_evidence(info: &HttpInfo) -> Vec<Evidence> {
     let Some(title) = info.title.as_deref() else {
         return Vec::new();
@@ -169,6 +220,32 @@ fn panel_title_evidence(info: &HttpInfo) -> Vec<Evidence> {
 mod tests {
     use super::*;
     use dscan_core::models::HttpHeader;
+
+    #[test]
+    fn unfinished_setup_and_development_title() {
+        let mut wordpress = info(Some("WordPress › Installation"), &[]);
+        wordpress.url = "http://10.0.0.5/wp-admin/install.php".into();
+        let found = environment_findings(&[], &wordpress, &[]);
+        let setup = found
+            .iter()
+            .find(|d| d.technology == UNFINISHED_SETUP)
+            .unwrap();
+        assert_eq!(setup.confidence, 100);
+        let dvwa = info(
+            Some("Login :: Damn Vulnerable Web Application (DVWA) v1.10 *Development*"),
+            &[],
+        );
+        assert!(
+            environment_findings(&[], &dvwa, &[])
+                .iter()
+                .any(|d| d.technology == TEST_ENVIRONMENT)
+        );
+        assert!(
+            environment_findings(&[], &info(Some("Developer docs"), &[]), &[])
+                .iter()
+                .all(|d| d.technology != TEST_ENVIRONMENT)
+        );
+    }
 
     fn info(title: Option<&str>, headers: &[(&str, &str)]) -> HttpInfo {
         HttpInfo {
@@ -188,6 +265,7 @@ mod tests {
             certificate: None,
             favicon: None,
             simhash: None,
+            response_ms: None,
         }
     }
 

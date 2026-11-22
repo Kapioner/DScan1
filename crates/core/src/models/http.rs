@@ -60,6 +60,9 @@ pub struct HttpInfo {
     /// SimHash tytułu, nagłówków i struktury HTML (M4) — bity u64 zapisane jako i64.
     #[serde(default)]
     pub simhash: Option<i64>,
+    /// Czas odpowiedzi strony głównej w ms (np. opóźnienie wprowadzone przez Toxiproxy).
+    #[serde(default)]
+    pub response_ms: Option<u32>,
 }
 
 impl HttpInfo {
@@ -96,6 +99,7 @@ mod tests {
             certificate: None,
             favicon: None,
             simhash: None,
+            response_ms: None,
         }
     }
 

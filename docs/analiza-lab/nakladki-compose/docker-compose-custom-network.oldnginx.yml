@@ -1,0 +1,4 @@
+# Wariant testowy: ta sama usługa na 8787 w starszej wersji (zmiana wersji między przebiegami).
+services:
+  flask-app:
+    image: nginx:1.24-alpine

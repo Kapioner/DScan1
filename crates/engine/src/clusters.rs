@@ -106,6 +106,7 @@ mod tests {
             certificate: None,
             favicon: None,
             simhash: Some(hash as i64),
+            response_ms: None,
         });
         host.services.push(service);
         host

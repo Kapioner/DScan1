@@ -33,8 +33,9 @@ nmap_max_rate = 100
 max_parallel_nmap = 4
 # Globalny limit zapytań HTTP na sekundę.
 http_requests_per_second = 10
-# Maksymalna liczba zapytań HTTP do jednego hosta w przebiegu.
-http_requests_per_host = 20
+# Maksymalna liczba zapytań HTTP do jednego hosta w przebiegu (wszystkie jego usługi WWW razem:
+# strona główna, favicon i sondy — przy kilku usługach na hoście potrzeba ok. 25 na usługę).
+http_requests_per_host = 150
 # Adresów w jednej podgrupie (= jeden proces nmap); potęga dwójki, np. 256 = jedna sieć /24.
 subgroup_size = 256
 # Bezpiecznik: skan większej liczby adresów zostanie odrzucony.
@@ -93,7 +94,7 @@ user_agent = "DScan/0.1.0 (skaner bezpieczeństwa)"
 # usłudze WWW. Dochodzą do nich ścieżki z sygnatur (np. /wp-login.php).
 probe_paths = ["/login", "/admin", "/version", "/robots.txt"]
 # Najwyżej tyle sond na usługę (obowiązuje też limits.http_requests_per_host).
-max_probes_per_service = 12
+max_probes_per_service = 20
 # Detekcje o pewności poniżej progu (0–100) są pomijane.
 min_confidence = 30
 # Dodatkowe sygnatury (np. przykłady od organizatora) w tym samym formacie YAML co wbudowane:
@@ -128,6 +129,12 @@ new_service = 20
 modified_service = 10
 # Kategorie sygnatur: kamery, drukarki, CI/CD, bazy danych, panele.
 sensitive_category = 25
+# Kreator pierwszego uruchomienia (np. „WordPress › Installation”) — możliwe przejęcie aplikacji.
+unfinished_setup = 40
+# Protokół bez szyfrowania (FTP, Telnet).
+cleartext_protocol = 10
+# Baza danych lub broker wystawione bezpośrednio (Redis, MySQL, PostgreSQL, AMQP, MongoDB).
+exposed_datastore = 15
 
 # Wersja starsza niż podana = „stara wersja”. Klucz: fragment nazwy produktu (małe litery).
 [scoring.minimum_versions]

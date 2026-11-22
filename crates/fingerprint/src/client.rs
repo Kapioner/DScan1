@@ -37,6 +37,8 @@ pub struct RawResponse {
     pub body: Vec<u8>,
     pub redirects: Vec<Redirect>,
     pub tls_verified: Option<bool>,
+    /// Czas od wysłania pierwszego zapytania do odebrania treści (ms), łącznie z przekierowaniami.
+    pub elapsed_ms: u32,
 }
 
 /// Klient do odpytywania usług WWW.
@@ -69,16 +71,23 @@ impl HttpFetcher {
     pub async fn fetch(&self, url: &str, ip: IpAddr) -> Result<RawResponse, FetchError> {
         let start = Url::parse(url).map_err(|_| FetchError::InvalidUrl(url.to_string()))?;
         let is_https = start.scheme() == "https";
+        let started = std::time::Instant::now();
+        let elapsed = |started: std::time::Instant| {
+            u32::try_from(started.elapsed().as_millis()).unwrap_or(u32::MAX)
+        };
 
         match self.follow(&self.strict, start.clone(), ip).await {
             Ok(mut response) => {
                 response.tls_verified = is_https.then_some(true);
+                response.elapsed_ms = elapsed(started);
                 Ok(response)
             }
             Err(FetchError::Request(error)) if is_https && error.is_connect() => {
                 // Najczęstsza przyczyna: certyfikat self-signed, wygasły lub na inną nazwę.
+                let retry = std::time::Instant::now();
                 let mut response = self.follow(&self.lenient, start, ip).await?;
                 response.tls_verified = Some(false);
+                response.elapsed_ms = elapsed(retry);
                 Ok(response)
             }
             Err(error) => Err(error),
@@ -162,6 +171,7 @@ impl HttpFetcher {
             body,
             redirects,
             tls_verified: None,
+            elapsed_ms: 0,
         })
     }
 }
