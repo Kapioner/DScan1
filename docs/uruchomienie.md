@@ -89,7 +89,9 @@ Docker Desktop. Windows: `wsl --install -d Ubuntu`, Docker Desktop z *WSL integr
 
 Dane demo to dwa przebiegi ze zmianą (nowy SSH, inna wersja nginx, brak MySQL, nowa kamera).
 Konta ról: `demo-operator`, `demo-modyfikacja`, `demo-odczyt`, hasło `DSCAN_DEMO_PASSWORD` w `.env`.
-Sprawdzanie wymagań zadania krok po kroku: `hacknation.md`.
+Usługa testowa do skanu z panelu (uruchamiana przez `scripts/demo.sh`): `127.0.0.1:8088` (HTTP), `127.0.0.1:8089` (HTTPS).
+W panelu WWW: import wyników - **Cele → Wgraj wyniki skanu**, eksport - linki na stronie **Hosty**.
+Sprawdzanie wymagań zadania w panelu WWW: `hacknation.md`; wersja z poleceniami: `docs/hacknation-techniczny.md`.
 Widoki: **Pulpit**, **Hosty**, **Porównanie**, **W czasie**.
 
 ## 5. Laboratorium

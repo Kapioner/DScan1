@@ -20,6 +20,7 @@ mod login;
 mod menu;
 mod pages;
 mod profiles_form;
+mod results_form;
 mod service_view;
 mod session;
 mod signatures_ui;
@@ -85,6 +86,10 @@ pub fn web_routes() -> Router<AppState> {
         .route("/ui/scans/{id}/{action}", post(dashboard::control_scan))
         .route("/ui/targets", post(targets_form::add_target))
         .route("/ui/targets/import", post(targets_form::import_file))
+        .route(
+            "/ui/results/import",
+            post(results_form::import_results_file),
+        )
         .route("/ui/targets/{id}", delete(targets_form::delete_target))
         .route("/login", get(login::login_page).post(login::login_submit))
         .route("/logout", post(login::logout))

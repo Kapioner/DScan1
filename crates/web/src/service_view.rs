@@ -34,6 +34,37 @@ impl From<&Detection> for DetectionView {
     }
 }
 
+/// Ciasteczko bez wartości: `PHPSESSID (Path=/, HttpOnly, bez Secure)`.
+fn cookie_label(cookie: &dscan_core::models::Cookie) -> String {
+    let mut attributes = Vec::new();
+    if let Some(path) = &cookie.path {
+        attributes.push(format!("Path={path}"));
+    }
+    if let Some(domain) = &cookie.domain {
+        attributes.push(format!("Domain={domain}"));
+    }
+    attributes.push(
+        if cookie.http_only {
+            "HttpOnly"
+        } else {
+            "bez HttpOnly"
+        }
+        .to_string(),
+    );
+    attributes.push(
+        if cookie.secure {
+            "Secure"
+        } else {
+            "bez Secure"
+        }
+        .to_string(),
+    );
+    if let Some(same_site) = &cookie.same_site {
+        attributes.push(format!("SameSite={same_site}"));
+    }
+    format!("{} ({})", cookie.name, attributes.join(", "))
+}
+
 pub struct ServiceView {
     pub port: u16,
     pub protocol: String,
@@ -42,6 +73,12 @@ pub struct ServiceView {
     /// Np. `HTTP 200 „Panel” → https://…/login`.
     pub http: Option<String>,
     pub favicon: Option<String>,
+    /// Kroki przekierowań, np. `302 http://…/ → http://…/admin/`.
+    pub redirects: Vec<String>,
+    /// Nagłówki odpowiedzi (nazwa, wartość).
+    pub headers: Vec<(String, String)>,
+    /// Ciasteczka: nazwa i atrybuty; wartość (identyfikator sesji) nie jest pokazywana.
+    pub cookies: Vec<String>,
     pub certificate: Option<String>,
     pub certificate_warning: Option<String>,
     pub detections: Vec<DetectionView>,
@@ -88,6 +125,25 @@ impl ServiceView {
             favicon: http
                 .and_then(|h| h.favicon.as_ref())
                 .map(|f| format!("mmh3 {} · sha256 {}", f.mmh3, f.sha256)),
+            redirects: http
+                .map(|h| {
+                    h.redirect_chain
+                        .iter()
+                        .map(|r| format!("{} {} → {}", r.status_code, r.from, r.to))
+                        .collect()
+                })
+                .unwrap_or_default(),
+            headers: http
+                .map(|h| {
+                    h.headers
+                        .iter()
+                        .map(|header| (header.name.clone(), header.value.clone()))
+                        .collect()
+                })
+                .unwrap_or_default(),
+            cookies: http
+                .map(|h| h.cookies.iter().map(cookie_label).collect())
+                .unwrap_or_default(),
             certificate: certificate.map(|c| {
                 let names = if c.alt_names.is_empty() {
                     String::new()

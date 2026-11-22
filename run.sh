@@ -139,7 +139,7 @@ start_database() {
         log "Uruchamiam PostgreSQL w Dockerze (pierwszy raz pobiera obraz)..."
         docker compose up -d --wait postgres
     else
-        step 2 "Baza PostgreSQL działa"
+        :
     fi
     sync_database_credentials
 }

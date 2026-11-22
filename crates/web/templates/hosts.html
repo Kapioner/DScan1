@@ -30,7 +30,11 @@
   {% else if hosts.is_empty() %}
   <p class="muted">Brak hostów spełniających filtry.</p>
   {% else %}
-  <p class="muted">Hostów: {{ hosts.len() }}</p>
+  <p class="muted">Hostów: {{ hosts.len() }}{% if let Some(r) = run %} · Eksport przebiegu #{{ r }}:
+    <a href="/api/v1/exports/services?format=csv&amp;run={{ r }}" download="uslugi-{{ r }}.csv">usługi CSV</a> ·
+    <a href="/api/v1/exports/services?format=json&amp;run={{ r }}" download="uslugi-{{ r }}.json">usługi JSON</a> ·
+    <a href="/api/v1/exports/hosts?format=json&amp;run={{ r }}" download="hosty-{{ r }}.json">hosty JSON</a> ·
+    <a href="/api/v1/exports/changes?format=csv&amp;run={{ r }}" download="zmiany-{{ r }}.csv">zmiany CSV</a>{% endif %}</p>
   <table>
     <thead><tr><th>Adres</th><th>Nazwa</th><th>Stan</th><th>Stabilność</th><th>Usługi</th><th>Technologie</th><th>Tagi</th><th></th></tr></thead>
     <tbody>

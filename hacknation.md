@@ -1,62 +1,87 @@
-# DScan - spełnienie wymagań zadania „Attack Surface Intelligence”
+# DScan - jak sprawdzić wymagania zadania w panelu WWW
 
-Każde wymaganie z treści zadania: jak jest spełnione i jak to sprawdzić.
-**[demo]** = widoczne po `./install.sh` (dane z plików), **[skan]** = wymaga skanu na żywo (`scripts/demo.sh --uslugi` albo laboratorium).
+Instrukcja dla jury: instalacja przez `install.sh`, kolejne starty przez `run.sh` (Linux), wszystkie testy w przeglądarce.
+Przy każdym teście: gdzie kliknąć, co wpisać i jaki wynik powinien się pojawić. Zrzuty ekranu: `docs/pdf/zrzuty-ekranu.pdf`.
 
-## 1. Uruchomienie demo (Linux)
+## 1. Uruchomienie
 
 ```bash
 git clone https://github.com/Kapioner/DScan1.git DScan && cd DScan && ./install.sh
 ```
 
-`install.sh` instaluje narzędzia, kompiluje, wgrywa demo (`scripts/demo.sh`), wypisuje adres, login i hasło,
-a na końcu uruchamia serwer w tym samym terminalu (zostaw go otwartego). Kolejne starty: `./run.sh`.
-Polecenia `scripts/demo.sh` i `./run.sh scan …` uruchamiaj w drugim terminalu.
+`install.sh` instaluje brakujące narzędzia, kompiluje aplikację i przygotowuje dane testowe. Na końcu wypisuje
+adres, login i hasła, a potem uruchamia serwer w tym samym terminalu. **Terminal zostaw otwarty.**
+Kolejne uruchomienia: `./run.sh`. Zatrzymanie: `Ctrl+C`.
 
-| Polecenie | Co robi |
-|---|---|
-| `scripts/demo.sh` | wgrywa demo, zakłada konta ról, ocenia trafność, eksportuje CSV/JSON do `.dscan-demo/` |
-| `scripts/demo.sh --uslugi` | jak wyżej + Grafana, Jenkins, Portainer, MongoDB w Dockerze i dwa skany `127.0.0.1` |
-| `./install.sh --lab lab.zip` | scenariusz laboratorium: usługa 8787 znika i wraca, 4 skany z kodami wyjścia |
+Adres panelu: **http://127.0.0.1:9080/**
 
 | Konto | Rola | Hasło |
 |---|---|---|
-| `admin` | administracja | `DSCAN_ADMIN_PASSWORD` w `.env` |
-| `demo-operator` | dodawanie, usuwanie, modyfikacja | `DSCAN_DEMO_PASSWORD` w `.env` |
+| `admin` | administracja | wypisane na końcu `install.sh` („Hasło”) |
+| `demo-operator` | dodawanie, usuwanie, modyfikacja | wypisane na końcu `install.sh` („Konta ról”) |
 | `demo-modyfikacja` | modyfikacja i odczyt | jw. |
 | `demo-odczyt` | odczyt | jw. |
 
-Zawartość demo (`docs/demo/`, sieć `172.20.0.0/24`, 8 hostów): dwa przebiegi nmap. Między nimi:
-`+` SSH na `172.20.0.11:2222`, `+` kamera Hikvision `172.20.0.34`, `~` nginx 1.18.0 → 1.24.0 na `172.20.0.10:80`,
-`-` MySQL `172.20.0.12:3306`.
+Co przygotowuje `install.sh`:
 
-## 2. Scenariusz pokazu w aplikacji (ok. 15 min)
+- **dane demo** - dwa przebiegi skanu sieci `172.20.0.0/24` (8 hostów) ze zmianami między nimi,
+- **usługa do skanu na żywo** - `127.0.0.1:8088` (HTTP) i `127.0.0.1:8089` (HTTPS): panel logowania WordPress,
+  przekierowanie, ciasteczka, nagłówki debugowania, intranet „Development” z certyfikatem self-signed.
 
-Przygotowanie: terminal 1 - `./install.sh` (albo `./run.sh`), serwer zostaje otwarty. Terminal 2 - usługa do skanu na żywo:
+Pliki do testów importu (w katalogu `DScan`): `docs/examples/cele.csv`, `docs/examples/cele.json`, `docs/demo/przebieg-2.xml`.
 
-```bash
-mkdir -p /tmp/demo-www && echo '<title>Admin Panel - Login</title><input type="password">' > /tmp/demo-www/index.html && python3 -m http.server 8088 --bind 127.0.0.1 -d /tmp/demo-www
-```
+## 2. Testy
 
-| # | Gdzie kliknąć | Co pokazać | Wymagania |
-|---|---|---|---|
-| 1 | http://127.0.0.1:9080/ → login `admin` | logowanie, menu: Pulpit, Hosty, Grupy usług, Porównanie, W czasie, Cele, Profile skanów, Sygnatury, Użytkownicy, Audyt | 15 |
-| 2 | **Pulpit** | karty (hosty, usługi, znaleziska), **Najciekawsze usługi** z punktami i uzasadnieniem, **Zmiany od poprzedniego skanu**: `+` 172.20.0.11:2222, `+` kamera 172.20.0.34, `~` 172.20.0.10:80, `-` 172.20.0.12:3306 | 8, 9, 15 |
-| 3 | **Porównanie** → starszy #1, nowszy #2 → **Porównaj** | nowe: 3, zniknęły: 1, zmienione: 1, kolory; nginx 1.18.0 → 1.24.0 | 8, 9 |
-| 4 | **Hosty** → `172.20.0.10` → usługa `80/tcp` → pole produktu → wpisz wartość → **Zapisz** | znaczek „edytowane ręcznie”; po ponownym imporcie (`./run.sh import --kind results docs/demo/przebieg-2.xml`) poprawka zostaje | 14 |
-| 5 | na tym samym hoście: **Tagi** → `serwer-www` → dodaj | tag na hoście lub usłudze | mile widziane |
-| 6 | **W czasie** | wykres hostów i usług w przebiegach, aktywność hostów w godzinach doby | mile widziane |
-| 7 | **Cele** → wpisz `127.0.0.1`, grupa `lab` → **Dodaj**; potem plik `docs/examples/cele.csv` + „tylko sprawdź” → **Wgraj** | wpis ręczny; raport: 3 poprawne, 3 odrzucone z powodem (błędny wpis, 2 duplikaty) | 1, 11 |
-| 8 | **Pulpit** → **Uruchom skan**: cele `127.0.0.1`, tryb `usługi` → **Uruchom** | **Trwające skany**: pasek postępu, czas, prognoza; skan trwa ok. 1-2 min | 2, 2b, 3, 4 |
-| 9 | **Hosty** → najnowszy przebieg → `127.0.0.1` → `8088/tcp` | tytuł strony, kod HTTP 200, nagłówki, detekcja „Panel administracyjny” z pewnością i dowodem | 5, 6, 7 |
-| 10 | **Sygnatury** → wklej YAML poniżej, adres `http://127.0.0.1:8088/` → **Testuj** → **Zapisz** | wynik testu: pewność 90%, dowód; sygnatura na liście | 10 |
-| 11 | terminal 2: `Ctrl+C` (koniec usługi 8088); **Pulpit** → **Uruchom skan** `127.0.0.1` | po skanie **Zmiany**: `- 127.0.0.1:8088/tcp zniknęła` | 9 |
-| 12 | **Profile skanów** → **Nowy profil**: nazwa `nocny`, okna `22:00-06:00`, co ile minut `1440` → **Utwórz** | harmonogram z oknem i częstotliwością | harmonogram |
-| 13 | **Użytkownicy** | konta `demo-operator`, `demo-modyfikacja`, `demo-odczyt` z rolami; formularz nowej roli z uprawnień | 12, 13 |
-| 14 | **Audyt** | wpisy z kroków 4, 7, 10, 12: kto, co, kiedy | 12 |
-| 15 | **Wyloguj** → login `demo-odczyt` (hasło `DSCAN_DEMO_PASSWORD` w `.env`) | brak pozycji Użytkownicy i Audyt, brak formularzy „Uruchom skan”, „Dodaj”, „Zapisz” | 12, 13 |
+Testy wykonuj po kolei, zalogowany jako `admin` (chyba że test mówi inaczej).
 
-Sygnatura do kroku 10:
+### A. Dane demo: dashboard i zmiany
+
+| # | Gdzie | Co zrobić | Oczekiwany wynik | Wymaganie |
+|---|---|---|---|---|
+| A1 | **Pulpit** | otwórz po zalogowaniu | karty (hosty, usługi, znaleziska, aktywne/nieaktywne), **Najciekawsze usługi** z punktami i uzasadnieniem, **Technologie** | 15 |
+| A2 | **Pulpit → Zmiany od poprzedniego skanu** | przewiń | `Nowe: 3, zniknęły: 1, zmienione: 1`: `+` 172.20.0.11:2222, `+` 172.20.0.34:80 i :554, `−` 172.20.0.12:3306, `~` 172.20.0.10:80 | 8, 9 |
+| A3 | **Porównanie** | Starszy przebieg: `#1`, Nowszy: `#2` → **Porównaj** | `nowe: 3, zniknęły: 1, zmienione: 1`; wiersz `172.20.0.10:80/tcp`: `nginx 1.18.0` → `nginx 1.24.0` | 8, 9 |
+| A4 | **Hosty** | Przebieg `#2`, Technologia: `Hikvision` → **Filtruj** | `Hostów: 4` - kamery IP (urządzenia IoT) | 3, 4, 6 |
+| A5 | **W czasie** | otwórz | wykres hostów i usług w kolejnych przebiegach, aktywność hostów w godzinach doby | zmiany w czasie, pora dnia |
+
+### B. Edycja wyników
+
+| # | Gdzie | Co zrobić | Oczekiwany wynik | Wymaganie |
+|---|---|---|---|---|
+| B1 | **Hosty** → `172.20.0.10` | w sekcji `80/tcp`, pole **Produkt**: wpisz `Serwer WWW firmy` → **Zapisz** | wartość ze znaczkiem „edytowane ręcznie” i przyciskiem „Przywróć wartość ze skanu” | 14 |
+| B2 | ten sam host → **Tagi** | wpisz `serwer-www` → **Dodaj tag** | tag przy hoście; **Hosty** → Tag `serwer-www` → **Filtruj** pokazuje ten host | tagi |
+| B3 | **Cele → Wgraj wyniki skanu** | plik `docs/demo/przebieg-2.xml` → **Wgraj wyniki** | `Zapisano przebieg #3: 7 hostów, 14 otwartych portów`, `Brak zmian względem przebiegu #2` | import wyników |
+| B4 | **Hosty** → Przebieg `#3` → `172.20.0.10` | sprawdź `80/tcp` | produkt nadal `Serwer WWW firmy` ze znaczkiem „edytowane ręcznie” - edycja przetrwała nowy przebieg | 14 |
+
+### C. Cele: formularz ręczny i pliki
+
+| # | Gdzie | Co zrobić | Oczekiwany wynik | Wymaganie |
+|---|---|---|---|---|
+| C1 | **Cele → Dodaj cel** | Cel: `10.10.0.7/24`, Grupa: `lab` → **Dodaj** | `Dodano cel 10.10.0.0/24.` (sieć znormalizowana), cel w tabeli | 1, 11 |
+| C2 | **Cele → Dodaj cel** | Cel: `zły cel` → **Dodaj** | komunikat o błędzie: to nie jest adres IP, sieć CIDR ani domena | 1, 11 |
+| C3 | **Cele → Wgraj plik** | plik `docs/examples/cele.csv`, zaznacz „tylko sprawdź” → **Wgraj** | `Poprawne cele: 3, odrzucone wiersze: 3`; tabela: wiersz 5 błędny cel, wiersze 6 i 7 duplikaty (celowo) | 1, 11 |
+| C4 | **Cele → Wgraj plik** | plik `docs/examples/cele.json`, „tylko sprawdź” → **Wgraj** | `Poprawne cele: 2, odrzucone wiersze: 1` (`300.1.1.1`) | 1, 11 |
+
+### D. Skan na żywo i fingerprinting HTTP/HTTPS
+
+| # | Gdzie | Co zrobić | Oczekiwany wynik | Wymaganie |
+|---|---|---|---|---|
+| D1 | **Pulpit → Uruchom skan** | Cele: `127.0.0.1`, Tryb: `usługi` → **Uruchom** | `Uruchomiono przebieg #N`; w **Trwające skany** pasek postępu, czas i prognoza; skan trwa ok. 15-60 s | 2, 3, 4, czas skanu |
+| D2 | **Hosty** → najnowszy przebieg → `127.0.0.1` | sekcja `8088/tcp` | `HTTP 200 „Admin Panel - Login”`, **Przekierowania** `302 …/ → …/admin/`, **Ciasteczka** `PHPSESSID (Path=/, HttpOnly, bez Secure)`, **Nagłówki** m.in. `x-powered-by`, `x-debug-token` | 5 |
+| D3 | ta sama strona, sekcja `8089/tcp` | sprawdź **Certyfikat** | `CN=staging.lab.local`, ważność, SAN, `self-signed`, `TLS niezweryfikowany` | 5 |
+| D4 | ta sama strona → **Technologie** | sprawdź tabele | `WordPress 4.7` (CMS), `PHP 5.6.40`, `nginx 1.27.5` (serwer), `Panel logowania`, `Panel administracyjny`, `Tryb debugowania`, `Środowisko testowe` - z pewnością w % i dowodami | 6, 7 |
+| D5 | **Pulpit** | przewiń | **Najciekawsze usługi**: `127.0.0.1:8088/tcp` ok. 135 pkt (panel, debug, stary PHP i WordPress); **Najważniejsze znaleziska**: panel logowania, tryb debugowania, środowisko testowe, certyfikat | 7, 15 |
+| D6 | **Pulpit → Uruchom skan** | ponownie `127.0.0.1`, tryb `usługi` | po skanie **Zmiany**: `Nowe: 0, zniknęły: 0, zmienione: 0` - brak fałszywych zmian | 8 |
+| D7 | **Pulpit → Uruchom skan** | Cele: `127.0.0.0/18`, Tryb: `wykrywanie hostów` → **Uruchom** | przebieg 16 384 adresów w 64 podgrupach (tabela **Przebiegi skanów**, kolumna Podgrupy `64/64`); **Hosty** → ten przebieg: `Hostów: 16384` | ponad 10 000 IP, podgrupy |
+
+Test D7 wykonaj na końcu - kolejne widoki domyślnie pokazują najnowszy przebieg.
+
+### E. Własne sygnatury
+
+| # | Gdzie | Co zrobić | Oczekiwany wynik | Wymaganie |
+|---|---|---|---|---|
+| E1 | **Sygnatury → Nowa sygnatura** | wklej YAML poniżej; Testuj na adresie: `http://127.0.0.1:8088/admin/` → **Testuj** | wynik testu: `Panel demo 90%`, dowód `treść pasuje do /Admin Panel/ (+90)` | 10 |
+| E2 | ten sam formularz | **Zapisz** | `Zapisano sygnaturę - działa w kolejnych skanach.`, sygnatura na liście; kolejny skan `127.0.0.1` pokazuje `Panel demo` w technologiach | 10 |
 
 ```yaml
 name: Panel demo
@@ -66,90 +91,63 @@ matchers:
   - { type: body, pattern: 'Admin Panel', weight: 90 }
 ```
 
-Poza aplikacją (terminal 2):
+### F. Harmonogram
 
-| Co | Polecenie | Wymaganie |
-|---|---|---|
-| eksport CSV / JSON | `./run.sh export services --format csv` | eksport |
-| import wyników | `./run.sh import --kind results .dscan-demo/uslugi.csv` | import JSON/CSV |
-| ponad 10 000 adresów | `./run.sh scan 127.0.0.0/16 --dry-run` | duże zakresy, 2c |
-| szyfrowanie | `docker compose exec -T postgres psql -U dscan -d dscan -c "SELECT encode(substr(raw_nmap_xml,1,16),'hex') FROM subgroups LIMIT 3"` | 16 |
-| trafność | `./run.sh evaluate docs/demo/referencja.csv` | walidacja |
+| # | Gdzie | Co zrobić | Oczekiwany wynik | Wymaganie |
+|---|---|---|---|---|
+| F1 | **Profile skanów → Nowy profil** | Nazwa: `nocny`, Okna czasowe: `22:00-06:00`, Co ile minut: `1440` → **Utwórz** | `Zapisano profil.`; w tabeli: okno `22:00–06:00`, `co 1440 min` | okna czasowe, częstotliwość |
+| F2 | **Profile skanów** → rozwiń `Edytuj „nocny”` | Co ile minut: `720` → **Zapisz** | w tabeli `co 720 min` (edycja konfiguracji) | edycja konfiguracji |
 
-## 3. Wyzwanie (wymagania 1-16)
+Skan przerwany końcem okna dostaje stan `paused` i jest wznawiany w kolejnym oknie (przycisk **Wznów** na Pulpicie).
 
-| # | Wymaganie | Jak spełnione | Jak sprawdzić |
-|---|---|---|---|
-| 1 | Lista IP, CIDR, domen | parser celów: DNS (także `/etc/hosts`), scalanie, normalizacja, zakres `[scope]` | `./run.sh targets check 127.0.0.1 10.10.0.7/24 localhost 'zły cel'`; WWW: **Cele** |
-| 2 | Bezpieczny skan discovery | tylko `nmap -sn`/`-sV`, bez NSE, zawsze `--max-rate`, tylko sieci i porty z `[scope]` (`crates/scanner/src/safety.rs`) | `./run.sh scan 8.8.8.8` → odrzucony; [docs/bezpieczenstwo-skanera.md](docs/bezpieczenstwo-skanera.md) |
-| 2a | Wielowątkowo, nmap, DefectDojo | pula `max_parallel_nmap` procesów; `dojo import` (XML nmap) i `dojo export` | `./run.sh scan 127.0.0.0/28 --parallel 4` → „do 4 procesów naraz”; rozdział 4 |
-| 2b | Czas trwania skanu | postęp, czas i prognoza po każdej podgrupie; czasy w bazie i API | [skan] terminal skanu; WWW: **Pulpit → Trwające skany**; `GET /api/v1/scans` |
-| 2c | Optymalne podgrupy | podział CIDR, rozmiar z przepustowości (EWMA) i czasu okna (`crates/engine/src/adaptive.rs`) | `./run.sh scan 127.0.0.0/16 --dry-run` → liczba podgrup i szacowany czas, bez pakietów |
-| 3 | Aktywne hosty | `nmap -sn` / `-sV`, obecność hostów w każdym przebiegu | [demo] **Hosty**; [skan] `./run.sh scan 127.0.0.1 --mode discovery` |
-| 4 | Identyfikacja usług | `nmap -sV` + weryfikacja HTTP dla usług niejednoznacznych | [demo] **Hosty → host**: produkt i wersja; `./run.sh evaluate docs/demo/referencja.csv` |
-| 5 | Tytuł, kod HTTP, nagłówki, ciasteczka, TLS, przekierowania | klient HTTP(S) tylko GET; certyfikat: CN/SAN, ważność, self-signed | [skan] **Hosty → 127.0.0.1** (Grafana: przekierowanie na `/login`, ciasteczka; Jenkins: `X-Jenkins`) |
-| 6 | Technologie: CMS, framework, serwer, IoT | ok. 50 sygnatur YAML + produkty nmap; pewność 0-100 z dowodami | [demo] kamery Hikvision, Jetty, nginx, Apache; [skan] Grafana, Jenkins, Portainer, MongoDB |
-| 7 | Staging, panel administracyjny | heurystyki: nazwy hostów, nagłówki debug, `robots.txt`, tytuły paneli, kreatory instalacji | [skan] **Pulpit → Najważniejsze znaleziska** (panele Grafana, Jenkins, Portainer) |
-| 8 | Porównanie przebiegów | odcisk SHA-256 usługi po kluczu IP, port, protokół | [demo] **Porównanie**; `./run.sh diff 1 2` |
-| 9 | Nowe, znikające, zmienione | `+` / `-` / `~`, kolory w WWW, kod wyjścia 2 | [demo] **Pulpit → Zmiany od poprzedniego skanu**; [skan] `--uslugi`: `8083/tcp zniknęła` |
-| 10 | Własne sygnatury | edytor w WWW z testem przed zapisem; plik YAML `[http] signatures_file` | WWW: **Sygnatury → Nowa sygnatura → Testuj**; `./run.sh sig test '*' --host http://127.0.0.1:8082/` |
-| 11 | Formularz: ręcznie, CSV, JSON, te same reguły | jeden parser dla WWW, API i CLI; raport odrzuconych wierszy | WWW: **Cele** → wpis ręczny i plik `docs/examples/cele.csv` (3 poprawne, 3 odrzucone celowo: błędny wpis i 2 duplikaty) lub `cele.json` |
-| 12 | RBAC, tworzenie ról | middleware sprawdza każde żądanie (`crates/api/src/auth/rbac.rs`); własne role z uprawnień | WWW jako `admin`: **Użytkownicy → Nowa rola**; test wszystkich ról na każdym endpoincie: `DSCAN_TEST_DATABASE_URL=… cargo test -p dscan-api --test roles` |
-| 13 | 4 role | `administracja`, `dodawanie_usuwanie_modyfikacja`, `modyfikacja_odczyt`, `odczyt` | zaloguj się kontami `demo-*`: różne menu, przyciski i odpowiedzi `403` |
-| 14 | Edycja niezależna od skanu, trwała | poprawki przypięte do adresu, nakładane przy odczycie; przetrwają kolejne przebiegi | [demo] **Hosty → host → Zapisz** → znaczek „edytowane ręcznie”; wgraj ponownie `przebieg-2.xml` → poprawka zostaje |
-| 15 | Czytelny UI, dashboard znalezisk | menu zależne od roli; Pulpit: znaleziska, ranking ciekawości, zmiany, technologie | [demo] **Pulpit** |
-| 16 | Szyfrowanie w spoczynku | AES-256-GCM pól poufnych, klucz tylko w `.env`, rotacja | `docker compose exec -T postgres psql -U dscan -d dscan -c "SELECT encode(substr(raw_nmap_xml,1,16),'hex') FROM subgroups LIMIT 3"` → szyfrogram zamiast XML; [docs/klasyfikacja-danych.md](docs/klasyfikacja-danych.md) |
-| - | Harmonogram: okna, częstotliwość, przerwanie i wznowienie | profile z oknami `HH:MM` i częstotliwością; koniec okna → `paused`, wznowienie w kolejnym oknie | WWW: **Profile skanów → Nowy profil**; [skan] `./run.sh stop N`, `./run.sh resume N` |
+### G. Eksport i import
 
-## 4. Oczekiwany rezultat - zakres minimalny
+| # | Gdzie | Co zrobić | Oczekiwany wynik | Wymaganie |
+|---|---|---|---|---|
+| G1 | **Hosty** → Przebieg `#2` | kliknij `usługi CSV`, `usługi JSON`, `hosty JSON`, `zmiany CSV` | pobrane pliki z wynikami przebiegu | eksport JSON/CSV |
+| G2 | **Cele → Wgraj wyniki skanu** | pobrany plik `hosty-…json` albo `uslugi-…csv` → **Wgraj wyniki** | `Zapisano przebieg #N` z liczbą hostów i portów oraz zmianami względem poprzedniego importu | import JSON/CSV |
 
-| Wymaganie | Jak sprawdzić |
+### H. Role i uprawnienia
+
+| # | Gdzie | Co zrobić | Oczekiwany wynik | Wymaganie |
+|---|---|---|---|---|
+| H1 | **Użytkownicy** | otwórz | konta `admin`, `demo-operator`, `demo-modyfikacja`, `demo-odczyt` z rolami | 13 |
+| H2 | **Użytkownicy → Nowa rola** | Nazwa: `audytor`, uprawnienie `read` (zaznaczone) → **Utwórz rolę** | nowa rola na liście, do wyboru przy kontach | 12 |
+| H3 | **Audyt** | otwórz | wpisy z testów B1-F1: kto, co, kiedy (edycja, tag, import, skan, sygnatura, profil) | 12 |
+| H4 | **Wyloguj** → `demo-odczyt` | przejdź po menu | brak pozycji **Użytkownicy** i **Audyt**, brak formularzy „Uruchom skan”, „Dodaj”, przycisków „Zapisz”; adres `/users` → „Brak dostępu” | 12, 13 |
+| H5 | **Wyloguj** → `demo-modyfikacja` | **Hosty** → host | przyciski **Zapisz** (edycja wyników) są, formularza „Uruchom skan” na Pulpicie nie ma | 12, 13 |
+| H6 | **Wyloguj** → `demo-operator` | **Pulpit**, **Cele** | może uruchamiać skany i dodawać cele, nie widzi **Użytkownicy** i **Audyt** | 12, 13 |
+
+### I. Bezpieczeństwo danych i skanera
+
+| # | Gdzie | Co zrobić | Oczekiwany wynik | Wymaganie |
+|---|---|---|---|---|
+| I1 | **Pulpit → Uruchom skan** | Cele: `8.8.8.8` → **Uruchom** | odmowa: cel poza dozwolonym zakresem - skaner nie wysyła pakietów poza `[scope]` | 2, bezpieczeństwo |
+| I2 | **Hosty** → `127.0.0.1` → `8088/tcp` | sprawdź ciasteczka i nagłówek `set-cookie` | wartość ciasteczka sesji ukryta (`PHPSESSID=***`) - dane poufne | 16 |
+| I3 | **Cele → Dodaj cel** | pole **Notatka** | opis pola: „zapisywana zaszyfrowana” - notatki, banery, nagłówki, ciasteczka, certyfikaty i surowe wyniki nmap są w bazie szyfrowane AES-256-GCM | 16 |
+
+## 3. Podsumowanie: wymaganie → test
+
+| Wymaganie zadania | Testy |
 |---|---|
-| import hostów lub zakresów | WWW **Cele** albo `./run.sh import docs/examples/cele.csv --dry-run` |
-| import wyników JSON / CSV | `./run.sh import --kind results .dscan-demo/uslugi.csv` (także `hosty.json`, nmap XML) |
-| ponad 10 000 IP | `./run.sh scan 127.0.0.0/16 --dry-run` (65 536 adresów, adresy liczone strumieniowo); test przebiegu /18: `DSCAN_TEST_DATABASE_URL=… cargo test -p dscan-engine --test scale` |
-| okno czasowe i częstotliwość | **Profile skanów**; `[[schedule.windows]]` w `dscan.toml` |
-| ograniczanie tempa | `--max-rate` (łączny, dzielony między procesy), `max_bandwidth_kbps`, limity HTTP na host |
-| aktywne hosty, identyfikacja usług | [demo] **Hosty** |
-| zapis do bazy | PostgreSQL; `./run.sh db status` |
-| porównanie dwóch skanów | [demo] **Porównanie**, `./run.sh diff 1 2` |
-| dashboard najważniejszych zmian | [demo] **Pulpit** |
-| eksport JSON / CSV | `./run.sh export services --format csv`; pliki w `.dscan-demo/` |
-| role | konta `demo-*` |
-| edycja skanów, wyników, konfiguracji | wyniki: strona hosta; profile: **Profile skanów**; cele: **Cele** (dodawanie, usuwanie), grupa i notatka: `PUT /api/v1/targets/{id}` |
-| szyfrowanie | wymaganie 16 |
+| 1. Lista IP, CIDR, domen | C1-C4 |
+| 2. Bezpieczny skan, wielowątkowość, czas skanu, podgrupy | D1, D7, I1 |
+| 3. Aktywne hosty | A4, D1, D7 |
+| 4. Identyfikacja usług | A3, D2 |
+| 5. Tytuł, kod HTTP, nagłówki, ciasteczka, TLS, przekierowania | D2, D3 |
+| 6. CMS, framework, serwer, IoT | A4, D4 |
+| 7. Staging, panel administracyjny | D4, D5 |
+| 8. Porównanie przebiegów | A2, A3, D6 |
+| 9. Nowe, znikające, zmienione usługi | A2, A3 |
+| 10. Własne sygnatury | E1, E2 |
+| 11. Formularz ręczny, CSV, JSON | C1-C4 |
+| 12-13. RBAC i 4 role | H1-H6 |
+| 14. Edycja trwała między skanami | B1, B4 |
+| 15. Czytelny interfejs, dashboard znalezisk | A1, D5 |
+| 16. Szyfrowanie danych wrażliwych | I2, I3 |
+| Import wyników JSON/CSV, eksport | B3, G1, G2 |
+| Ponad 10 000 IP | D7 |
+| Okno czasowe, częstotliwość | F1, F2 |
+| Ocena ciekawości, tagi, zmiany w czasie, pora dnia | A1, D5, B2, A5 |
 
-## 5. Zakres mile widziany
-
-| Funkcja | Jak sprawdzić |
-|---|---|
-| harmonogram cyklicznych skanów | **Profile skanów**: częstotliwość w minutach, uruchamiane przez `dscan serve` |
-| różnice zależne od pory dnia | **Hosty → host → Dostępność w godzinach doby**; **W czasie → Aktywność hostów w godzinach** |
-| ocena ciekawości | [demo] **Pulpit → Najciekawsze usługi** (punkty z uzasadnieniem) |
-| ponowne pomiary hostów niestabilnych | `[stability] unstable_retries`, `retry_delay_seconds`; host nieaktywny po `inactive_after_missed_runs` |
-| HTTP/HTTPS fingerprinting, CMS | wymagania 5-6 |
-| grupowanie podobnych usług | [skan] **Grupy usług** (SimHash treści stron) → jeden tag dla grupy |
-| tagi | **Hosty → host → Tagi** |
-| eksport do DefectDojo | `./scripts/defectdojo-setup.sh`, potem `./run.sh dojo import N`, `./run.sh dojo export N --item "IP:PORT/tcp=Technologia"`; WWW: zaznaczenie detekcji na stronie hosta |
-| wizualizacja zmian w czasie | [demo] **W czasie** |
-| źródła pasywne | `./run.sh import --kind results PLIK --format shodan` lub `--format masscan` |
-
-## 6. Walidacja w laboratorium (rozdział 6 zadania)
-
-| Kryterium | Gdzie udowodnione |
-|---|---|
-| hosty, usługi, fingerprinting, CMS | [docs/analiza-skutecznosci.md](docs/analiza-skutecznosci.md): 31/31 portów, 20/20 usług i aplikacji |
-| nagłówki i ciasteczka | strona hosta: nagłówki, ciasteczka z atrybutami, detekcje z dowodami |
-| własne sygnatury | **Sygnatury** (edytor i test) |
-| porównanie, hosty niestabilne | quickstart: `./install.sh --lab lab.zip`; obecność hostów, ponowne pomiary |
-| bezpieczeństwo skanera | [docs/bezpieczenstwo-skanera.md](docs/bezpieczenstwo-skanera.md) |
-| import, eksport, role | rozdziały 2-4 |
-
-## 7. Wymagania formalne
-
-| Wymaganie | Gdzie |
-|---|---|
-| repozytorium | ten projekt (Rust, 12 modułów w `crates/`) |
-| dokumentacja techniczna | [docs/architektura.md](docs/architektura.md), [docs/cli.md](docs/cli.md), PDF: `docs/pdf/` |
-| prezentacja do 10 slajdów | [docs/prezentacja.md](docs/prezentacja.md), `docs/pdf/prezentacja.pdf` (10 slajdów) |
-| testy | `cargo test --workspace`, CI w `.github/workflows/ci.yml` |
+Szczegóły techniczne (polecenia, kod źródłowy, testy automatyczne): `docs/hacknation-techniczny.md`.

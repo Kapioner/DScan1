@@ -18,7 +18,15 @@
     <label class="inline"><input type="checkbox" name="dry_run"> tylko sprawdź (nic nie zapisuj)</label>
     <button type="submit">Wgraj</button>
   </form>
+  <form class="card" hx-post="/ui/results/import" hx-encoding="multipart/form-data" hx-target="#results-report">
+    <h2>Wgraj wyniki skanu</h2>
+    <p class="muted">nmap XML (<code>-oX</code>), JSON (eksport hostów) albo CSV (eksport usług) - przetwarzane jak skan: zakres, zapis przebiegu, porównanie z poprzednim importem.</p>
+    <label>Plik <input type="file" name="file" accept=".xml,.csv,.json" required></label>
+    <label class="inline"><input type="checkbox" name="dry_run"> tylko sprawdź (nic nie zapisuj)</label>
+    <button type="submit">Wgraj wyniki</button>
+  </form>
 </div>
+<section class="card" id="results-report" aria-live="polite"></section>
 {% endif %}
 <section class="card" id="targets-section">
   {{ section|safe }}

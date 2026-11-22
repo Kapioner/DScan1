@@ -30,6 +30,9 @@
   <table class="fields">
     {% for f in s.fields %}{% let port = s.port.to_string() %}{% let protocol = s.protocol.clone() %}{% include "edit_field.html" %}{% endfor %}
     {% if let Some(http) = s.http %}<tr><th>HTTP</th><td colspan="2">{{ http }}</td></tr>{% endif %}
+    {% if !s.redirects.is_empty() %}<tr><th>Przekierowania</th><td colspan="2">{% for r in s.redirects %}<div><code>{{ r }}</code></div>{% endfor %}</td></tr>{% endif %}
+    {% if !s.cookies.is_empty() %}<tr><th>Ciasteczka</th><td colspan="2">{% for c in s.cookies %}<div><code>{{ c }}</code></div>{% endfor %}</td></tr>{% endif %}
+    {% if !s.headers.is_empty() %}<tr><th>Nagłówki</th><td colspan="2"><details open><summary>{{ s.headers.len() }} nagłówków odpowiedzi</summary>{% for (name, value) in s.headers %}<div><code>{{ name }}: {{ value }}</code></div>{% endfor %}</details></td></tr>{% endif %}
     {% if let Some(fav) = s.favicon %}<tr><th>Favicon</th><td colspan="2"><code>{{ fav }}</code></td></tr>{% endif %}
     {% if let Some(cert) = s.certificate %}<tr><th>Certyfikat</th><td colspan="2">{{ cert }}{% if let Some(w) = s.certificate_warning %} <span class="badge warn">{{ w }}</span>{% endif %}</td></tr>{% endif %}
   </table>
@@ -39,7 +42,7 @@
     <thead><tr>{% if can_export %}<th></th>{% endif %}<th>Technologia</th><th>Pewność</th><th>Dowody</th></tr></thead>
     <tbody>
       {% for d in s.detections %}
-      <tr>{% if can_export %}<td><input type="checkbox" form="dojo-form" name="item" value="{{ s.port }}/{{ s.protocol }}={{ d.name }}" aria-label="Wyślij {{ d.name }}"></td>{% endif %}<td>{{ d.technology }}</td><td><progress max="100" value="{{ d.confidence }}"></progress> {{ d.confidence }}%</td><td>{{ d.evidence }}</td></tr>
+      <tr>{% if can_export %}<td><input type="checkbox" form="dojo-form" name="item" value="{{ s.port }}/{{ s.protocol }}={{ d.name }}" aria-label="Wyślij {{ d.name }}"></td>{% endif %}<td>{{ d.technology }}</td><td><progress max="100" value="{{ d.confidence }}"></progress> {{ d.confidence }}%</td><td class="wrap">{{ d.evidence }}</td></tr>
       {% endfor %}
     </tbody>
   </table>
