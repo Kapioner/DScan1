@@ -24,6 +24,7 @@ pub use routes::defectdojo::{
 pub use routes::health::{DatabaseStatus, HealthResponse};
 pub use routes::profiles::{ProfileInput, WindowDto};
 pub use routes::scans::ScanRunView;
+pub use routes::signatures::{CustomSignatureInput, save_signature as save_custom_signature};
 pub use routes::validation::{clean_group, clean_note, validate_profile};
 pub use server::serve;
 pub use state::{AppState, AuthConfig};

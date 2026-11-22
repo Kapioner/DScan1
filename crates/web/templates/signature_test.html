@@ -1,0 +1,6 @@
+{% if let Some(e) = error %}<p class="notice notice-error" role="status">{{ e }}</p>{% else %}
+<p class="notice notice-ok" role="status">{{ summary }}</p>
+{% if detections.is_empty() %}<p class="muted">Sygnatura nie pasuje do tej usługi.</p>{% else %}
+<table><thead><tr><th>Technologia</th><th>Pewność</th><th>Dowody</th></tr></thead>
+<tbody>{% for d in detections %}<tr><td>{{ d.0 }}</td><td>{{ d.1 }}%</td><td>{{ d.2 }}</td></tr>{% endfor %}</tbody></table>
+{% endif %}{% endif %}

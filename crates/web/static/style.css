@@ -67,3 +67,5 @@ table.fields th { text-align: left; width: 140px; color: var(--muted); font-weig
 .inline-form.compact { gap: 6px; }
 .checkbox { flex-direction: row !important; align-items: center; }
 details summary { cursor: pointer; color: var(--accent); }
+textarea.code { width: 100%; font-family: ui-monospace, monospace; font-size: 0.9em; }
+form.inline { display: inline; }

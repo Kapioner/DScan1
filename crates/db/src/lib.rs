@@ -22,6 +22,7 @@ mod resume;
 mod run_hosts;
 mod scan_runs;
 mod sessions;
+mod signatures;
 mod subgroups;
 mod target_crud;
 mod targets;
@@ -68,6 +69,9 @@ pub use scan_runs::{
 };
 pub use sessions::{
     SessionUser, create_session, delete_expired_sessions, delete_session, find_session_user,
+};
+pub use signatures::{
+    CustomSignature, delete_custom_signature, list_custom_signatures, save_custom_signature,
 };
 pub use subgroups::{
     SubgroupCompletion, complete_subgroup, fail_subgroup, mark_subgroup_running, run_raw_xml,

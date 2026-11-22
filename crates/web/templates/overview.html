@@ -27,6 +27,20 @@
 
 {% if let Some(run) = latest %}
 <section class="card">
+  <h2>Najciekawsze usługi</h2>
+  {% if data.interesting.is_empty() %}<p class="muted">Brak usług z punktami w ocenie.</p>{% else %}
+  <table>
+    <thead><tr><th>Usługa</th><th>Ocena</th><th>Dlaczego</th></tr></thead>
+    <tbody>
+      {% for i in data.interesting %}
+      <tr><td><a href="/hosts/{{ i.ip }}?run={{ run.id }}"><code>{{ i.ip }}:{{ i.port }}/{{ i.protocol }}</code></a></td><td><strong>{{ i.score }}</strong></td>
+        <td>{% for r in i.reasons %}<span class="badge">{{ r.0 }} +{{ r.1 }}</span> {% endfor %}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+</section>
+<section class="card">
   <h2>Najważniejsze znaleziska — przebieg #{{ run.id }} ({{ run.profile }})</h2>
   {% if data.findings.is_empty() %}
   <p class="muted">Brak ważnych znalezisk.</p>

@@ -39,6 +39,8 @@ pub struct Dashboard {
     /// Przebiegi trwające i wstrzymane.
     pub active: Vec<ScanRun>,
     pub findings: Vec<Finding>,
+    /// Najciekawsze usługi (M3), od najwyższego wyniku.
+    pub interesting: Vec<crate::scoring::Interest>,
     /// Zmiany zapisane dla ostatniego przebiegu (względem poprzedniego tego profilu).
     pub changes: Vec<Change>,
     /// (technologia, liczba usług), malejąco.
@@ -97,7 +99,11 @@ pub fn technology_stats(hosts: &[Host]) -> Vec<(String, usize)> {
 }
 
 /// Wczytuje dane dashboardu z bazy.
-pub async fn load_dashboard(pool: &PgPool, settings: &Settings) -> Result<Dashboard, EngineError> {
+pub async fn load_dashboard(
+    pool: &PgPool,
+    cipher: &dscan_crypto::Cipher,
+    settings: &Settings,
+) -> Result<Dashboard, EngineError> {
     let runs = dscan_db::list_scan_runs(pool, 50).await?;
     let active = runs
         .iter()
@@ -126,7 +132,8 @@ pub async fn load_dashboard(pool: &PgPool, settings: &Settings) -> Result<Dashbo
         ..Dashboard::default()
     };
     if let Some(run) = &latest {
-        let hosts = dscan_db::load_run_hosts(pool, run.id).await?;
+        // Z certyfikatami — ocena (M3) uwzględnia wygasłe i self-signed.
+        let hosts = dscan_db::load_run_hosts_with_certificates(pool, cipher, run.id).await?;
         let categories: HashMap<String, String> = load_signatures(settings)?
             .summaries()
             .into_iter()
@@ -135,6 +142,14 @@ pub async fn load_dashboard(pool: &PgPool, settings: &Settings) -> Result<Dashbo
         dashboard.findings = important_findings(&hosts, &categories);
         dashboard.technologies = technology_stats(&hosts);
         dashboard.changes = dscan_db::list_changes(pool, run.id).await?;
+        dashboard.interesting = crate::scoring::rank_interesting(
+            &hosts,
+            &settings.scoring,
+            &categories,
+            &dashboard.changes,
+            chrono::Utc::now(),
+        );
+        dashboard.interesting.truncate(20);
         dashboard.hosts = hosts.len();
         dashboard.open_services = hosts.iter().map(Host::open_port_count).sum();
     }

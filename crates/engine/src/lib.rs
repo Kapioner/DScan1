@@ -8,6 +8,7 @@
 
 pub mod adaptive;
 mod comparison;
+pub mod custom_signatures;
 mod dashboard;
 mod error;
 mod import;
@@ -18,8 +19,10 @@ mod progress;
 mod retry;
 mod running;
 pub mod scheduler;
+pub mod scoring;
 mod service;
 mod setup;
+pub mod signature_test;
 mod web;
 pub mod windows;
 

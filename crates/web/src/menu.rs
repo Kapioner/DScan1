@@ -9,12 +9,13 @@ pub struct MenuItem {
 }
 
 /// (etykieta, adres, wymagane uprawnienie)
-const MENU: [(&str, &str, &str); 7] = [
+const MENU: [(&str, &str, &str); 8] = [
     ("Pulpit", "/", permissions::READ),
     ("Hosty", "/hosts", permissions::READ),
     ("Porównanie", "/compare", permissions::READ),
     ("Cele", "/targets", permissions::READ),
     ("Profile skanów", "/profiles", permissions::READ),
+    ("Sygnatury", "/signatures", permissions::READ),
     ("Użytkownicy", "/users", permissions::ADMIN),
     ("Audyt", "/audit", permissions::ADMIN),
 ];
@@ -53,13 +54,20 @@ mod tests {
             .collect();
         assert_eq!(
             labels,
-            vec!["Pulpit", "Hosty", "Porównanie", "Cele", "Profile skanów"]
+            vec![
+                "Pulpit",
+                "Hosty",
+                "Porównanie",
+                "Cele",
+                "Profile skanów",
+                "Sygnatury"
+            ]
         );
     }
 
     #[test]
     fn admin_sees_everything() {
-        assert_eq!(menu_for(&user(&["admin"]), "/").len(), 7);
+        assert_eq!(menu_for(&user(&["admin"]), "/").len(), 8);
     }
 
     #[test]

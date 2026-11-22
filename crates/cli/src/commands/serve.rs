@@ -57,6 +57,11 @@ impl Command for ServeArgs {
                 "wstrzymano przerwane przebiegi: {orphaned} (wznowienie: dscan resume ID)"
             );
         }
+        match dscan_engine::custom_signatures::refresh_custom_signatures(&pool).await {
+            Ok(0) => {}
+            Ok(count) => tracing::info!("własne sygnatury z edytora: {count}"),
+            Err(error) => tracing::warn!("własne sygnatury: {error}"),
+        }
         let scans = ScanService::new(pool.clone(), cipher.clone(), config.settings.clone());
         // Harmonogram profili z bazy (S8): sprawdza co minutę okna i częstotliwość.
         tokio::spawn(run_scheduler(scans.clone()));

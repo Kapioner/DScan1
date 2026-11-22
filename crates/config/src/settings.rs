@@ -19,6 +19,8 @@ pub struct Settings {
     pub http: HttpSettings,
     /// Integracja z DefectDojo (I4, I5).
     pub defectdojo: DefectDojoSettings,
+    /// Wagi oceny „ciekawości” znalezisk (M3).
+    pub scoring: ScoringSettings,
     /// Nazwane profile skanów (C4): `[profiles.NAZWA]`.
     pub profiles: std::collections::BTreeMap<String, crate::ScanProfileSettings>,
 }
@@ -237,6 +239,61 @@ impl Default for DefectDojoSettings {
             engagement_name: "Skany DScan".into(),
             auto_import: false,
             verify_tls: true,
+        }
+    }
+}
+
+/// Wagi oceny „ciekawości” znaleziska (M3). Wynik usługi = suma wag spełnionych cech.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct ScoringSettings {
+    pub admin_panel: u32,
+    pub staging: u32,
+    pub debug_mode: u32,
+    pub old_version: u32,
+    pub unusual_port: u32,
+    pub expired_certificate: u32,
+    pub self_signed_certificate: u32,
+    pub tls_unverified: u32,
+    pub new_service: u32,
+    pub modified_service: u32,
+    /// Kategorie sygnatur: kamery, CI/CD, bazy danych, drukarki.
+    pub sensitive_category: u32,
+    /// Minimalne „aktualne” wersje produktów; starsza wersja = `old_version`.
+    /// Klucz: fragment nazwy produktu (małe litery), wartość: wersja, np. `"openssh" = "8.0"`.
+    pub minimum_versions: std::collections::BTreeMap<String, String>,
+}
+
+impl Default for ScoringSettings {
+    fn default() -> Self {
+        let minimum_versions = [
+            ("openssh", "8.0"),
+            ("apache", "2.4.50"),
+            ("nginx", "1.20"),
+            ("microsoft iis", "10.0"),
+            ("php", "8.0"),
+            ("tomcat", "9.0"),
+            ("wordpress", "6.0"),
+            ("jenkins", "2.400"),
+            ("openssl", "3.0"),
+            ("mysql", "8.0"),
+        ]
+        .into_iter()
+        .map(|(k, v)| (k.to_string(), v.to_string()))
+        .collect();
+        ScoringSettings {
+            admin_panel: 30,
+            staging: 25,
+            debug_mode: 30,
+            old_version: 20,
+            unusual_port: 10,
+            expired_certificate: 15,
+            self_signed_certificate: 10,
+            tls_unverified: 5,
+            new_service: 20,
+            modified_service: 10,
+            sensitive_category: 25,
+            minimum_versions,
         }
     }
 }

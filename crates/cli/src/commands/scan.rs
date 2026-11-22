@@ -103,6 +103,9 @@ async fn run_local(args: &ScanArgs, context: &Context) -> Result<(), CliError> {
         .collect();
     let stop_at = window_stop(&windows, Local::now()).map_err(|_| EngineError::OutsideWindow)?;
 
+    // Własne sygnatury (F8) muszą być w rejestrze, zanim powstanie skaner.
+    let pool = connect_database(&config).await?;
+    dscan_engine::custom_signatures::refresh_custom_signatures(&pool).await?;
     let mut prepared = match prepare_scan(&config.settings, &request).await {
         Err(EngineError::NoTargetsInScope(plan)) => {
             eprint!("{}", format_plan(&plan));
@@ -111,7 +114,6 @@ async fn run_local(args: &ScanArgs, context: &Context) -> Result<(), CliError> {
         other => other?,
     };
     eprint!("{}", format_plan(&prepared.plan));
-    let pool = connect_database(&config).await?;
     prepared.job.subgroup_size =
         adaptive_subgroup_size(&pool, &settings, &prepared.job.mode, stop_at).await?;
     let plan = create_job(&pool, &prepared.plan.networks, &prepared.job).await?;

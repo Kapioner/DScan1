@@ -17,7 +17,7 @@ const ENV_SECTION_SEPARATOR: &str = "__";
 /// Sekcje [`Settings`]. Z env czytamy tylko zmienne `DSCAN_<SEKCJA>__<POLE>`,
 /// więc inne zmienne z prefiksem (sekrety, `DSCAN_CONFIG`, `DSCAN_TEST_…`) nie psują
 /// konfiguracji, a literówka w nazwie pola znanej sekcji nadal daje błąd.
-const SETTINGS_SECTIONS: [&str; 9] = [
+const SETTINGS_SECTIONS: [&str; 10] = [
     "scope",
     "limits",
     "schedule",
@@ -27,6 +27,7 @@ const SETTINGS_SECTIONS: [&str; 9] = [
     "http",
     "profiles",
     "defectdojo",
+    "scoring",
 ];
 
 /// Gotowa, zwalidowana konfiguracja.

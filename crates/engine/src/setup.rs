@@ -27,7 +27,7 @@ pub fn build_fetcher(settings: &Settings) -> Result<HttpFetcher, EngineError> {
     HttpFetcher::new(options, Some(limiter)).map_err(|error| EngineError::Setup(error.to_string()))
 }
 
-/// Wbudowane sygnatury + opcjonalny plik z `[http] signatures_file`.
+/// Wbudowane sygnatury + opcjonalny plik z `[http] signatures_file` + własne z edytora (F8).
 pub fn load_signatures(settings: &Settings) -> Result<SignatureSet, EngineError> {
     let extra = match &settings.http.signatures_file {
         Some(path) => Some(
@@ -36,8 +36,10 @@ pub fn load_signatures(settings: &Settings) -> Result<SignatureSet, EngineError>
         ),
         None => None,
     };
-    SignatureSet::builtin_with(extra.as_deref())
-        .map_err(|error| EngineError::Setup(error.to_string()))
+    let mut set = SignatureSet::builtin_with(extra.as_deref())
+        .map_err(|error| EngineError::Setup(error.to_string()))?;
+    crate::custom_signatures::append_custom_signatures(&mut set);
+    Ok(set)
 }
 
 /// Analiza WWW: sygnatury, ścieżki do sondowania, próg pewności i nazwy domen celów (M6).

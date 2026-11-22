@@ -20,6 +20,7 @@ mod pages;
 mod profiles_form;
 mod service_view;
 mod session;
+mod signatures_ui;
 mod targets_form;
 mod views;
 
@@ -46,6 +47,13 @@ pub fn web_routes() -> Router<AppState> {
         .route("/hosts/{ip}", get(hosts::host_page))
         .route("/ui/hosts/{ip}/edit", post(edits::edit_result))
         .route("/ui/hosts/{ip}/dojo", post(dojo_ui::send_to_dojo))
+        .route("/signatures", get(signatures_ui::signatures_page))
+        .route("/ui/signatures", post(signatures_ui::save_signature))
+        .route("/ui/signatures/test", post(signatures_ui::test_signature))
+        .route(
+            "/ui/signatures/{id}/delete",
+            post(signatures_ui::delete_signature),
+        )
         .route("/compare", get(compare::compare_page))
         .route("/ui/profiles", post(profiles_form::create_profile))
         .route("/ui/profiles/{id}", post(profiles_form::update_profile))

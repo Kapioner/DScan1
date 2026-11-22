@@ -31,7 +31,7 @@ pub use secret::{
 };
 pub use settings::{
     DatabaseSettings, DefectDojoSettings, HttpSettings, RateLimitSettings, ScheduleSettings,
-    ScopeSettings, ServerSettings, Settings, StabilitySettings, TimeWindow,
+    ScopeSettings, ScoringSettings, ServerSettings, Settings, StabilitySettings, TimeWindow,
 };
 pub use show::render_effective_config;
 pub use validation::{collect_warnings, validate_settings};

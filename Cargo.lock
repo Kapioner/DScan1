@@ -894,6 +894,7 @@ dependencies = [
  "dscan-crypto",
  "dscan-db",
  "dscan-engine",
+ "dscan-fingerprint",
  "dscan-integrations",
  "dscan-scanner",
  "http-body-util",

@@ -89,6 +89,15 @@ fn api_routes() -> Router<AppState> {
         .route("/api/v1/exports/{kind}", get(export))
         .route("/api/v1/signatures", get(list_signatures))
         .route("/api/v1/signatures/test", post(test_signature))
+        .route(
+            "/api/v1/signatures/custom",
+            get(crate::routes::signatures::list_custom)
+                .post(crate::routes::signatures::save_custom),
+        )
+        .route(
+            "/api/v1/signatures/custom/{id}",
+            axum::routing::delete(crate::routes::signatures::delete_custom),
+        )
         .route("/api/v1/dashboard", get(dashboard))
         .route("/api/v1/search", get(crate::routes::search::search))
         .route("/api/v1/scans/{id}", get(get_scan))

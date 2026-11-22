@@ -79,7 +79,9 @@ pub async fn overview_partial(
     State(state): State<AppState>,
     WebUser(_user): WebUser,
 ) -> Result<Html<String>, ApiError> {
-    let data = dscan_engine::load_dashboard(&state.db, state.scan_service()?.settings()).await?;
+    let data =
+        dscan_engine::load_dashboard(&state.db, &state.cipher, state.scan_service()?.settings())
+            .await?;
     render(&OverviewPartial::new(data))
 }
 
