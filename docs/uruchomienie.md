@@ -14,7 +14,7 @@
 ## 2. Instalacja automatyczna (Linux)
 
 ```bash
-git clone https://github.com/Kapioner/DScan1.git DScan && cd DScan && ./install.sh
+git clone https://github.com/Kapioner/DScan.git DScan && cd DScan && ./install.sh
 ```
 
 `install.sh` wykonuje kolejno, pokazując postęp każdego kroku:

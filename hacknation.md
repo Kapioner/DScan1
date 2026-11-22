@@ -6,7 +6,7 @@ Przy każdym teście: gdzie kliknąć, co wpisać i jaki wynik powinien się poj
 ## 1. Uruchomienie
 
 ```bash
-git clone https://github.com/Kapioner/DScan1.git DScan && cd DScan && ./install.sh
+git clone https://github.com/Kapioner/DScan.git DScan && cd DScan && ./install.sh
 ```
 
 `install.sh` instaluje brakujące narzędzia, kompiluje aplikację i przygotowuje dane testowe. Na końcu wypisuje

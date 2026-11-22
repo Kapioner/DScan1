@@ -6,7 +6,7 @@ Każde wymaganie z treści zadania: jak jest spełnione i jak to sprawdzić.
 ## 1. Uruchomienie demo (Linux)
 
 ```bash
-git clone https://github.com/Kapioner/DScan1.git DScan && cd DScan && ./install.sh
+git clone https://github.com/Kapioner/DScan.git DScan && cd DScan && ./install.sh
 ```
 
 `install.sh` instaluje narzędzia, kompiluje, wgrywa demo (`scripts/demo.sh`), wypisuje adres, login i hasło,
