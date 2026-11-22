@@ -8,6 +8,7 @@
 
 mod admin;
 mod assets;
+mod charts;
 mod clusters_ui;
 mod compare;
 mod dashboard;
@@ -23,6 +24,7 @@ mod service_view;
 mod session;
 mod signatures_ui;
 mod targets_form;
+mod trends;
 mod views;
 
 use axum::Router;
@@ -62,6 +64,7 @@ pub fn web_routes() -> Router<AppState> {
             "/ui/hosts/{ip}/tags/{id}/delete",
             post(clusters_ui::delete_tag),
         )
+        .route("/trends", get(trends::trends_page))
         .route("/compare", get(compare::compare_page))
         .route("/ui/profiles", post(profiles_form::create_profile))
         .route("/ui/profiles/{id}", post(profiles_form::update_profile))

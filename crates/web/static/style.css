@@ -75,3 +75,15 @@ form.inline { display: inline; }
 .hour-mixed { background: color-mix(in srgb, var(--warn) 45%, transparent); }
 .hour-down { background: color-mix(in srgb, var(--error) 35%, transparent); }
 .hour-none { color: var(--muted); }
+svg.chart { width: 100%; height: auto; max-width: 760px; }
+svg.chart .grid { stroke: var(--border); stroke-width: 1; }
+svg.chart .axis { fill: var(--muted); font-size: 11px; }
+svg.chart .line { fill: none; stroke-width: 2.5; }
+svg.chart .series-a, .legend.series-a { stroke: var(--accent); fill: var(--accent); color: var(--accent); }
+svg.chart .series-b, .legend.series-b { stroke: var(--ok); fill: var(--ok); color: var(--ok); }
+svg.chart .line.series-a, svg.chart .line.series-b { fill: none; }
+svg.chart .heat-0 { fill: var(--border); }
+svg.chart .heat-1 { fill: color-mix(in srgb, var(--accent) 25%, var(--card)); }
+svg.chart .heat-2 { fill: color-mix(in srgb, var(--accent) 50%, var(--card)); }
+svg.chart .heat-3 { fill: color-mix(in srgb, var(--accent) 75%, var(--card)); }
+svg.chart .heat-4 { fill: var(--accent); }

@@ -27,6 +27,7 @@ mod subgroups;
 mod tags;
 mod target_crud;
 mod targets;
+mod trends;
 mod users;
 
 pub use accounts::{
@@ -83,6 +84,7 @@ pub use target_crud::{
     TargetGroup, create_target, delete_target, get_target, list_target_groups, update_target,
 };
 pub use targets::{InsertSummary, StoredTarget, insert_targets, list_targets, target_kind_name};
+pub use trends::{RunTotals, responses_by_run, run_totals};
 pub use users::{
     ADMIN_ROLE, LoginUser, UserSummary, count_users, create_admin, find_login_user, list_users,
     record_login,

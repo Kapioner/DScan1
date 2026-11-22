@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Zmiany w czasie{% endblock %}
+{% block content %}
+<h1>Zmiany w czasie</h1>
+<section class="card">
+  <h2>Hosty i usługi w przebiegach</h2>
+  {% if runs == 0 %}<p class="muted">Brak zakończonych przebiegów.</p>{% else %}
+  <p><span class="legend series-a">■ hosty</span> <span class="legend series-b">■ otwarte usługi</span> <small class="muted">(ostatnie {{ runs }} przebiegów)</small></p>
+  {{ counts_svg|safe }}
+  {% endif %}
+</section>
+<section class="card">
+  <h2>Aktywność hostów w godzinach</h2>
+  <p class="muted">Średnia liczba odpowiadających hostów w przebiegach z ostatnich 30 dni (dzień tygodnia × godzina).</p>
+  {{ heatmap_svg|safe }}
+</section>
+{% endblock %}
