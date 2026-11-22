@@ -1,4 +1,10 @@
+<p align="center">
+  <img src="docs/img/logo.png" alt="DScan — Smart Scanning" width="220">
+</p>
+
 # DScan
+
+> **Jury:** instrukcja uruchomienia od zera krok po kroku — [`docs/INSTRUKCJA-JURY.md`](docs/INSTRUKCJA-JURY.md).
 
 **DScan (Defect Scan)**: narzędzie do skanowania i inwentaryzacji usług sieciowych,
 napisane w Rust i uruchamiane natywnie na hoście. Binarka: `dscan`.

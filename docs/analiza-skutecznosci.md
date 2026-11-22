@@ -1,3 +1,5 @@
+<img src="img/logo-mark.png" alt="DScan" width="64" align="right">
+
 # Analiza skuteczności DScan na laboratorium organizatorów
 
 Środowisko: laboratorium z pliku organizatorów (`lab.zip`: 4 stacki Docker + scenariusz quickstart),

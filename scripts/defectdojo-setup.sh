@@ -50,7 +50,8 @@ prepare_secrets() {
     ensure_secret DEFECTDOJO_DB_PASSWORD "$(random_hex 16)"
     ensure_secret DEFECTDOJO_SECRET_KEY "$(random_hex 32)"
     ensure_secret DEFECTDOJO_AES_KEY "$(random_hex 16)"
-    ensure_secret DEFECTDOJO_PORT 8081
+    # 8180, bo 8081 zajmuje phpMyAdmin w laboratorium organizatorów.
+    ensure_secret DEFECTDOJO_PORT "${DEFECTDOJO_PORT:-8180}"
 }
 
 wait_for_api() {

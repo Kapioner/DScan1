@@ -4,6 +4,8 @@ title: DScan — Defect Scan
 paginate: true
 ---
 
+![w:220](img/logo.png)
+
 # DScan — Defect Scan
 
 Inwentaryzacja usług sieciowych z wykrywaniem zmian
@@ -80,6 +82,8 @@ Inwentaryzacja usług sieciowych z wykrywaniem zmian
 ---
 
 ## Podsumowanie
+
+![bg right:30% w:200](img/logo-mark.png)
 
 - pełny cykl: import → skan → zmiany → edycja → role → eksport
 - działa offline (htmx i wykresy wkompilowane), dane zapasowe do demo: `docs/demo`
