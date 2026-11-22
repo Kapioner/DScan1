@@ -31,6 +31,10 @@ pub enum FileFormat {
     Json,
     /// Wynik nmap `-oX` (tylko `--kind results`).
     NmapXml,
+    /// Źródło pasywne: eksport Shodana, JSON w liniach (I6).
+    Shodan,
+    /// Źródło pasywne: wynik masscan `-oJ` (I6).
+    Masscan,
 }
 
 impl FileFormat {
@@ -39,6 +43,8 @@ impl FileFormat {
             FileFormat::Csv => "csv",
             FileFormat::Json => "json",
             FileFormat::NmapXml => "nmap-xml",
+            FileFormat::Shodan => "shodan",
+            FileFormat::Masscan => "masscan",
         }
     }
 }
@@ -78,6 +84,8 @@ impl ImportArgs {
                 ResultFormat::NmapXml => FileFormat::NmapXml,
                 ResultFormat::Json => FileFormat::Json,
                 ResultFormat::Csv => FileFormat::Csv,
+                ResultFormat::Shodan => FileFormat::Shodan,
+                ResultFormat::Masscan => FileFormat::Masscan,
             },
         })
     }
@@ -100,7 +108,7 @@ impl Command for ImportArgs {
         let import_format = match format {
             FileFormat::Csv => ImportFormat::Csv,
             FileFormat::Json => ImportFormat::Json,
-            FileFormat::NmapXml => {
+            FileFormat::NmapXml | FileFormat::Shodan | FileFormat::Masscan => {
                 return Err(CliError::Import(
                     dscan_integrations::ImportError::UnknownFormat("nmap-xml".into()),
                 ));
