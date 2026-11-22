@@ -46,14 +46,23 @@ pre { background: var(--soft); border: 1px solid var(--line); border-radius: 4px
 pre code { background: none; padding: 0; font-size: 7.9pt; }
 a { color: var(--accent); text-decoration: none; }
 blockquote { margin: 6px 0; padding: 4px 10px; border-left: 3px solid var(--accent); background: var(--soft); }
-section.slide { break-after: page; min-height: 150mm; display: flex; flex-direction: column;
-                justify-content: center; font-size: 24pt; }
-section.slide h1 { font-size: 40pt; }
-section.slide h2 { font-size: 32pt; border: none; color: var(--accent); }
-section.slide code { font-size: 18pt; }
-section.slide img.logo { max-height: 60mm; align-self: flex-start; }
-section.slide p > img:not(.logo) { display: block; max-height: 95mm; max-width: 100%; margin-top: 3mm; border: 1px solid var(--line); border-radius: 4px; }
-section.slide ul { margin: 2mm 0; }
+section.slide { break-after: page; height: 210mm; padding: 11mm 16mm 9mm; display: flex; flex-direction: column;
+                justify-content: center; font-size: 17pt; position: relative; overflow: hidden;
+                background:
+                  radial-gradient(ellipse 60% 55% at 8% 0%, rgba(31,95,174,.22), transparent 70%),
+                  radial-gradient(ellipse 55% 60% at 100% 100%, rgba(56,189,248,.22), transparent 70%),
+                  radial-gradient(ellipse 40% 40% at 85% 10%, rgba(129,140,248,.14), transparent 70%),
+                  linear-gradient(160deg, #f8fbff 0%, #eef4fb 100%); }
+section.slide h1 { font-size: 36pt; }
+section.slide h2 { font-size: 24pt; border: none; color: var(--accent); margin: 0 0 2mm; }
+section.slide p { margin: 0 0 3mm; color: #3a4656; font-size: 13.5pt; }
+section.slide code { font-size: 14pt; }
+section.slide li { margin: 3mm 0; }
+section.slide img.logo { max-height: 55mm; align-self: flex-start; filter: drop-shadow(0 0 18px rgba(56,189,248,.45)); }
+section.slide p > img:not(.logo) { display: block; width: 100%; max-height: 150mm; object-fit: contain; object-position: top center;
+                margin: 1mm auto 0; border-radius: 6px; border: 1px solid #d0dbea;
+                box-shadow: 0 0 0 1px rgba(31,95,174,.06), 0 10px 40px rgba(31,95,174,.28), 0 0 70px rgba(56,189,248,.25); }
+section.slide:last-child { break-after: auto; }
 p > img { display: block; max-width: 100%; max-height: 225mm; margin: 0 auto; border: 1px solid var(--line); border-radius: 4px; break-inside: avoid; }
 body.zrzuty-ekranu h2 { break-before: page; border: none; }
 body.zrzuty-ekranu h2:first-of-type { break-before: auto; }
@@ -111,7 +120,7 @@ const browser = await chromium.launch();
 const page = await browser.newPage();
 for (const name of names) {
   const html = `<!doctype html><html lang="pl"><head><meta charset="utf-8">
-<title>DScan - ${titles[name] ?? name}</title><style>${css}${name === "prezentacja" ? "@page { size: A4 landscape; margin: 18mm; }" : ""}</style></head><body class="${name}">${render(name)}</body></html>`;
+<title>DScan - ${titles[name] ?? name}</title><style>${css}${name === "prezentacja" ? "@page { size: A4 landscape; margin: 0; }" : ""}</style></head><body class="${name}">${render(name)}</body></html>`;
   const file = join(tmp, `${name}.html`);
   writeFileSync(file, html);
   await page.goto(pathToFileURL(file).href, { waitUntil: "load" });
