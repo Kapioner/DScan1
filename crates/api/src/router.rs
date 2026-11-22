@@ -99,6 +99,10 @@ fn api_routes() -> Router<AppState> {
             axum::routing::delete(crate::routes::signatures::delete_custom),
         )
         .route("/api/v1/dashboard", get(dashboard))
+        .route(
+            "/api/v1/hosts/{ip}/availability",
+            get(crate::routes::availability::availability),
+        )
         .route("/api/v1/search", get(crate::routes::search::search))
         .route("/api/v1/scans/{id}", get(get_scan))
         .route("/api/v1/scans/{id}/hosts", get(run_hosts))

@@ -48,6 +48,9 @@
     <tbody>{% for c in changes %}<tr class="{{ c.css }}"><td>#{{ c.run }}</td><td>{{ c.address }}</td><td>{{ c.label }}</td></tr>{% endfor %}</tbody>
   </table>
   {% endif %}
+  <h3>Dostępność w godzinach doby</h3>
+  <p>Klasa: <strong>{{ stability }}</strong></p>
+  <div class="hours" role="img" aria-label="Mapa dostępności w godzinach">{% for c in hours %}<span class="hour {{ c.css }}" title="{{ c.title }}">{{ c.hour }}</span>{% endfor %}</div>
   <h3>Odpowiedzi w przebiegach</h3>
   <p>{% for h in history %}<span class="badge {% if h.ok %}ok{% else %}warn{% endif %}">#{{ h.run }} {% if h.ok %}odpowiedział{% else %}brak odpowiedzi{% endif %}</span> {% endfor %}</p>
 </section>

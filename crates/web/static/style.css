@@ -69,3 +69,9 @@ table.fields th { text-align: left; width: 140px; color: var(--muted); font-weig
 details summary { cursor: pointer; color: var(--accent); }
 textarea.code { width: 100%; font-family: ui-monospace, monospace; font-size: 0.9em; }
 form.inline { display: inline; }
+.hours { display: grid; grid-template-columns: repeat(24, 1fr); gap: 2px; margin: 8px 0 16px; }
+.hour { text-align: center; font-size: 0.75em; padding: 6px 0; border-radius: 3px; border: 1px solid var(--border); }
+.hour-up { background: color-mix(in srgb, var(--ok) 45%, transparent); }
+.hour-mixed { background: color-mix(in srgb, var(--warn) 45%, transparent); }
+.hour-down { background: color-mix(in srgb, var(--error) 35%, transparent); }
+.hour-none { color: var(--muted); }

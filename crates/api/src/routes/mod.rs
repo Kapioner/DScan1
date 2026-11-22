@@ -2,6 +2,7 @@
 
 pub mod accounts;
 pub mod audit_log;
+pub mod availability;
 pub mod dashboard;
 pub mod defectdojo;
 pub mod exports;

@@ -9,12 +9,13 @@ use axum::response::Html;
 use chrono::Utc;
 use dscan_api::auth::permissions;
 use dscan_api::{ApiError, AppState};
-use dscan_core::models::{HostStatus, ScanStatus, apply_overrides};
+use dscan_core::models::{HostStatus, ScanStatus, apply_overrides, classify_stability};
 use dscan_integrations::{ExportFilter, filter_hosts};
 use serde::Deserialize;
 
 use crate::host_views::{
-    ChangeEntry, FieldView, HostRow, ResponseEntry, SelectOption, host_fields, status_label,
+    ChangeEntry, FieldView, HostRow, HourCell, ResponseEntry, SelectOption, host_fields,
+    hour_cells, status_label,
 };
 use crate::pages::{render, user_bar};
 use crate::service_view::ServiceView;
@@ -109,6 +110,13 @@ pub async fn hosts_page(
             only_edited: !filter.edited.is_empty(),
         };
         let presence = presence_map(&state).await?;
+        let histories = dscan_db::presence_histories(&state.db, 50).await?;
+        let stability = |ip: &IpAddr| {
+            histories.get(ip).map_or_else(
+                || "za mało pomiarów".to_string(),
+                |h| classify_stability(h).label(),
+            )
+        };
         let needle = filter.q.trim().to_lowercase();
         rows = filter_hosts(&hosts, &export_filter)
             .iter()
@@ -119,7 +127,7 @@ pub async fn hosts_page(
                         .iter()
                         .any(|n| n.to_lowercase().contains(&needle))
             })
-            .map(|h| HostRow::new(h, &presence))
+            .map(|h| HostRow::new(h, &presence, stability(&h.ip)))
             .filter(|row| filter.status.is_empty() || row.status == filter.status)
             .collect();
     }
@@ -154,6 +162,9 @@ pub struct HostPage {
     pub services: Vec<ServiceView>,
     pub changes: Vec<ChangeEntry>,
     pub history: Vec<ResponseEntry>,
+    /// Klasa stabilności (M5) i mapa godzinowa (M2).
+    pub stability: String,
+    pub hours: Vec<HourCell>,
     pub can_edit: bool,
     /// Zaznaczanie obserwacji do DefectDojo (I5): skonfigurowane i rola z `results:write`.
     pub can_export: bool,
@@ -186,6 +197,7 @@ pub async fn host_page(
         .find(|h| h.ip == ip)
         .ok_or(ApiError::NotFound)?;
     let presence = presence_map(&state).await?;
+    let timeline = dscan_db::presence_history(&state.db, ip).await?;
     let now = Utc::now();
     render(&HostPage {
         menu: menu_for(&user, "/hosts"),
@@ -209,6 +221,8 @@ pub async fn host_page(
             .into_iter()
             .map(|(run, ok)| ResponseEntry { run, ok })
             .collect(),
+        stability: classify_stability(&timeline).label(),
+        hours: hour_cells(&timeline),
         can_edit: user.has(permissions::RESULTS_WRITE),
         can_export: user.has(permissions::RESULTS_WRITE) && state.defectdojo.is_some(),
         message: param.msg,

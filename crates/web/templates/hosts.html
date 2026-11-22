@@ -30,12 +30,12 @@
   {% else %}
   <p class="muted">Hostów: {{ hosts.len() }}</p>
   <table>
-    <thead><tr><th>Adres</th><th>Nazwa</th><th>Stan</th><th>Usługi</th><th>Technologie</th><th></th></tr></thead>
+    <thead><tr><th>Adres</th><th>Nazwa</th><th>Stan</th><th>Stabilność</th><th>Usługi</th><th>Technologie</th><th></th></tr></thead>
     <tbody>
       {% for h in hosts %}
       <tr>
         <td><a href="/hosts/{{ h.ip }}{% if let Some(r) = run %}?run={{ r }}{% endif %}"><code>{{ h.ip }}</code></a></td>
-        <td>{{ h.hostname }}</td><td>{{ h.status }}</td><td>{{ h.ports }}</td><td>{{ h.technologies }}</td>
+        <td>{{ h.hostname }}</td><td>{{ h.status }}</td><td>{{ h.stability }}</td><td>{{ h.ports }}</td><td>{{ h.technologies }}</td>
         <td>{% if h.edited %}<span class="badge">edytowane ręcznie</span>{% endif %}</td>
       </tr>
       {% endfor %}

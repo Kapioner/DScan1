@@ -48,7 +48,8 @@ pub use migrations::{
 pub use overrides::{OverrideTarget, delete_override, list_overrides, set_override};
 pub use pool::{PgPool, PoolOptions, check_connection, connect, connect_lazy};
 pub use presence::{
-    PresenceUpdate, load_presence, mark_unstable, response_history, update_presence,
+    PresenceUpdate, load_presence, mark_unstable, presence_histories, presence_history,
+    response_history, update_presence,
 };
 pub use profiles::{
     ProfileData, ProfileSaved, ProfileWindow, ScanProfile, create_profile, delete_profile,
