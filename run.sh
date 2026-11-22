@@ -139,7 +139,7 @@ start_database() {
         log "Uruchamiam PostgreSQL w Dockerze (pierwszy raz pobiera obraz)..."
         docker compose up -d --wait postgres
     else
-        step 2 "Baza PostgreSQL działa"
+        :
     fi
     sync_database_credentials
 }
@@ -170,7 +170,7 @@ exit_if_server_running() {
     if [ -n "$port" ] && command -v curl > /dev/null 2>&1 \
         && curl -fsS --max-time 2 "http://127.0.0.1:${port}/api/v1/health" > /dev/null 2>&1; then
         log "DScan działa już na http://127.0.0.1:${port}/ - otwórz ten adres w przeglądarce."
-        log "Serwer uruchomiony przez install.sh zatrzymuje: ./install.sh --stop"
+        log "Serwer w tle (install.sh --background) zatrzymuje: ./install.sh --stop"
         exit 0
     fi
 }

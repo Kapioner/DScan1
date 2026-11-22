@@ -16,8 +16,9 @@
 </p>
 
 > **Dla jury:** uruchamiajcie DScan w środowisku Linux - najpierw `./install.sh` (instalacja i pierwsze
-> uruchomienie z danymi demo), kolejne starty przez `./run.sh`. Jak sprawdzić każde wymaganie zadania:
-> **[hacknation.md](hacknation.md)**.
+> uruchomienie z danymi demo), kolejne starty przez `./run.sh`. Wszystkie testy wykonuje się w panelu WWW -
+> co wpisać i jaki wynik zobaczyć: **[hacknation.md](hacknation.md)** ([PDF](docs/pdf/hacknation.pdf)),
+> zrzuty ekranu: [docs/pdf/zrzuty-ekranu.pdf](docs/pdf/zrzuty-ekranu.pdf).
 
 ---
 
@@ -34,6 +35,8 @@
 | **Import / eksport** | cele CSV/JSON, wyniki nmap XML/JSON/CSV, eksport z filtrami, DefectDojo |
 | **Bezpieczeństwo** | tylko dozwolone sieci i porty, bez NSE, AES-256-GCM dla danych poufnych, RBAC i audyt |
 
+<p align="center"><img src="docs/img/zrzuty/10-pulpit-po-skanie.png" alt="Pulpit DScan po skanie" width="820"></p>
+
 Na laboratorium testowym: **31/31 portów, 100% precyzji i czułości, 0 fałszywych zmian**.
 
 ## Szybki start
@@ -43,8 +46,9 @@ git clone https://github.com/Kapioner/DScan1.git DScan && cd DScan && ./install.
 ```
 
 `install.sh` (Linux) pokazuje postęp każdego kroku: instaluje brakujące narzędzia (Git, kompilator C, nmap,
-Docker, Rust ≥ 1.85), kompiluje DScan, uruchamia PostgreSQL i serwer w tle, loguje administratora i ładuje
-dane demo. Na końcu wypisuje adres interfejsu WWW (domyślnie http://127.0.0.1:9080/), login i hasło.
+Docker, Rust ≥ 1.85), kompiluje DScan, uruchamia PostgreSQL, loguje administratora i ładuje dane demo.
+Na końcu wypisuje adres interfejsu WWW (domyślnie http://127.0.0.1:9080/), login i hasło, i uruchamia serwer
+w tym samym terminalu - zostaw go otwartego, `Ctrl+C` kończy.
 
 | Opcja | Działanie |
 |---|---|
@@ -52,7 +56,7 @@ dane demo. Na końcu wypisuje adres interfejsu WWW (domyślnie http://127.0.0.1:
 | `--dojo` | lokalny DefectDojo z integracją |
 | `--no-install` / `--no-demo` | bez instalacji pakietów / bez danych demo |
 | `--force-config` | zastępuje istniejący `dscan.toml` konfiguracją lokalną (kopia: `dscan.toml.bak`) |
-| `--stop` | zatrzymanie serwera i bazy |
+| `--background` | serwer w tle, skrypt się kończy (zatrzymanie: `--stop`) |
 
 Kolejne uruchomienia (wymaga Rust, Docker, nmap):
 
@@ -124,7 +128,9 @@ CI: fmt, clippy, ok. 400 testów, `cargo audit`, obraz Docker. Wytyczne: [`.clau
 
 | Dokument | PDF | Źródło |
 |---|---|---|
-| Spełnienie wymagań zadania | [PDF](docs/pdf/hacknation.pdf) | [md](hacknation.md) |
+| Sprawdzanie wymagań w panelu WWW (dla jury) | [PDF](docs/pdf/hacknation.pdf) | [md](hacknation.md) |
+| Zrzuty ekranu z działania | [PDF](docs/pdf/zrzuty-ekranu.pdf) | [md](docs/zrzuty-ekranu.md) |
+| Spełnienie wymagań - wersja techniczna | [PDF](docs/pdf/hacknation-techniczny.pdf) | [md](docs/hacknation-techniczny.md) |
 | Instrukcja uruchomienia | [PDF](docs/pdf/uruchomienie.pdf) | [md](docs/uruchomienie.md) |
 | Architektura | [PDF](docs/pdf/architektura.pdf) | [md](docs/architektura.md) |
 | Polecenia CLI | [PDF](docs/pdf/cli.pdf) | [md](docs/cli.md) |

@@ -17,6 +17,7 @@ const tmp = join(out, ".tmp");
 mkdirSync(tmp, { recursive: true });
 
 const logo = pathToFileURL(join(docs, "img", "logo-mark.png")).href;
+const imgBase = pathToFileURL(join(docs, "img")).href;
 
 const css = `
 @page { size: A4; margin: 16mm 14mm 18mm 14mm; }
@@ -50,7 +51,12 @@ section.slide { break-after: page; min-height: 150mm; display: flex; flex-direct
 section.slide h1 { font-size: 40pt; }
 section.slide h2 { font-size: 32pt; border: none; color: var(--accent); }
 section.slide code { font-size: 18pt; }
-section.slide img { max-height: 60mm; align-self: flex-start; }
+section.slide img.logo { max-height: 60mm; align-self: flex-start; }
+section.slide p > img:not(.logo) { display: block; max-height: 95mm; max-width: 100%; margin-top: 3mm; border: 1px solid var(--line); border-radius: 4px; }
+section.slide ul { margin: 2mm 0; }
+p > img { display: block; max-width: 100%; max-height: 225mm; margin: 0 auto; border: 1px solid var(--line); border-radius: 4px; break-inside: avoid; }
+body.zrzuty-ekranu h2 { break-before: page; border: none; }
+body.zrzuty-ekranu h2:first-of-type { break-before: auto; }
 section.slide:last-child { break-after: auto; }
 `;
 
@@ -63,7 +69,9 @@ const titles = {
   "klasyfikacja-danych": "Klasyfikacja danych",
   "testy-reczne": "Testy ręczne",
   prezentacja: "Prezentacja",
-  hacknation: "Spełnienie wymagań zadania",
+  hacknation: "Sprawdzanie wymagań w panelu WWW",
+  "hacknation-techniczny": "Spełnienie wymagań - wersja techniczna",
+  "zrzuty-ekranu": "Zrzuty ekranu",
 };
 
 function pandoc(markdown) {
@@ -80,10 +88,13 @@ function render(name) {
   if (name === "prezentacja") {
     md = md.replace(/^---\n[\s\S]*?\n---\n/, "");
     const slides = md.split(/\n---\n/).map((s) =>
-      s.replace(/!\[[^\]]*\]\(img\/[^)]*\)/g, `![](${logo})`),
+      s
+        .replace(/!\[[^\]]*\]\(img\/logo[^)]*\)/g, `<img class="logo" src="${logo}">`)
+        .replace(/\]\(img\//g, `](${imgBase}/`),
     );
     return slides.map((s) => `<section class="slide">${pandoc(s)}</section>`).join("\n");
   }
+  md = md.replace(/\]\(img\//g, `](${imgBase}/`);
   // Pierwszy nagłówek trafia do nagłówka dokumentu.
   const h1 = md.match(/^# (.+)$/m);
   md = md.replace(/^# .+$/m, "");
@@ -100,7 +111,7 @@ const browser = await chromium.launch();
 const page = await browser.newPage();
 for (const name of names) {
   const html = `<!doctype html><html lang="pl"><head><meta charset="utf-8">
-<title>DScan - ${titles[name] ?? name}</title><style>${css}${name === "prezentacja" ? "@page { size: A4 landscape; margin: 18mm; }" : ""}</style></head><body>${render(name)}</body></html>`;
+<title>DScan - ${titles[name] ?? name}</title><style>${css}${name === "prezentacja" ? "@page { size: A4 landscape; margin: 18mm; }" : ""}</style></head><body class="${name}">${render(name)}</body></html>`;
   const file = join(tmp, `${name}.html`);
   writeFileSync(file, html);
   await page.goto(pathToFileURL(file).href, { waitUntil: "load" });

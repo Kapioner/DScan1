@@ -1,0 +1,26 @@
+{% if let Some(message) = error %}
+<p class="notice notice-error" role="status">{{ message }}</p>
+{% else %}
+<div class="report">
+  <h2>Plik {{ file_name }}</h2>
+  {% if let Some(id) = run_id %}
+  <p class="notice notice-ok" role="status">Zapisano przebieg <strong>#{{ id }}</strong>: {{ hosts }} hostów, {{ open_ports }} otwartych portów.
+    <a href="/hosts?run={{ id }}">Hosty przebiegu</a>{% if let Some(prev) = previous_run_id %} · <a href="/compare?from={{ prev }}&amp;to={{ id }}">Porównanie #{{ prev }} → #{{ id }}</a>{% endif %}</p>
+  {% else %}
+  <p>Tryb „tylko sprawdź”: {{ hosts }} hostów, {{ open_ports }} otwartych portów - nic nie zapisano.</p>
+  {% endif %}
+  {% if !out_of_scope.is_empty() %}<p class="muted">Poza zakresem [scope] (pominięte): {{ out_of_scope.join(", ") }}</p>{% endif %}
+  {% if run_id.is_some() %}
+  {% if previous_run_id.is_none() %}<p class="muted">Pierwszy przebieg importu - brak poprzedniego do porównania.</p>
+  {% else if changes.is_empty() %}<p>Brak zmian względem przebiegu #{% if let Some(prev) = previous_run_id %}{{ prev }}{% endif %}.</p>
+  {% else %}
+  <table>
+    <thead><tr><th></th><th>Usługa</th><th>Zmiana</th></tr></thead>
+    <tbody>
+      {% for c in changes %}<tr><td>{{ c.mark }}</td><td><code>{{ c.address }}</code></td><td>{{ c.label }}</td></tr>{% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+  {% endif %}
+</div>
+{% endif %}

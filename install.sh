@@ -28,6 +28,7 @@ OPT_LAB=""
 OPT_DOJO=0
 OPT_FORCE_CONFIG=0
 OPT_STOP=0
+OPT_BACKGROUND=0
 
 usage() {
     cat << 'EOF'
@@ -38,7 +39,8 @@ Użycie: ./install.sh [opcje]
   --no-install         nie instaluj pakietów systemowych (tylko sprawdź, czy są)
   --no-demo            nie ładuj zapasowych danych demo
   --force-config       zastąp istniejący dscan.toml konfiguracją lokalną (kopia: dscan.toml.bak)
-  --stop               zatrzymaj serwer DScan uruchomiony przez ten skrypt oraz bazę
+  --background         zostaw serwer w tle i zakończ skrypt (domyślnie serwer działa na pierwszym planie)
+  --stop               zatrzymaj serwer DScan uruchomiony w tle oraz bazę
   -h, --help           ta pomoc
 EOF
 }
@@ -51,6 +53,7 @@ while [ "$#" -gt 0 ]; do
         --no-demo) OPT_DEMO=0 ;;
         --force-config) OPT_FORCE_CONFIG=1 ;;
         --stop) OPT_STOP=1 ;;
+        --background) OPT_BACKGROUND=1 ;;
         -h | --help) usage; exit 0 ;;
         *) echo "Nieznana opcja: $1" >&2; usage >&2; exit 1 ;;
     esac
@@ -363,6 +366,7 @@ if ! docker info > /dev/null 2>&1; then
             [ "$OPT_DOJO" = 1 ] && args+=(--dojo)
             [ "$OPT_DEMO" = 0 ] && args+=(--no-demo)
             [ "$OPT_FORCE_CONFIG" = 1 ] && args+=(--force-config)
+            [ "$OPT_BACKGROUND" = 1 ] && args+=(--background)
             exec sg docker -c "$(printf '%q ' "$REPO_DIR/install.sh" --no-install "${args[@]}")"
         fi
         fail "Brak uprawnień do Dockera. Wyloguj się i zaloguj ponownie (grupa docker), potem uruchom ./install.sh."
@@ -559,7 +563,7 @@ cat << EOF
 
   ${B}Zobacz w przeglądarce:${N} Pulpit · Hosty · Porównanie · W czasie
 
-  ${B}Serwer pracuje w tle.${N} Kolejne uruchomienia (np. po restarcie komputera): ${B}./run.sh${N}
+  ${B}Kolejne uruchomienia:${N} ./run.sh
 
   ${B}Dalej w terminalu:${N}
     ./run.sh scan 127.0.0.1               skan (kod wyjścia: 0 brak zmian, 2 zmiany, 1 błąd)
@@ -568,6 +572,24 @@ cat << EOF
     ./run.sh diff 1 2                     porównanie dwóch przebiegów
     ./run.sh --help                       wszystkie polecenia
 
-  ${B}Zatrzymanie:${N}    ./install.sh --stop
-  ${B}Logi:${N}           ${SERVER_LOG}, ${LOG_FILE}
+  ${B}Logi instalacji:${N} ${LOG_FILE}
 EOF
+
+if [ "$OPT_BACKGROUND" = 1 ]; then
+    printf '\n  %sSerwer działa w tle%s (log: %s). Zatrzymanie: ./install.sh --stop\n' "$B" "$N" "$SERVER_LOG"
+    exit 0
+fi
+
+# Serwer na pierwszym planie: widać jego adres i logi, Ctrl+C kończy. Proces w tle (potrzebny do
+# logowania i importu demo) jest zatrzymywany, żeby nie zginął razem z sesją terminala.
+if [ -f "$PID_FILE" ]; then
+    kill -INT "$(cat "$PID_FILE")" 2> /dev/null || true
+    for _ in $(seq 1 50); do
+        kill -0 "$(cat "$PID_FILE")" 2> /dev/null || break
+        sleep 0.2
+    done
+    kill -TERM "$(cat "$PID_FILE")" 2> /dev/null || true
+    rm -f "$PID_FILE"
+fi
+printf '\n  %sUruchamiam serwer DScan - zostaw ten terminal otwarty (Ctrl+C kończy).%s\n\n' "$B$G" "$N"
+exec ./run.sh

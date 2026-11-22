@@ -5,13 +5,13 @@ use std::net::IpAddr;
 
 use chrono::{DateTime, Utc};
 use dscan_core::models::{
-    CertificateInfo, Detection, Evidence, Host, HostStatus, HttpHeader, HttpInfo, Protocol,
-    Service, ServiceState,
+    CertificateInfo, Cookie, Detection, Evidence, Host, HostStatus, HttpHeader, HttpInfo, Protocol,
+    Redirect, Service, ServiceState,
 };
 
 use dscan_crypto::Cipher;
 
-use crate::columns::{HTTP_INFO_CERTIFICATE, HTTP_INFO_HEADERS};
+use crate::columns::{HTTP_INFO_CERTIFICATE, HTTP_INFO_COOKIES, HTTP_INFO_HEADERS};
 use crate::{DbError, Encrypted, PgPool};
 
 type HostRow = (
@@ -44,6 +44,8 @@ type HttpRow = (
     Vec<u8>,
     Option<i64>,
     Option<i32>,
+    Vec<u8>,
+    String,
 );
 type DetectionRow = (i64, String, Option<String>, i16, String);
 
@@ -82,7 +84,7 @@ async fn load_hosts(
     .await
     .map_err(DbError::Query)?;
     let http: Vec<HttpRow> = sqlx::query_as(
-        "SELECT i.service_id, i.url, i.status_code, i.title, i.tls_verified, i.favicon::text, i.certificate, i.headers, i.simhash, i.response_ms FROM http_info i \
+        "SELECT i.service_id, i.url, i.status_code, i.title, i.tls_verified, i.favicon::text, i.certificate, i.headers, i.simhash, i.response_ms, i.cookies, i.redirect_chain::text FROM http_info i \
          JOIN services s ON s.id = i.service_id JOIN hosts h ON h.id = s.host_id WHERE h.scan_run_id = $1",
     )
     .bind(run_id)
@@ -99,6 +101,23 @@ async fn load_hosts(
     .await
     .map_err(DbError::Query)?;
     Ok(assemble(hosts, services, http, detections, cipher))
+}
+
+/// `Set-Cookie: SESJA=wartość; Path=/` → `SESJA=***; Path=/` - wartość ciasteczka jest poufna.
+fn mask_set_cookie(header: HttpHeader) -> HttpHeader {
+    if !header.name.eq_ignore_ascii_case("set-cookie") {
+        return header;
+    }
+    let (pair, attributes) = header
+        .value
+        .split_once(';')
+        .map_or((header.value.as_str(), ""), |(pair, rest)| (pair, rest));
+    let name = pair.split_once('=').map_or(pair, |(name, _)| name).trim();
+    let separator = if attributes.is_empty() { "" } else { ";" };
+    HttpHeader {
+        value: format!("{name}=***{separator}{attributes}"),
+        name: header.name,
+    }
 }
 
 /// Składa wiersze z czterech zapytań w hosty z usługami.
@@ -123,7 +142,25 @@ fn assemble(
                 headers,
                 simhash,
                 response_ms,
+                cookies,
+                redirect_chain,
             )| {
+                // Ciasteczka (poufne) tylko z kluczem; wartość (identyfikator sesji) nie wychodzi poza bazę.
+                let cookies = cipher
+                    .and_then(|cipher| {
+                        Encrypted::<Vec<Cookie>>::from_bytes(cookies)
+                            .open(cipher, &HTTP_INFO_COOKIES)
+                            .ok()
+                    })
+                    .unwrap_or_default()
+                    .into_iter()
+                    .map(|cookie| Cookie {
+                        value: "***".into(),
+                        ..cookie
+                    })
+                    .collect();
+                let redirect_chain: Vec<Redirect> =
+                    serde_json::from_str(&redirect_chain).unwrap_or_default();
                 // Nagłówki (poufne) tylko z kluczem — widok hosta i dowody dla DefectDojo.
                 let headers = cipher
                     .and_then(|cipher| {
@@ -131,7 +168,10 @@ fn assemble(
                             .open(cipher, &HTTP_INFO_HEADERS)
                             .ok()
                     })
-                    .unwrap_or_default();
+                    .unwrap_or_default()
+                    .into_iter()
+                    .map(mask_set_cookie)
+                    .collect();
                 // Certyfikat odszyfrowujemy tylko na żądanie (z kluczem); uszkodzony pomijamy.
                 let certificate = cipher.zip(certificate).and_then(|(cipher, bytes)| {
                     Encrypted::<CertificateInfo>::from_bytes(bytes)
@@ -144,8 +184,8 @@ fn assemble(
                     status_code,
                     title,
                     headers,
-                    cookies: Vec::new(),
-                    redirect_chain: Vec::new(),
+                    cookies,
+                    redirect_chain,
                     tls_verified,
                     certificate,
                     favicon: favicon.and_then(|json| serde_json::from_str(&json).ok()),
@@ -208,4 +248,27 @@ fn assemble(
             host
         })
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn set_cookie_value_is_masked() {
+        let header = |value: &str| HttpHeader {
+            name: "Set-Cookie".into(),
+            value: value.into(),
+        };
+        assert_eq!(
+            mask_set_cookie(header("PHPSESSID=abc123; Path=/; HttpOnly")).value,
+            "PHPSESSID=***; Path=/; HttpOnly"
+        );
+        assert_eq!(mask_set_cookie(header("sid=xyz")).value, "sid=***");
+        let other = HttpHeader {
+            name: "Server".into(),
+            value: "nginx".into(),
+        };
+        assert_eq!(mask_set_cookie(other).value, "nginx");
+    }
 }

@@ -26,6 +26,8 @@ h2 { font-size: 1.1rem; margin: 0 0 8px; }
 .error { color: var(--error); }
 table { width: 100%; border-collapse: collapse; }
 th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+td.wrap { white-space: normal; }
+td.wrap .badge { margin: 2px 0; }
 th { color: var(--muted); font-weight: 600; font-size: 0.85em; }
 .status { padding: 2px 8px; border-radius: 10px; font-size: 0.85em; border: 1px solid var(--border); }
 .status-completed { color: var(--ok); }

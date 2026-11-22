@@ -3,12 +3,14 @@
 # Wymaga działającego serwera (./run.sh albo ./install.sh). Można uruchamiać wielokrotnie.
 #
 #   scripts/demo.sh            dane demo z plików (dwa przebiegi nmap ze zmianą, sieć 172.20.0.0/24)
+#                              i usługa demo do skanu z panelu WWW: 127.0.0.1:8088 (HTTP), :8089 (HTTPS)
 #   scripts/demo.sh --uslugi   dodatkowo skan na żywo usług z docs/demo/uslugi.compose.yml (Docker)
-#   scripts/demo.sh --stop     zatrzymanie usług z --uslugi
+#   scripts/demo.sh --stop     zatrzymanie usług demo
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
 COMPOSE_USLUGI="docs/demo/uslugi.compose.yml"
+COMPOSE_WWW="docs/demo/www/compose.yml"
 OUT_DIR=".dscan-demo"
 mkdir -p "$OUT_DIR"
 
@@ -19,7 +21,8 @@ env_value() { sed -n "s/^$1=//p" .env 2> /dev/null | tail -n1; }
 port() { sed -n 's/^[[:space:]]*listen[[:space:]]*=[[:space:]]*"\(.*\)"/\1/p' dscan.toml | head -n1 | sed 's/.*://'; }
 
 if [ "${1:-}" = "--stop" ]; then
-    docker compose -f "$COMPOSE_USLUGI" down
+    docker compose -f "$COMPOSE_WWW" down || true
+    docker compose -f "$COMPOSE_USLUGI" down || true
     exit 0
 fi
 
@@ -68,6 +71,22 @@ for pair in odczyt:demo-odczyt modyfikacja_odczyt:demo-modyfikacja dodawanie_usu
         info "$user (rola $role) już istnieje"
     fi
 done
+
+say "Usługa demo do skanu z panelu WWW (127.0.0.1:8088 HTTP, 127.0.0.1:8089 HTTPS)"
+if command -v docker > /dev/null 2>&1 && docker info > /dev/null 2>&1; then
+    certs="docs/demo/www/certs"
+    if [ ! -f "$certs/cert.pem" ]; then
+        mkdir -p "$certs"
+        openssl req -x509 -newkey rsa:2048 -nodes -days 365 -subj /CN=staging.lab.local \
+            -addext "subjectAltName=DNS:staging.lab.local" \
+            -keyout "$certs/key.pem" -out "$certs/cert.pem" 2> /dev/null
+        chmod 644 "$certs/key.pem"
+    fi
+    docker compose -f "$COMPOSE_WWW" up -d
+    info "Działa: http://127.0.0.1:8088/ i https://127.0.0.1:8089/ (skan z panelu: cel 127.0.0.1)"
+else
+    info "Brak Dockera - pomijam usługę demo."
+fi
 
 say "4. Trafność względem referencji (docs/demo/referencja.csv)"
 ./run.sh evaluate docs/demo/referencja.csv | tee "$OUT_DIR/ocena.txt"

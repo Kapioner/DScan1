@@ -24,11 +24,12 @@ git clone https://github.com/Kapioner/DScan1.git DScan && cd DScan && ./install.
 3. weryfikację wersji i dostępu do Dockera,
 4. utworzenie `dscan.toml` z `docs/konfiguracja/dscan.toml`,
 5. kompilację z paskiem postępu i utworzenie `.env` z sekretami,
-6. start PostgreSQL i serwera DScan w tle,
+6. start PostgreSQL i serwera DScan (na czas logowania i importu demo),
 7. logowanie administratora w CLI,
 8. załadowanie danych demo, konta ról, ocenę trafności (`scripts/demo.sh`).
 
-Na końcu wypisuje adres interfejsu WWW, login i hasło. Log: `.dscan-install/install.log`.
+Na końcu wypisuje adres interfejsu WWW, login i hasło, a potem uruchamia serwer w tym samym terminalu
+(jak `./run.sh`): terminal zostaje otwarty, widać logi serwera, `Ctrl+C` kończy. Log instalacji: `.dscan-install/install.log`.
 
 | Opcja | Działanie |
 |---|---|
@@ -37,7 +38,8 @@ Na końcu wypisuje adres interfejsu WWW, login i hasło. Log: `.dscan-install/in
 | `--no-install` | tylko sprawdzenie narzędzi |
 | `--no-demo` | bez danych demo |
 | `--force-config` | zastąpienie istniejącego `dscan.toml` (kopia: `dscan.toml.bak`) |
-| `--stop` | zatrzymanie serwera i bazy |
+| `--background` | serwer w tle, skrypt się kończy |
+| `--stop` | zatrzymanie serwera uruchomionego z `--background` i bazy |
 
 ## 3. Uruchomienie przez run.sh
 
@@ -87,7 +89,9 @@ Docker Desktop. Windows: `wsl --install -d Ubuntu`, Docker Desktop z *WSL integr
 
 Dane demo to dwa przebiegi ze zmianą (nowy SSH, inna wersja nginx, brak MySQL, nowa kamera).
 Konta ról: `demo-operator`, `demo-modyfikacja`, `demo-odczyt`, hasło `DSCAN_DEMO_PASSWORD` w `.env`.
-Sprawdzanie wymagań zadania krok po kroku: `hacknation.md`.
+Usługa testowa do skanu z panelu (uruchamiana przez `scripts/demo.sh`): `127.0.0.1:8088` (HTTP), `127.0.0.1:8089` (HTTPS).
+W panelu WWW: import wyników - **Cele → Wgraj wyniki skanu**, eksport - linki na stronie **Hosty**.
+Sprawdzanie wymagań zadania w panelu WWW: `hacknation.md`; wersja z poleceniami: `docs/hacknation-techniczny.md`.
 Widoki: **Pulpit**, **Hosty**, **Porównanie**, **W czasie**.
 
 ## 5. Laboratorium
@@ -147,8 +151,8 @@ Panel: http://127.0.0.1:8180/ (login `admin`, hasło `DEFECTDOJO_ADMIN_PASSWORD`
 
 | Co | Polecenie |
 |---|---|
-| serwer uruchomiony przez `install.sh` | `./install.sh --stop` |
-| serwer uruchomiony przez `run.sh` | `Ctrl+C`, baza: `docker compose stop` |
+| serwer (`install.sh`, `run.sh`) | `Ctrl+C` w jego terminalu, baza: `docker compose stop` |
+| serwer w tle (`install.sh --background`) | `./install.sh --stop` |
 | laboratorium | `docker compose -f <stack>.yml down` |
 | DefectDojo | `./scripts/defectdojo-setup.sh stop` |
 

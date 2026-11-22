@@ -34,7 +34,7 @@
     <tbody>
       {% for i in data.interesting %}
       <tr><td><a href="/hosts/{{ i.ip }}?run={{ run.id }}"><code>{{ i.ip }}:{{ i.port }}/{{ i.protocol }}</code></a></td><td><strong>{{ i.score }}</strong></td>
-        <td>{% for r in i.reasons %}<span class="badge">{{ r.0 }} +{{ r.1 }}</span> {% endfor %}</td></tr>
+        <td class="wrap">{% for r in i.reasons %}<span class="badge">{{ r.0 }} +{{ r.1 }}</span> {% endfor %}</td></tr>
       {% endfor %}
     </tbody>
   </table>
