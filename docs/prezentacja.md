@@ -8,84 +8,81 @@ paginate: true
 
 # DScan - Defect Scan
 
-Inwentaryzacja usług sieciowych z wykrywaniem zmian
+Attack Surface Intelligence: cykliczne skanowanie rozległych sieci z wykrywaniem zmian
 
 - jedna binarka w Ruście: serwer WWW + API + CLI, PostgreSQL
-- instalacja i start: `./install.sh`, kolejne uruchomienia: `./run.sh`
+- instalacja: `./install.sh`, uruchomienie: `./run.sh`
 
 ---
 
-## Problem i rozwiązanie
+## Wyzwanie → DScan
 
-- Co działa w dużej sieci, w jakiej wersji i **co się zmieniło** od ostatniego skanu?
-- Skan nmap w podgrupach CIDR z limitem tempa, tylko dozwolone sieci i porty, okna czasowe
-- Fingerprinting HTTP/HTTPS, ok. 50 sygnatur + własne, ranking najciekawszych usług
-- Porównanie przebiegów, edycja wyników, 4 role, szyfrowanie danych, DefectDojo
-
----
-
-## Skan z panelu WWW
-
-- cel, profil i tryb w formularzu; postęp, czas i prognoza na żywo
-- 16 384 adresów w 64 podgrupach - test z panelu
-
-![Skan w toku](img/zrzuty/09-skan-w-toku.png)
+- **1-4** cele IP/CIDR/domeny, bezpieczny skan nmap w podgrupach, hosty i usługi
+- **5-7** HTTP/HTTPS: tytuł, kod, nagłówki, ciasteczka, TLS, przekierowania; CMS, IoT, staging, panele
+- **8-10** porównanie przebiegów, usługi nowe / zniknięte / zmienione, własne sygnatury
+- **11-14** formularz ręczny i CSV/JSON, RBAC z 4 rolami, trwała edycja wyników
+- **15-16** dashboard znalezisk, szyfrowanie danych wrażliwych AES-256-GCM
 
 ---
 
-## Wykrywanie zmian
+## Wymagania 1-4: skan discovery z panelu
 
-- usługi nowe / zniknięte / zmienione między dowolnymi przebiegami
+Cele, profil i tryb w formularzu · wielowątkowy nmap · postęp, czas trwania i prognoza
 
-![Porównanie](img/zrzuty/03-porownanie.png)
-
----
-
-## Fingerprinting HTTP/HTTPS
-
-- tytuł, kod, przekierowania, ciasteczka, nagłówki, certyfikat; technologie z pewnością i dowodami
-
-![Fingerprinting](img/zrzuty/11a-http-8088.png)
+![Skan w toku](img/slajdy/09-skan-w-toku.png)
 
 ---
 
-## Najważniejsze znaleziska
+## Wymagania 8-9: porównanie przebiegów
 
-- ranking „ciekawości” z uzasadnieniem: panel, debug, stare wersje, staging, TLS
+Usługi nowe, zniknięte i zmienione między dowolnymi skanami (np. nginx 1.18.0 → 1.24.0)
 
-![Pulpit po skanie](img/zrzuty/10-pulpit-po-skanie.png)
-
----
-
-## Edycja, import, eksport
-
-- edycja wyniku przetrwa kolejne skany; import celów i wyników (XML, JSON, CSV), eksport CSV/JSON
-
-![Import celów](img/zrzuty/07-cele-import.png)
+![Porównanie](img/slajdy/03-porownanie.png)
 
 ---
 
-## Role i audyt
+## Wymagania 5-7: fingerprinting HTTP/HTTPS
 
-- 4 role + własne; „odczyt” bez formularzy zmian, każda zmiana w dzienniku audytu
+Przekierowania, ciasteczka z atrybutami, nagłówki · WordPress, PHP, panel logowania, tryb debugowania
 
-![Rola odczyt](img/zrzuty/16-rola-odczyt.png)
-
----
-
-## Bezpieczeństwo i jakość
-
-- tylko `nmap -sn/-sV`, bez NSE i logowania; zakres i porty wymuszone w kodzie; HTTP tylko GET
-- AES-256-GCM dla danych poufnych, rotacja kluczy, hasła argon2id, wartości ciasteczek ukryte
-- laboratorium: 31/31 portów, 100% precyzji i czułości, 0 fałszywych zmian
-- CI: fmt, clippy `-D warnings`, ok. 400 testów, `cargo audit`
+![Fingerprinting](img/slajdy/11a-http-8088.png)
 
 ---
 
-## Podsumowanie
+## Wymaganie 15: dashboard najważniejszych znalezisk
 
-![bg right:30% w:200](img/logo-mark.png)
+Ranking „ciekawości” z uzasadnieniem: panel, debug, stare wersje, staging, certyfikat self-signed
 
-- pełny cykl w panelu WWW: cele → skan → zmiany → edycja → role → eksport
-- instrukcja dla jury: `hacknation.md`, zrzuty: `docs/pdf/zrzuty-ekranu.pdf`
-- dokumentacja: `docs/architektura.md`, `docs/uruchomienie.md`, `docs/cli.md`
+![Pulpit po skanie](img/slajdy/10-pulpit-po-skanie.png)
+
+---
+
+## Wymaganie 10: własne sygnatury
+
+Edytor YAML z testem na usłudze przed zapisem · nagłówek, ciasteczko, treść, favicon, ścieżka
+
+![Test sygnatury](img/slajdy/12-sygnatura-test.png)
+
+---
+
+## Wymagania 11 i 14: formularz, import, edycja
+
+Wpis ręczny i pliki CSV/JSON z raportem odrzuconych wierszy · import wyników nmap · edycja trwała między skanami
+
+![Import celów](img/slajdy/07-cele-import.png)
+
+---
+
+## Wymagania 12, 13, 16: role i ochrona danych
+
+4 role + własne, rola „odczyt” bez formularzy zmian, dziennik audytu · dane poufne szyfrowane, wartości ciasteczek ukryte
+
+![Rola odczyt](img/slajdy/16-rola-odczyt.png)
+
+---
+
+## Ponad 10 000 adresów i bezpieczeństwo skanera
+
+16 384 adresów w 64 podgrupach · tylko dozwolone sieci i porty, limit tempa, bez NSE i prób logowania
+
+![Duży skan](img/slajdy/18-duzy-skan.png)

@@ -42,7 +42,7 @@ Na laboratorium testowym: **31/31 portów, 100% precyzji i czułości, 0 fałszy
 ## Szybki start
 
 ```bash
-git clone https://github.com/Kapioner/DScan1.git DScan && cd DScan && ./install.sh
+git clone https://github.com/Kapioner/DScan.git DScan && cd DScan && ./install.sh
 ```
 
 `install.sh` (Linux) pokazuje postęp każdego kroku: instaluje brakujące narzędzia (Git, kompilator C, nmap,
