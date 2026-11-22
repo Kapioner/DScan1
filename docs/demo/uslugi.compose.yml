@@ -1,0 +1,17 @@
+# Usługi do skanu na żywo (scripts/demo.sh --uslugi): panele, CI/CD, baza danych na 127.0.0.1.
+# Porty mieszczą się w [scope] allowed_ports z docs/konfiguracja/dscan.toml.
+name: dscan-demo-uslugi
+services:
+  grafana:
+    image: grafana/grafana:latest
+    ports: ["127.0.0.1:3000:3000"]
+  jenkins:
+    image: jenkins/jenkins:lts-jdk17
+    ports: ["127.0.0.1:8082:8080"]
+  portainer:
+    image: portainer/portainer-ce:latest
+    command: ["--http-enabled"]
+    ports: ["127.0.0.1:8083:9000"]
+  mongo:
+    image: mongo:7
+    ports: ["127.0.0.1:8084:27017"]

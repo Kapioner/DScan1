@@ -63,6 +63,7 @@ const titles = {
   "klasyfikacja-danych": "Klasyfikacja danych",
   "testy-reczne": "Testy ręczne",
   prezentacja: "Prezentacja",
+  hacknation: "Spełnienie wymagań zadania",
 };
 
 function pandoc(markdown) {
@@ -73,7 +74,8 @@ function pandoc(markdown) {
 }
 
 function render(name) {
-  let md = readFileSync(join(docs, `${name}.md`), "utf8");
+  const source = name === "hacknation" ? join(root, "hacknation.md") : join(docs, `${name}.md`);
+  let md = readFileSync(source, "utf8");
   md = md.replace(/<img[^>]*>\s*/g, "").replace(/<\/?p[^>]*>\s*/g, "");
   if (name === "prezentacja") {
     md = md.replace(/^---\n[\s\S]*?\n---\n/, "");
@@ -91,7 +93,8 @@ function render(name) {
 
 const names = readdirSync(docs)
   .filter((f) => f.endsWith(".md"))
-  .map((f) => basename(f, ".md"));
+  .map((f) => basename(f, ".md"))
+  .concat("hacknation");
 
 const browser = await chromium.launch();
 const page = await browser.newPage();

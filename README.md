@@ -16,7 +16,8 @@
 </p>
 
 > **Dla jury:** uruchamiajcie DScan w środowisku Linux - najpierw `./install.sh` (instalacja i pierwsze
-> uruchomienie z danymi demo), kolejne starty przez `./run.sh`.
+> uruchomienie z danymi demo), kolejne starty przez `./run.sh`. Jak sprawdzić każde wymaganie zadania:
+> **[hacknation.md](hacknation.md)**.
 
 ---
 
@@ -123,6 +124,7 @@ CI: fmt, clippy, ok. 400 testów, `cargo audit`, obraz Docker. Wytyczne: [`.clau
 
 | Dokument | PDF | Źródło |
 |---|---|---|
+| Spełnienie wymagań zadania | [PDF](docs/pdf/hacknation.pdf) | [md](hacknation.md) |
 | Instrukcja uruchomienia | [PDF](docs/pdf/uruchomienie.pdf) | [md](docs/uruchomienie.md) |
 | Architektura | [PDF](docs/pdf/architektura.pdf) | [md](docs/architektura.md) |
 | Polecenia CLI | [PDF](docs/pdf/cli.pdf) | [md](docs/cli.md) |
