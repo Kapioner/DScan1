@@ -263,7 +263,7 @@ curl -X PUT -H "Authorization: Bearer $TOKEN" -H 'content-type: application/json
 ./scripts/defectdojo-setup.sh
 ```
 
-Uruchamia lokalny DefectDojo 3.5.202 (`compose.defectdojo.yaml`, osobny projekt, http://127.0.0.1:8081),
+Uruchamia lokalny DefectDojo 3.5.202 (`compose.defectdojo.yaml`, osobny projekt, http://127.0.0.1:8180),
 generuje jego sekrety w `.env`, pobiera token API i tworzy testowy produkt „DScan lab” oraz engagement
 „DScan — testy”. Wynik trafia do `.env`: `DSCAN_DEFECTDOJO_URL`, `DSCAN_DEFECTDOJO_TOKEN`,
 `DSCAN_DEFECTDOJO_PRODUCT_ID`, `DSCAN_DEFECTDOJO_ENGAGEMENT_ID` (użyje ich eksport w zadaniach I4/I5).
