@@ -11,6 +11,7 @@ pub mod columns;
 mod encrypted;
 mod error;
 mod http_results;
+mod key_versions;
 mod keys;
 mod migrations;
 mod overrides;
@@ -43,6 +44,7 @@ pub use columns::{ENCRYPTED_COLUMNS, EncryptedColumn};
 pub use encrypted::Encrypted;
 pub use error::DbError;
 pub use http_results::HTTP_INFO_PER_INSERT;
+pub use key_versions::{KeyUsage, key_usage, reencrypt_stale};
 pub use keys::{RotatedColumn, reencrypt, rotate_encryption_key};
 pub use migrations::{
     MigrationInfo, available_migrations, compute_migration_status, migration_status, run_migrations,

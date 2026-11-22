@@ -40,8 +40,8 @@ wymieniał każdą z nich.
 - Losowy 12-bajtowy nonce dla **każdej** wartości, więc ta sama wartość daje za każdym razem inny szyfrogram.
 - Nazwa kolumny (np. `services.banner`) jest danymi uwierzytelnianymi (AAD), więc szyfrogramu
   nie da się przenieść do innej kolumny bez wykrycia.
-- Format `[wersja 1 B][nonce 12 B][szyfrogram + tag 16 B]`; bajt wersji pozwoli zmienić format później.
-- Rotacja klucza: `dscan keys rotate` przeszyfrowuje wszystkie kolumny z listy w jednej transakcji.
+- Format `[wersja 1 B][id klucza 1 B][nonce 12 B][szyfrogram + tag 16 B]` (wersja 2, B6); rekordy w starszym formacie bez identyfikatora są nadal odczytywane.
+- Rotacja klucza: `dscan keys rotate` przeszyfrowuje wszystkie kolumny w jednej transakcji, albo stopniowo (B6): nowy klucz z `DSCAN_ENCRYPTION_KEY_ID`, stare w `DSCAN_PREVIOUS_ENCRYPTION_KEYS` (tylko odczyt), `dscan keys reencrypt` partiami, `dscan keys status` pokazuje postęp.
 
 ## Dane wewnętrzne (jawne) i uzasadnienie
 
@@ -72,5 +72,5 @@ i usuwa plik; token wygasa też sam po `[server] session_hours`.
 
 ## Planowane rozszerzenia
 
-- **B3:** ślepy indeks (HMAC-SHA256) dla pól poufnych, po których trzeba filtrować (np. nazwa ciasteczka).
-- **B6:** wersja klucza w każdym rekordzie, co pozwoli rotować klucz stopniowo.
+- **B3 (zrobione):** ślepy indeks HMAC-SHA256 (`http_blind_index`) dla nazw ciasteczek, nazw nagłówków i par nagłówek=wartość; klucz indeksu wyprowadzony z klucza aplikacji.
+- **B6 (zrobione):** identyfikator klucza w każdym rekordzie i stopniowa rotacja.

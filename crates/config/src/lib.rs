@@ -26,8 +26,9 @@ pub use profiles::{ResolvedProfile, ScanProfileSettings, profile_names, resolve_
 pub use schedule::{parse_clock_time, window_length_minutes};
 pub use secret::{
     ADMIN_PASSWORD_ENV, ADMIN_USERNAME_ENV, ApiToken, DATABASE_URL_ENV, DEFECTDOJO_TOKEN_ENV,
-    DatabaseUrl, ENCRYPTION_KEY_ENV, ENCRYPTION_KEY_LEN, EncryptionKey, InitialAdmin,
-    NEW_ENCRYPTION_KEY_ENV, decode_hex_key, mask_url_password,
+    DatabaseUrl, ENCRYPTION_KEY_ENV, ENCRYPTION_KEY_ID_ENV, ENCRYPTION_KEY_LEN, EncryptionKey,
+    InitialAdmin, NEW_ENCRYPTION_KEY_ENV, PREVIOUS_KEYS_ENV, decode_hex_key, mask_url_password,
+    parse_previous_keys,
 };
 pub use settings::{
     DatabaseSettings, DefectDojoSettings, HttpSettings, RateLimitSettings, ScheduleSettings,

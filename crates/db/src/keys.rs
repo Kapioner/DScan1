@@ -89,7 +89,7 @@ pub fn reencrypt(
 
 /// Ślepy indeks zależy od klucza (B3), więc po rotacji liczymy go od nowa
 /// z odszyfrowanych (już nowym kluczem) nagłówków i ciasteczek.
-async fn rebuild_blind_index(
+pub(crate) async fn rebuild_blind_index(
     transaction: &mut Transaction<'_, Postgres>,
     new: &Cipher,
 ) -> Result<u64, DbError> {
