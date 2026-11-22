@@ -10,6 +10,8 @@
 #   DSCAN_DATABASE_URL    adres bazy, np. postgres://dscan:haslo@127.0.0.1:5433/dscan
 #   DSCAN_ADMIN_USERNAME, DSCAN_ADMIN_PASSWORD
 #                         konto administratora tworzone przy pierwszym starcie serwera
+#   DSCAN_DEFECTDOJO_TOKEN
+#                         token API DefectDojo (sekcja [defectdojo])
 
 # --- Środowisko testowe od organizatora (D3) --------------------------------
 # UWAGA: poniższe wartości są przykładowe. Zastąp je danymi z regulaminu
@@ -37,6 +39,10 @@ http_requests_per_host = 20
 subgroup_size = 256
 # Bezpiecznik: skan większej liczby adresów zostanie odrzucony.
 max_addresses_per_scan = 1048576
+# Dobór rozmiaru podgrup do zmierzonej przepustowości (EWMA), najwyżej subgroup_size.
+adaptive_subgroups = true
+# Docelowy czas skanu jednej podgrupy (s); w oknie czasowym najwyżej 1/4 pozostałego okna.
+target_subgroup_seconds = 300
 
 # --- Okna czasowe -----------------------------------------------------------
 # Skanowanie tylko w podanych oknach (HH:MM). Okno może przechodzić przez północ.
@@ -92,6 +98,49 @@ max_probes_per_service = 12
 min_confidence = 30
 # Dodatkowe sygnatury (np. przykłady od organizatora) w tym samym formacie YAML co wbudowane:
 # signatures_file = "sygnatury-organizatora.yaml"
+
+# --- DefectDojo ---------------------------------------------------------------
+# Import surowego XML nmap (parser „Nmap Scan”) i eksport wybranych obserwacji.
+# Token: zmienna DSCAN_DEFECTDOJO_TOKEN.
+[defectdojo]
+enabled = false
+url = "http://127.0.0.1:8081"
+product_name = "DScan"
+product_type = "Research and Development"
+engagement_name = "Skany DScan"
+# Wysyłaj automatycznie po każdym udanym przebiegu.
+auto_import = false
+# Weryfikacja certyfikatu TLS DefectDojo (false tylko w lokalnym laboratorium).
+verify_tls = true
+
+# --- Ocena „ciekawości” znalezisk ---------------------------------------------
+# Wynik usługi = suma wag spełnionych cech; uzasadnienie widać na dashboardzie.
+[scoring]
+admin_panel = 30
+staging = 25
+debug_mode = 30
+old_version = 20
+unusual_port = 10
+expired_certificate = 15
+self_signed_certificate = 10
+tls_unverified = 5
+new_service = 20
+modified_service = 10
+# Kategorie sygnatur: kamery, drukarki, CI/CD, bazy danych, panele.
+sensitive_category = 25
+
+# Wersja starsza niż podana = „stara wersja”. Klucz: fragment nazwy produktu (małe litery).
+[scoring.minimum_versions]
+openssh = "8.0"
+apache = "2.4.50"
+nginx = "1.20"
+"microsoft iis" = "10.0"
+php = "8.0"
+tomcat = "9.0"
+wordpress = "6.0"
+jenkins = "2.400"
+openssl = "3.0"
+mysql = "8.0"
 
 # --- Nazwane profile skanów --------------------------------------------------
 # Wybór: ./run.sh scan CEL --profile NAZWA (oraz w interfejsie WWW przy uruchamianiu skanu).
