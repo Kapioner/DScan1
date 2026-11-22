@@ -30,7 +30,53 @@ Zawartość demo (`docs/demo/`, sieć `172.20.0.0/24`, 8 hostów): dwa przebiegi
 `+` SSH na `172.20.0.11:2222`, `+` kamera Hikvision `172.20.0.34`, `~` nginx 1.18.0 → 1.24.0 na `172.20.0.10:80`,
 `-` MySQL `172.20.0.12:3306`.
 
-## 2. Wyzwanie (wymagania 1-16)
+## 2. Scenariusz pokazu w aplikacji (ok. 15 min)
+
+Przygotowanie: terminal 1 - `./install.sh` (albo `./run.sh`), serwer zostaje otwarty. Terminal 2 - usługa do skanu na żywo:
+
+```bash
+mkdir -p /tmp/demo-www && echo '<title>Admin Panel - Login</title><input type="password">' > /tmp/demo-www/index.html && python3 -m http.server 8088 --bind 127.0.0.1 -d /tmp/demo-www
+```
+
+| # | Gdzie kliknąć | Co pokazać | Wymagania |
+|---|---|---|---|
+| 1 | http://127.0.0.1:9080/ → login `admin` | logowanie, menu: Pulpit, Hosty, Grupy usług, Porównanie, W czasie, Cele, Profile skanów, Sygnatury, Użytkownicy, Audyt | 15 |
+| 2 | **Pulpit** | karty (hosty, usługi, znaleziska), **Najciekawsze usługi** z punktami i uzasadnieniem, **Zmiany od poprzedniego skanu**: `+` 172.20.0.11:2222, `+` kamera 172.20.0.34, `~` 172.20.0.10:80, `-` 172.20.0.12:3306 | 8, 9, 15 |
+| 3 | **Porównanie** → starszy #1, nowszy #2 → **Porównaj** | nowe: 3, zniknęły: 1, zmienione: 1, kolory; nginx 1.18.0 → 1.24.0 | 8, 9 |
+| 4 | **Hosty** → `172.20.0.10` → usługa `80/tcp` → pole produktu → wpisz wartość → **Zapisz** | znaczek „edytowane ręcznie”; po ponownym imporcie (`./run.sh import --kind results docs/demo/przebieg-2.xml`) poprawka zostaje | 14 |
+| 5 | na tym samym hoście: **Tagi** → `serwer-www` → dodaj | tag na hoście lub usłudze | mile widziane |
+| 6 | **W czasie** | wykres hostów i usług w przebiegach, aktywność hostów w godzinach doby | mile widziane |
+| 7 | **Cele** → wpisz `127.0.0.1`, grupa `lab` → **Dodaj**; potem plik `docs/examples/cele.csv` + „tylko sprawdź” → **Wgraj** | wpis ręczny; raport: 3 poprawne, 3 odrzucone z powodem (błędny wpis, 2 duplikaty) | 1, 11 |
+| 8 | **Pulpit** → **Uruchom skan**: cele `127.0.0.1`, tryb `usługi` → **Uruchom** | **Trwające skany**: pasek postępu, czas, prognoza; skan trwa ok. 1-2 min | 2, 2b, 3, 4 |
+| 9 | **Hosty** → najnowszy przebieg → `127.0.0.1` → `8088/tcp` | tytuł strony, kod HTTP 200, nagłówki, detekcja „Panel administracyjny” z pewnością i dowodem | 5, 6, 7 |
+| 10 | **Sygnatury** → wklej YAML poniżej, adres `http://127.0.0.1:8088/` → **Testuj** → **Zapisz** | wynik testu: pewność 90%, dowód; sygnatura na liście | 10 |
+| 11 | terminal 2: `Ctrl+C` (koniec usługi 8088); **Pulpit** → **Uruchom skan** `127.0.0.1` | po skanie **Zmiany**: `- 127.0.0.1:8088/tcp zniknęła` | 9 |
+| 12 | **Profile skanów** → **Nowy profil**: nazwa `nocny`, okna `22:00-06:00`, co ile minut `1440` → **Utwórz** | harmonogram z oknem i częstotliwością | harmonogram |
+| 13 | **Użytkownicy** | konta `demo-operator`, `demo-modyfikacja`, `demo-odczyt` z rolami; formularz nowej roli z uprawnień | 12, 13 |
+| 14 | **Audyt** | wpisy z kroków 4, 7, 10, 12: kto, co, kiedy | 12 |
+| 15 | **Wyloguj** → login `demo-odczyt` (hasło `DSCAN_DEMO_PASSWORD` w `.env`) | brak pozycji Użytkownicy i Audyt, brak formularzy „Uruchom skan”, „Dodaj”, „Zapisz” | 12, 13 |
+
+Sygnatura do kroku 10:
+
+```yaml
+name: Panel demo
+category: panel-admina
+condition: any
+matchers:
+  - { type: body, pattern: 'Admin Panel', weight: 90 }
+```
+
+Poza aplikacją (terminal 2):
+
+| Co | Polecenie | Wymaganie |
+|---|---|---|
+| eksport CSV / JSON | `./run.sh export services --format csv` | eksport |
+| import wyników | `./run.sh import --kind results .dscan-demo/uslugi.csv` | import JSON/CSV |
+| ponad 10 000 adresów | `./run.sh scan 127.0.0.0/16 --dry-run` | duże zakresy, 2c |
+| szyfrowanie | `docker compose exec -T postgres psql -U dscan -d dscan -c "SELECT encode(substr(raw_nmap_xml,1,16),'hex') FROM subgroups LIMIT 3"` | 16 |
+| trafność | `./run.sh evaluate docs/demo/referencja.csv` | walidacja |
+
+## 3. Wyzwanie (wymagania 1-16)
 
 | # | Wymaganie | Jak spełnione | Jak sprawdzić |
 |---|---|---|---|
@@ -55,7 +101,7 @@ Zawartość demo (`docs/demo/`, sieć `172.20.0.0/24`, 8 hostów): dwa przebiegi
 | 16 | Szyfrowanie w spoczynku | AES-256-GCM pól poufnych, klucz tylko w `.env`, rotacja | `docker compose exec -T postgres psql -U dscan -d dscan -c "SELECT encode(substr(raw_nmap_xml,1,16),'hex') FROM subgroups LIMIT 3"` → szyfrogram zamiast XML; [docs/klasyfikacja-danych.md](docs/klasyfikacja-danych.md) |
 | - | Harmonogram: okna, częstotliwość, przerwanie i wznowienie | profile z oknami `HH:MM` i częstotliwością; koniec okna → `paused`, wznowienie w kolejnym oknie | WWW: **Profile skanów → Nowy profil**; [skan] `./run.sh stop N`, `./run.sh resume N` |
 
-## 3. Oczekiwany rezultat - zakres minimalny
+## 4. Oczekiwany rezultat - zakres minimalny
 
 | Wymaganie | Jak sprawdzić |
 |---|---|
@@ -73,7 +119,7 @@ Zawartość demo (`docs/demo/`, sieć `172.20.0.0/24`, 8 hostów): dwa przebiegi
 | edycja skanów, wyników, konfiguracji | wyniki: strona hosta; profile: **Profile skanów**; cele: **Cele** (dodawanie, usuwanie), grupa i notatka: `PUT /api/v1/targets/{id}` |
 | szyfrowanie | wymaganie 16 |
 
-## 4. Zakres mile widziany
+## 5. Zakres mile widziany
 
 | Funkcja | Jak sprawdzić |
 |---|---|
@@ -88,7 +134,7 @@ Zawartość demo (`docs/demo/`, sieć `172.20.0.0/24`, 8 hostów): dwa przebiegi
 | wizualizacja zmian w czasie | [demo] **W czasie** |
 | źródła pasywne | `./run.sh import --kind results PLIK --format shodan` lub `--format masscan` |
 
-## 5. Walidacja w laboratorium (rozdział 6 zadania)
+## 6. Walidacja w laboratorium (rozdział 6 zadania)
 
 | Kryterium | Gdzie udowodnione |
 |---|---|
@@ -97,9 +143,9 @@ Zawartość demo (`docs/demo/`, sieć `172.20.0.0/24`, 8 hostów): dwa przebiegi
 | własne sygnatury | **Sygnatury** (edytor i test) |
 | porównanie, hosty niestabilne | quickstart: `./install.sh --lab lab.zip`; obecność hostów, ponowne pomiary |
 | bezpieczeństwo skanera | [docs/bezpieczenstwo-skanera.md](docs/bezpieczenstwo-skanera.md) |
-| import, eksport, role | rozdziały 2-3 |
+| import, eksport, role | rozdziały 2-4 |
 
-## 6. Wymagania formalne
+## 7. Wymagania formalne
 
 | Wymaganie | Gdzie |
 |---|---|
