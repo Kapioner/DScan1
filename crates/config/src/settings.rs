@@ -75,7 +75,7 @@ impl Default for RateLimitSettings {
             nmap_max_rate: 100,
             max_parallel_nmap: 4,
             http_requests_per_second: 10,
-            http_requests_per_host: 20,
+            http_requests_per_host: 150,
             subgroup_size: 256,
             max_addresses_per_scan: 1_048_576,
             adaptive_subgroups: true,
@@ -206,7 +206,7 @@ impl Default for HttpSettings {
                 "/version".into(),
                 "/robots.txt".into(),
             ],
-            max_probes_per_service: 12,
+            max_probes_per_service: 20,
             min_confidence: 30,
             signatures_file: None,
         }
@@ -259,6 +259,12 @@ pub struct ScoringSettings {
     pub modified_service: u32,
     /// Kategorie sygnatur: kamery, CI/CD, bazy danych, drukarki.
     pub sensitive_category: u32,
+    /// Niedokończona instalacja (kreator pierwszego uruchomienia — możliwe przejęcie).
+    pub unfinished_setup: u32,
+    /// Protokół bez szyfrowania (FTP, Telnet).
+    pub cleartext_protocol: u32,
+    /// Baza danych / broker wystawione bezpośrednio (Redis, MySQL, PostgreSQL, AMQP, MongoDB).
+    pub exposed_datastore: u32,
     /// Minimalne „aktualne” wersje produktów; starsza wersja = `old_version`.
     /// Klucz: fragment nazwy produktu (małe litery), wartość: wersja, np. `"openssh" = "8.0"`.
     pub minimum_versions: std::collections::BTreeMap<String, String>,
@@ -293,6 +299,9 @@ impl Default for ScoringSettings {
             new_service: 20,
             modified_service: 10,
             sensitive_category: 25,
+            unfinished_setup: 40,
+            cleartext_protocol: 10,
+            exposed_datastore: 15,
             minimum_versions,
         }
     }

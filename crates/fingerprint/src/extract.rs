@@ -38,6 +38,7 @@ pub fn to_http_info(response: &RawResponse) -> HttpInfo {
         certificate: None,
         favicon: None,
         simhash: None,
+        response_ms: Some(response.elapsed_ms),
     }
 }
 
@@ -151,6 +152,7 @@ mod tests {
             body: b"<title>Logowanie</title>".to_vec(),
             redirects: Vec::new(),
             tls_verified: None,
+            elapsed_ms: 0,
         };
 
         let info = to_http_info(&response);

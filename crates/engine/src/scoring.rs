@@ -8,7 +8,7 @@ use std::collections::HashMap;
 use chrono::{DateTime, Utc};
 use dscan_config::ScoringSettings;
 use dscan_core::models::{Change, ChangeKind, Host, Service, ServiceKey, ServiceState};
-use dscan_fingerprint::environment::{ADMIN_PANEL, DEBUG_MODE, TEST_ENVIRONMENT};
+use dscan_fingerprint::environment::{ADMIN_PANEL, DEBUG_MODE, TEST_ENVIRONMENT, UNFINISHED_SETUP};
 
 /// Wynik usługi z uzasadnieniem.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -124,18 +124,51 @@ pub fn score_service(
     }) {
         add(format!("{tech} ({category})"), weights.sensitive_category);
     }
+    if names.contains(&UNFINISHED_SETUP) {
+        add(
+            "niedokończona instalacja (kreator pierwszego uruchomienia)".into(),
+            weights.unfinished_setup,
+        );
+    }
+    // Każda stara wersja osobno (np. Apache i PHP na tej samej usłudze), bez powtórzeń.
+    let mut seen: Vec<String> = Vec::new();
     let versions = service
         .detections
         .iter()
         .filter_map(|d| d.version.as_deref().map(|v| (d.technology.as_str(), v)))
         .chain(service.product.as_deref().zip(service.version.as_deref()));
-    if let Some((product, version, minimum)) = versions
-        .into_iter()
-        .find_map(|(p, v)| is_old_version(p, v, &weights.minimum_versions).map(|m| (p, v, m)))
+    for (product, version) in versions {
+        if let Some(minimum) = is_old_version(product, version, &weights.minimum_versions) {
+            let key = format!("{minimum}/{version}");
+            if !seen.contains(&key) {
+                seen.push(key);
+                add(
+                    format!("stara wersja {product} {version} (< {minimum})"),
+                    weights.old_version,
+                );
+            }
+        }
+    }
+    let service_name = service.name.as_deref().unwrap_or("");
+    if ["ftp", "telnet"].contains(&service_name) {
+        add(
+            format!("protokół bez szyfrowania ({service_name})"),
+            weights.cleartext_protocol,
+        );
+    }
+    if [
+        "redis",
+        "mysql",
+        "postgresql",
+        "amqp",
+        "mongodb",
+        "ms-sql-s",
+    ]
+    .contains(&service_name)
     {
         add(
-            format!("stara wersja {product} {version} (< {minimum})"),
-            weights.old_version,
+            format!("wystawiona baza/broker ({service_name})"),
+            weights.exposed_datastore,
         );
     }
     if unusual_port(service) {

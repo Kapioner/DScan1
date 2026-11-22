@@ -1,0 +1,7 @@
+ip,port,protocol,state,service,product
+127.0.0.1,80,tcp,open,http,OpenResty
+127.0.0.1,81,tcp,open,http,Nginx Proxy Manager
+127.0.0.1,443,tcp,open,https,OpenResty
+127.0.0.1,6379,tcp,open,redis,Redis
+127.0.0.1,8080,tcp,open,http,WordPress
+127.0.0.1,8081,tcp,open,http,phpMyAdmin

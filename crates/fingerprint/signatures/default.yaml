@@ -318,3 +318,51 @@
 # Sygnatury z materiałów organizatora dopisz w osobnym pliku i wskaż go w dscan.toml:
 #   [http] signatures_file = "sygnatury-organizatora.yaml"
 # (ten sam format; sygnatury z pliku są dodawane do wbudowanych).
+
+# --- Dodane po analizie na laboratorium organizatorów ---------------------------
+
+- name: Gitea
+  category: ci-cd
+  matchers:
+    - { type: body, pattern: '(?i)<title>[^<]*Gitea', weight: 70 }
+    - { type: cookie, name: i_like_gitea, weight: 40 }
+    - { type: body, pattern: '(?i)Powered by Gitea|gitea\.(io|com)', weight: 20 }
+  version: { source: body, pattern: '(?i)Gitea[^0-9<]{0,40}Version:?\s*([0-9][0-9.]+)' }
+
+- name: httpbin
+  category: framework
+  matchers:
+    - { type: body, pattern: '(?i)<title>httpbin\.org', weight: 80 }
+    - { type: path, path: /get, pattern: '"headers"\s*:', weight: 20 }
+
+- name: Nginx Proxy Manager
+  category: panel-admina
+  matchers:
+    - { type: body, pattern: '(?i)<title>Nginx Proxy Manager', weight: 80 }
+    - { type: path, path: /api/, pattern: '"version"\s*:\s*\{', weight: 20 }
+
+- name: Traefik
+  category: panel-admina
+  matchers:
+    - { type: body, pattern: '(?i)<title>Traefik', weight: 70 }
+    - { type: path, path: /api/version, pattern: '"Version"\s*:', weight: 40 }
+    - { type: path, path: /dashboard/, pattern: '(?i)<title>Traefik', weight: 40 }
+  version: { source: body, pattern: '(?i)traefik[^0-9]{0,20}v?([0-9]+\.[0-9]+\.[0-9]+)' }
+
+- name: Toxiproxy
+  category: sieć
+  condition: all
+  matchers:
+    - { type: path, path: /version, pattern: '^\s*v?\d+\.\d+\.\d+\s*$', weight: 40 }
+    - { type: path, path: /proxies, pattern: '^\s*\{', weight: 50 }
+
+- name: DVWA
+  category: panel-admina
+  matchers:
+    - { type: body, pattern: '(?i)Damn Vulnerable Web Application', weight: 90 }
+  version: { source: body, pattern: '(?i)DVWA\)?\s*v([0-9][0-9.]+)' }
+
+- name: MongoDB
+  category: baza-danych
+  matchers:
+    - { type: body, pattern: 'access MongoDB over HTTP on the native driver port', weight: 95 }

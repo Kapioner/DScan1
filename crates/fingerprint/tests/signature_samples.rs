@@ -175,6 +175,7 @@ fn info(sample: &Sample) -> HttpInfo {
         certificate: None,
         favicon: None,
         simhash: None,
+        response_ms: None,
     }
 }
 

@@ -73,7 +73,17 @@ impl ServiceView {
                 } else {
                     ""
                 };
-                format!("HTTP {}{title} · {}{tls}", h.status_code, h.url)
+                let time = h
+                    .response_ms
+                    .map(|ms| {
+                        if ms == 0 {
+                            " · odpowiedź <1 ms".to_string()
+                        } else {
+                            format!(" · odpowiedź {ms} ms")
+                        }
+                    })
+                    .unwrap_or_default();
+                format!("HTTP {}{title} · {}{tls}{time}", h.status_code, h.url)
             }),
             favicon: http
                 .and_then(|h| h.favicon.as_ref())

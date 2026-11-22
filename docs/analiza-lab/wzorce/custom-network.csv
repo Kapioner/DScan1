@@ -1,0 +1,8 @@
+ip,port,protocol,state,service,product
+127.0.0.1,2223,tcp,open,ssh,OpenSSH
+127.0.0.1,3001,tcp,open,http,Gitea
+127.0.0.1,5673,tcp,open,amqp,RabbitMQ
+127.0.0.1,8787,tcp,open,http,nginx
+127.0.0.1,8888,tcp,open,http,httpbin
+127.0.0.1,15432,tcp,open,postgresql,PostgreSQL
+127.0.0.1,15673,tcp,open,http,RabbitMQ Management

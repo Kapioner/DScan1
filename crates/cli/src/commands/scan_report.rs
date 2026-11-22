@@ -166,6 +166,13 @@ pub fn format_http(http: &HttpInfo) -> String {
     if let Some(server) = http.header("server") {
         notes.push(format!("Server: {server}"));
     }
+    if let Some(ms) = http.response_ms {
+        notes.push(if ms == 0 {
+            "odpowiedź <1 ms".to_string()
+        } else {
+            format!("odpowiedź {ms} ms")
+        });
+    }
     if let Some(favicon) = &http.favicon {
         notes.push(format!("favicon mmh3 {}", favicon.mmh3));
     }
@@ -308,6 +315,7 @@ mod tests {
             certificate: None,
             favicon: None,
             simhash: None,
+            response_ms: None,
         };
         assert_eq!(
             format_http(&http),

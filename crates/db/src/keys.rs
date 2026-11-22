@@ -121,6 +121,7 @@ pub(crate) async fn rebuild_blind_index(
             certificate: None,
             favicon: None,
             simhash: None,
+            response_ms: None,
         };
         infos.push((service_id, info));
     }
