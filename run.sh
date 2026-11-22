@@ -137,7 +137,25 @@ sync_database_credentials() {
     fi
 }
 
+# Serwer już działa (np. uruchomiony w tle przez install.sh) — drugi nie wystartuje na tym samym porcie.
+exit_if_server_running() {
+    case "${1:-serve}" in
+        serve) ;;
+        *) return ;;
+    esac
+    local listen port
+    listen="$(sed -n 's/^[[:space:]]*listen[[:space:]]*=[[:space:]]*"\(.*\)"/\1/p' "$CONFIG_FILE" | head -n1)"
+    port="${listen##*:}"
+    if [ -n "$port" ] && command -v curl > /dev/null 2>&1 \
+        && curl -fsS --max-time 2 "http://127.0.0.1:${port}/api/v1/health" > /dev/null 2>&1; then
+        log "DScan już działa: http://127.0.0.1:${port}/ — otwórz ten adres w przeglądarce."
+        log "Zatrzymanie serwera uruchomionego przez install.sh: ./install.sh --stop"
+        exit 0
+    fi
+}
+
 create_config_if_missing
+exit_if_server_running "$@"
 prepare_env_file
 if command_needs_database "$@"; then
     start_database

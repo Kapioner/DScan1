@@ -26,7 +26,7 @@ OPT_INSTALL=1
 OPT_DEMO=1
 OPT_LAB=""
 OPT_DOJO=0
-OPT_FORCE_CONFIG=0
+OPT_KEEP_CONFIG=0
 OPT_STOP=0
 
 usage() {
@@ -37,7 +37,8 @@ Użycie: ./install.sh [opcje]
   --dojo               uruchom lokalny DefectDojo i włącz integrację
   --no-install         nie instaluj pakietów systemowych (tylko sprawdź, czy są)
   --no-demo            nie ładuj zapasowych danych demo
-  --force-config       nadpisz istniejący dscan.toml konfiguracją dla jury (docs/jury/dscan.toml)
+  --keep-config        zostaw istniejący dscan.toml (domyślnie zastępowany konfiguracją dla jury,
+                       stary trafia do dscan.toml.bak)
   --stop               zatrzymaj serwer DScan uruchomiony przez ten skrypt oraz bazę
   -h, --help           ta pomoc
 EOF
@@ -49,7 +50,8 @@ while [ "$#" -gt 0 ]; do
         --dojo) OPT_DOJO=1 ;;
         --no-install) OPT_INSTALL=0 ;;
         --no-demo) OPT_DEMO=0 ;;
-        --force-config) OPT_FORCE_CONFIG=1 ;;
+        --keep-config) OPT_KEEP_CONFIG=1 ;;
+        --force-config) ;; # dawna opcja — teraz to zachowanie domyślne
         --stop) OPT_STOP=1 ;;
         -h | --help) usage; exit 0 ;;
         *) echo "Nieznana opcja: $1" >&2; usage >&2; exit 1 ;;
@@ -161,7 +163,15 @@ health_ok() {
     curl -fsS --max-time 2 "http://127.0.0.1:$(server_port)/api/v1/health" > /dev/null 2>&1
 }
 
-dscan() { ./run.sh "$@"; }
+# Liczba przebiegów profilu (domyślnie „import”) na serwerze (przez API, z tokenem zapisanym przez `dscan login`).
+server_run_count() {
+    local creds token
+    creds="${DSCAN_CREDENTIALS:-${XDG_CONFIG_HOME:-$HOME/.config}/dscan/credentials.json}"
+    token="$(sed -n 's/.*"token": *"\([^"]*\)".*/\1/p' "$creds" 2> /dev/null | head -n1)"
+    curl -fsS --max-time 5 -H "Authorization: Bearer $token" \
+        "http://127.0.0.1:$(server_port)/api/v1/scans?limit=100" 2> /dev/null \
+        | grep -o "\"profile\":\"${1:-import}\"" | wc -l | tr -d ' '
+}
 
 OS="unknown"
 detect_os() {
@@ -354,7 +364,7 @@ if ! docker info > /dev/null 2>&1; then
             [ -n "$OPT_LAB" ] && args+=(--lab "$OPT_LAB")
             [ "$OPT_DOJO" = 1 ] && args+=(--dojo)
             [ "$OPT_DEMO" = 0 ] && args+=(--no-demo)
-            [ "$OPT_FORCE_CONFIG" = 1 ] && args+=(--force-config)
+            [ "$OPT_KEEP_CONFIG" = 1 ] && args+=(--keep-config)
             exec sg docker -c "$(printf '%q ' "$REPO_DIR/install.sh" --no-install "${args[@]}")"
         fi
         fail "Brak uprawnień do Dockera. Wyloguj się i zaloguj ponownie (grupa docker), potem uruchom ./install.sh."
@@ -367,13 +377,23 @@ ok "Docker działa, $(docker compose version --short 2> /dev/null | sed 's/^/Com
 # ===== 4. Konfiguracja =======================================================================
 step "Konfiguracja (dscan.toml dla jury i .env z sekretami)"
 
-if [ ! -f dscan.toml ] || [ "$OPT_FORCE_CONFIG" = 1 ]; then
+if [ ! -f dscan.toml ]; then
     cp docs/jury/dscan.toml dscan.toml
     ok "Skopiowano docs/jury/dscan.toml → dscan.toml (zakres 127.0.0.0/8 i 172.20.0.0/24, port 9080)"
 elif cmp -s dscan.toml docs/jury/dscan.toml; then
     ok "dscan.toml = konfiguracja dla jury"
+elif [ "$OPT_KEEP_CONFIG" = 1 ]; then
+    warn "Zostawiam własny dscan.toml (--keep-config) — port i zakres mogą różnić się od instrukcji."
 else
-    warn "Istniejący dscan.toml różni się od docs/jury/dscan.toml — zostawiam (nadpisanie: --force-config)."
+    # Np. dscan.toml utworzony wcześniej przez ./run.sh z dscan.example.toml (port 8080, okna 22:00–06:00).
+    OLD_PORT="$(server_port)"
+    cp dscan.toml dscan.toml.bak
+    cp docs/jury/dscan.toml dscan.toml
+    ok "Zastąpiono dscan.toml konfiguracją dla jury (poprzedni: dscan.toml.bak, port ${OLD_PORT:-?} → 9080)"
+    if [ -n "$OLD_PORT" ] && [ "$OLD_PORT" != "$(server_port)" ] \
+        && curl -fsS --max-time 2 "http://127.0.0.1:$OLD_PORT/api/v1/health" > /dev/null 2>&1; then
+        warn "Na porcie $OLD_PORT działa stary serwer DScan — zatrzymaj go (Ctrl+C w jego terminalu)."
+    fi
 fi
 PORT="$(server_port)"
 [ -n "$PORT" ] || fail "Nie znaleziono [server] listen w dscan.toml."
@@ -469,15 +489,19 @@ else
 fi
 if [ "$OPT_DEMO" = 0 ]; then
     info "Pominięto dane demo (--no-demo)"
-elif [ -f "$STATE_DIR/demo-imported" ]; then
-    ok "Dane demo zaimportowane wcześniej"
+elif [ "$(server_run_count)" -gt 0 ]; then
+    ok "Dane demo już są na serwerze (przebiegi importu: $(server_run_count))"
 else
-    run "Import przebiegu demo 1 (nmap XML)" ./run.sh import --kind results docs/demo/przebieg-1.xml
-    import_second() { ./run.sh import --kind results docs/demo/przebieg-2.xml | tee "$STATE_DIR/demo-diff.txt"; }
+    import_first() { ./run.sh import --kind results docs/demo/przebieg-1.xml | tee "$STATE_DIR/demo-1.txt"; }
+    import_second() { ./run.sh import --kind results docs/demo/przebieg-2.xml | tee "$STATE_DIR/demo-2.txt"; }
+    run "Import przebiegu demo 1 (nmap XML)" import_first
     run "Import przebiegu demo 2 — porównanie z pierwszym" import_second
-    touch "$STATE_DIR/demo-imported"
+    for f in "$STATE_DIR/demo-1.txt" "$STATE_DIR/demo-2.txt"; do
+        grep -E '^Przebieg #|^Poza zakresem' "$f" | sed 's/^/        /' || true
+    done
+    [ "$(server_run_count)" -gt 0 ] || fail "Import demo nie utworzył przebiegów — sprawdź [scope] w dscan.toml i $LOG_FILE."
     info "Zmiany wykryte między przebiegami demo:"
-    grep -E '^ *[-+~] ' "$STATE_DIR/demo-diff.txt" | head -n 10 | sed 's/^/      /' || true
+    grep -E '^ *[-+~] ' "$STATE_DIR/demo-2.txt" | head -n 10 | sed 's/^/      /' || true
 fi
 if ./run.sh evaluate docs/demo/referencja.csv > "$STATE_DIR/evaluate.txt" 2>&1; then
     ok "Ocena trafności względem docs/demo/referencja.csv:"
@@ -552,6 +576,9 @@ cat << EOF
   ${B}Hasło:${N}          ${ADMIN_PASS}   ${DIM}(też w .env: DSCAN_ADMIN_PASSWORD)${N}
 
   ${B}Zobacz w przeglądarce:${N} Pulpit · Hosty · Porównanie · W czasie
+
+  ${Y}${B}Serwer działa w tle — nie uruchamiaj teraz ./run.sh${N} (to drugi serwer na tym samym porcie).
+  Po restarcie komputera: ${B}./install.sh --no-install${N} albo ${B}./run.sh${N} (serwer na pierwszym planie).
 
   ${B}Dalej w terminalu:${N}
     ./run.sh scan 127.0.0.1               skan (kod wyjścia: 0 brak zmian, 2 zmiany, 1 błąd)

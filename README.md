@@ -47,7 +47,7 @@ Na końcu wypisuje **http://127.0.0.1:9080/**, login i hasło.
 | `--lab lab.zip` | scenariusz laboratorium (znikająca usługa 8787) |
 | `--dojo` | lokalny DefectDojo z integracją |
 | `--no-install` / `--no-demo` | bez instalacji pakietów / bez danych demo |
-| `--force-config` | nadpisanie `dscan.toml` konfiguracją dla jury |
+| `--keep-config` | zostawia własny `dscan.toml` (domyślnie zastępowany konfiguracją dla jury, kopia w `dscan.toml.bak`) |
 | `--stop` | zatrzymanie serwera i bazy |
 
 Ręcznie (wymaga Rust, Docker, nmap):
