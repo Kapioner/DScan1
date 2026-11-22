@@ -9,8 +9,9 @@ Każde wymaganie z treści zadania: jak jest spełnione i jak to sprawdzić.
 git clone https://github.com/Kapioner/DScan1.git DScan && cd DScan && ./install.sh
 ```
 
-`install.sh` instaluje narzędzia, kompiluje, uruchamia serwer w tle i wgrywa demo (`scripts/demo.sh`).
-Na końcu wypisuje adres, login i hasło. Kolejne starty serwera: `./run.sh`.
+`install.sh` instaluje narzędzia, kompiluje, wgrywa demo (`scripts/demo.sh`), wypisuje adres, login i hasło,
+a na końcu uruchamia serwer w tym samym terminalu (zostaw go otwartego). Kolejne starty: `./run.sh`.
+Polecenia `scripts/demo.sh` i `./run.sh scan …` uruchamiaj w drugim terminalu.
 
 | Polecenie | Co robi |
 |---|---|

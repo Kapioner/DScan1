@@ -43,8 +43,9 @@ git clone https://github.com/Kapioner/DScan1.git DScan && cd DScan && ./install.
 ```
 
 `install.sh` (Linux) pokazuje postęp każdego kroku: instaluje brakujące narzędzia (Git, kompilator C, nmap,
-Docker, Rust ≥ 1.85), kompiluje DScan, uruchamia PostgreSQL i serwer w tle, loguje administratora i ładuje
-dane demo. Na końcu wypisuje adres interfejsu WWW (domyślnie http://127.0.0.1:9080/), login i hasło.
+Docker, Rust ≥ 1.85), kompiluje DScan, uruchamia PostgreSQL, loguje administratora i ładuje dane demo.
+Na końcu wypisuje adres interfejsu WWW (domyślnie http://127.0.0.1:9080/), login i hasło, i uruchamia serwer
+w tym samym terminalu - zostaw go otwartego, `Ctrl+C` kończy.
 
 | Opcja | Działanie |
 |---|---|
@@ -52,7 +53,7 @@ dane demo. Na końcu wypisuje adres interfejsu WWW (domyślnie http://127.0.0.1:
 | `--dojo` | lokalny DefectDojo z integracją |
 | `--no-install` / `--no-demo` | bez instalacji pakietów / bez danych demo |
 | `--force-config` | zastępuje istniejący `dscan.toml` konfiguracją lokalną (kopia: `dscan.toml.bak`) |
-| `--stop` | zatrzymanie serwera i bazy |
+| `--background` | serwer w tle, skrypt się kończy (zatrzymanie: `--stop`) |
 
 Kolejne uruchomienia (wymaga Rust, Docker, nmap):
 
