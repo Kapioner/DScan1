@@ -1,364 +1,162 @@
-<p align="center">
-  <img src="img/logo.png" alt="DScan — Smart Scanning" width="220">
-</p>
+# DScan — instrukcja dla jury
 
-# DScan — uruchomienie od zera (instrukcja dla jury)
-
-Instrukcja prowadzi od czystego systemu do działającego skanera z danymi i przykładowymi skanami
-laboratorium organizatorów. Każdy blok poleceń można skopiować w całości.
-
-> **Szybka ścieżka:** kroki 2–6 (a z opcjami także 7a i 8) wykonuje automatycznie skrypt
-> [`install.sh`](../install.sh) z paskiem postępu: `git clone https://github.com/Kapioner/DScan1.git DScan && cd DScan && ./install.sh`
-> (opcje: `--lab ../lab.zip`, `--dojo`, `--stop`, `--help`). Poniżej te same kroki ręcznie.
-
-| Krok | Co robimy | Czas |
-|---|---|---|
-| [1](#1-wymagania) | Wymagania | — |
-| [2](#2-instalacja-narzędzi) | Instalacja: Git, kompilator C, nmap, Docker, Rust | 10–15 min |
-| [3](#3-pobranie-repozytorium) | Pobranie repozytorium | 1 min |
-| [4](#4-konfiguracja-i-pierwsze-uruchomienie) | Konfiguracja i pierwsze uruchomienie (`./run.sh`) | 5–10 min (pierwsza kompilacja) |
-| [5](#5-logowanie) | Logowanie (WWW i CLI) | 1 min |
-| [6](#6-załadowanie-danych) | Załadowanie danych: cele i zapasowe wyniki demo | 2 min |
-| [7](#7-przykładowe-skany-laboratorium-organizatorów) | Przykładowe skany laboratorium organizatorów | 10–20 min |
-| [8](#8-opcjonalnie-defectdojo) | Opcjonalnie: DefectDojo | 10 min |
-| [9](#9-zatrzymanie-i-sprzątanie) | Zatrzymanie i sprzątanie | 1 min |
-| [10](#10-rozwiązywanie-problemów) | Rozwiązywanie problemów | — |
-
----
+Od czystego systemu do działającego skanera z danymi demo i skanami laboratorium.
 
 ## 1. Wymagania
 
-| Element | Wersja | Do czego |
-|---|---|---|
-| System | Linux (Ubuntu 22.04+/Debian 12+), macOS 13+, Windows 10/11 z **WSL2** | — |
-| Git | dowolna | pobranie kodu |
-| Kompilator C (`build-essential` / Xcode CLT) | dowolna | kompilacja biblioteki kryptograficznej |
-| Rust + Cargo | **1.85 lub nowszy** (stable) | kompilacja DScan |
-| Docker + Docker Compose v2 | Docker 24+ | baza PostgreSQL, laboratorium, DefectDojo |
-| nmap | 7.80+ | skanowanie |
-| Wolne miejsce | ok. 6 GB (obrazy laboratorium i kompilacja) | — |
+| Element | Wersja |
+|---|---|
+| System | Ubuntu 22.04+ / Debian 12+, macOS 13+, Windows 10/11 z WSL2 |
+| Rust + Cargo | ≥ 1.85 |
+| Docker + Compose v2 | Docker 24+ |
+| nmap | 7.80+ |
+| Git, kompilator C | dowolne |
+| Wolne miejsce | ok. 6 GB |
 
-DScan nie wymaga OpenSSL ani lokalnie zainstalowanego PostgreSQL — bazę uruchamia w Dockerze.
+## 2. Instalacja automatyczna (zalecana)
 
-## 2. Instalacja narzędzi
+```bash
+git clone https://github.com/Kapioner/DScan1.git DScan && cd DScan && ./install.sh
+```
 
-### Ubuntu / Debian
+Skrypt instaluje brakujące narzędzia, kompiluje DScan, uruchamia bazę i serwer w tle, loguje
+administratora i ładuje dane demo. Na końcu wypisuje adres **http://127.0.0.1:9080/**, login i hasło.
+
+| Opcja | Działanie |
+|---|---|
+| `--lab ../lab.zip` | dodatkowo scenariusz laboratorium (krok 5a) |
+| `--dojo` | dodatkowo DefectDojo (krok 6) |
+| `--stop` | zatrzymanie serwera i bazy |
+
+Po `./install.sh` przejdź od razu do kroku 5.
+
+## 3. Instalacja ręczna
+
+Ubuntu / Debian:
 
 ```bash
 sudo apt-get update && sudo apt-get install -y git curl build-essential pkg-config nmap ca-certificates
 ```
 
-Docker (oficjalny skrypt instalacyjny Dockera; instaluje też wtyczkę Compose v2):
-
 ```bash
-curl -fsSL https://get.docker.com | sudo sh
+curl -fsSL https://get.docker.com | sudo sh && sudo usermod -aG docker "$USER"
 ```
 
-Uruchamianie Dockera bez `sudo` (po tym poleceniu **wyloguj się i zaloguj ponownie**):
+Wyloguj się i zaloguj ponownie (grupa `docker`), potem Rust:
 
 ```bash
-sudo usermod -aG docker "$USER"
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y && source "$HOME/.cargo/env"
 ```
 
-Rust (oficjalny instalator rustup, domyślne odpowiedzi):
+- **macOS:** `xcode-select --install`, `brew install git nmap`, Docker Desktop, Rust jak wyżej.
+- **Windows:** `wsl --install -d Ubuntu`, Docker Desktop z *WSL integration*, dalej jak Ubuntu (bez Dockera).
+
+## 4. Uruchomienie ręczne
 
 ```bash
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+git clone https://github.com/Kapioner/DScan1.git DScan && cd DScan && cp docs/jury/dscan.toml dscan.toml
 ```
-
-```bash
-source "$HOME/.cargo/env"
-```
-
-### macOS
-
-Narzędzia Xcode (kompilator C) i [Homebrew](https://brew.sh):
-
-```bash
-xcode-select --install
-```
-
-```bash
-brew install git nmap
-```
-
-Docker: zainstaluj i uruchom [Docker Desktop](https://www.docker.com/products/docker-desktop/).
-Rust: to samo polecenie `rustup` co dla Linuksa (powyżej).
-
-### Windows
-
-1. W PowerShell jako administrator: `wsl --install -d Ubuntu`, potem restart.
-2. Zainstaluj [Docker Desktop](https://www.docker.com/products/docker-desktop/) i włącz
-   *Settings → Resources → WSL integration → Ubuntu*.
-3. Dalsze kroki wykonuj w terminalu **Ubuntu (WSL)** według sekcji „Ubuntu / Debian” (bez instalacji Dockera).
-
-### Sprawdzenie
-
-```bash
-git --version && cargo --version && docker --version && docker compose version && nmap --version | head -1
-```
-
-Wszystkie polecenia powinny wypisać wersje (`cargo` ≥ 1.85, `docker compose` v2).
-
-## 3. Pobranie repozytorium
-
-```bash
-git clone https://github.com/Kapioner/DScan1.git DScan
-```
-
-```bash
-cd DScan
-```
-
-## 4. Konfiguracja i pierwsze uruchomienie
-
-Gotowa konfiguracja dla jury (zakres `127.0.0.1` i sieć danych demo, porty laboratorium, skanowanie
-przez całą dobę, serwer na porcie **9080**, bo 8080/8081 zajmuje laboratorium):
-
-```bash
-cp docs/jury/dscan.toml dscan.toml
-```
-
-Start jedną komendą:
 
 ```bash
 ./run.sh
 ```
 
-Skrypt przy pierwszym uruchomieniu:
+Pierwsza kompilacja trwa kilka minut. Gotowe przy komunikacie
+`DScan działa: http://127.0.0.1:9080/`. Terminal zostaw otwarty, dalej pracuj w drugim.
 
-1. tworzy `.env` z kluczem szyfrowania, hasłem bazy i kontem administratora (uprawnienia 600),
-2. uruchamia PostgreSQL w Dockerze (`127.0.0.1:5433`) i ustawia mu hasło z `.env`,
-3. kompiluje DScan w trybie release (**pierwsza kompilacja trwa kilka minut**, kolejne starty — sekundy),
-4. uruchamia serwer: migracje bazy, konto administratora, harmonogram.
-
-Gotowe, gdy w terminalu pojawi się:
-
-```text
-INFO DScan działa: http://127.0.0.1:9080/ (API: /api/v1, Ctrl+C kończy)
-```
-
-**Zostaw ten terminal otwarty** — kolejne kroki wykonuj w **drugim terminalu**, w katalogu `DScan`.
-
-## 5. Logowanie
-
-Login i hasło administratora (wygenerowane w kroku 4):
+Login i hasło administratora:
 
 ```bash
 grep -E '^DSCAN_ADMIN_(USERNAME|PASSWORD)=' .env
 ```
 
-**Przeglądarka:** <http://127.0.0.1:9080/> — zaloguj się tymi danymi.
-
-**Wiersz poleceń** (polecenia `scan`, `import`, `export`, `diff` działają przez API, z tokenem):
-
 ```bash
 ./run.sh login --user admin
 ```
 
-Wpisz hasło z `.env`. Token trafia do `~/.config/dscan/credentials.json` (uprawnienia 600).
-
-## 6. Załadowanie danych
-
-### 6a. Lista celów z pliku (CSV/JSON)
+Dane demo (dwa przebiegi ze zmianą: nowy SSH, inna wersja nginx, brak MySQL, nowa kamera):
 
 ```bash
-./run.sh import docs/examples/cele.csv --dry-run
+./run.sh import --kind results docs/demo/przebieg-1.xml && ./run.sh import --kind results docs/demo/przebieg-2.xml
 ```
-
-Tryb próbny pokazuje poprawne i odrzucone wiersze z powodem. Cele można też dodać ręcznie:
-
-```bash
-./run.sh targets add 127.0.0.1 --group laboratorium
-```
-
-### 6b. Zapasowe wyniki demo (bez sieci laboratorium)
-
-Dwa przebiegi z laboratorium ze zmianą między nimi (nowy port SSH, zmieniona wersja nginx,
-zniknięta baza MySQL, dodatkowa kamera):
-
-```bash
-./run.sh import --kind results docs/demo/przebieg-1.xml
-```
-
-```bash
-./run.sh import --kind results docs/demo/przebieg-2.xml
-```
-
-Drugi import wypisze zmiany względem pierwszego. Ocena trafności względem pliku referencyjnego:
 
 ```bash
 ./run.sh evaluate docs/demo/referencja.csv --details
 ```
 
-Cały scenariusz demo z pauzami między krokami: `scripts/demo.sh`.
+W przeglądarce: **Pulpit**, **Hosty**, **Porównanie**, **W czasie**.
 
-W przeglądarce zobacz teraz **Pulpit** (najciekawsze usługi z uzasadnieniem, zmiany, technologie),
-**Hosty** (szczegóły, edycja wyników, tagi), **Porównanie** (dwa przebiegi z kolorami) i **W czasie**.
-
-## 7. Przykładowe skany laboratorium organizatorów
-
-Rozpakuj `lab.zip` od organizatorów **obok** katalogu `DScan` i przejdź do niego w drugim terminalu:
+## 5. Laboratorium organizatorów
 
 ```bash
 unzip lab.zip -d ../lab && cd ../lab
 ```
 
-> Na hostach bez IPv6 (część maszyn wirtualnych i WSL) Nginx Proxy Manager i Adminer nie startują.
-> Naprawiają to nakładki z repozytorium: `../DScan/docs/analiza-lab/nakladki-compose/` (użyte niżej).
+### 5a. Znikająca usługa (quickstart)
 
-### 7a. Scenariusz organizatorów: znikająca i powracająca usługa
+| Polecenie | Oczekiwany wynik |
+|---|---|
+| `bash quickstart.sh up && ../DScan/run.sh scan 127.0.0.1` | porty 2223, 3001, 5673, 8787, 15673 |
+| `bash quickstart.sh change && ../DScan/run.sh scan 127.0.0.1 --quiet` | `- 127.0.0.1:8787/tcp zniknęła`, kod 2 |
+| `bash quickstart.sh up && ../DScan/run.sh scan 127.0.0.1 --quiet` | `+ 127.0.0.1:8787/tcp nowa`, kod 2 |
+| `../DScan/run.sh scan 127.0.0.1 --quiet` | `brak zmian`, kod 0 |
 
-```bash
-bash quickstart.sh up
-```
+Kody wyjścia: **0** brak zmian, **1** błąd, **2** zmiany. Skan hosta: ok. 1–2 min (sondy `nmap -sV`).
 
-Skan 1 — oczekiwane porty 2223, 3001, 5673, 8787, 15673 (Gitea, RabbitMQ, nginx):
+### 5b. Pozostałe stacki (po jednym, poprzedni zatrzymaj `down`)
 
-```bash
-../DScan/run.sh scan 127.0.0.1
-```
+Nakładki dla hostów bez IPv6: `N=../DScan/docs/analiza-lab/nakladki-compose`.
 
-Zatrzymanie usługi HTTP na 8787 i skan 2 — DScan wypisze `- 127.0.0.1:8787/tcp zniknęła`, kod wyjścia 2:
+| Stack | Uruchomienie |
+|---|---|
+| custom-network | `docker compose -f docker-compose-custom-network.yml up -d` |
+| modern | `docker compose -f docker-compose-modern.yml -f $N/docker-compose-modern.ipv4.yml up -d` |
+| vulnerable | `docker compose -f docker-compose-vulnerable.yml -f $N/docker-compose-vulnerable.ipv4.yml up -d` |
+| modern-proxy | `cp -n .env.example .env`, w `.env`: `ENABLE_LATENCY=true`, `LATENCY_MS=500`, potem `docker compose --env-file .env -f docker-compose-modern-proxy.yml up -d` |
 
-```bash
-bash quickstart.sh change && ../DScan/run.sh scan 127.0.0.1 --quiet; echo "kod wyjścia: $?"
-```
+Po starcie (ok. 60 s): `../DScan/run.sh scan 127.0.0.1`. Toxiproxy z Docker Hub zamiast ghcr.io:
+dodaj `-f $N/docker-compose-modern-proxy.dockerhub.yml`.
 
-Przywrócenie i skan 3 — `+ 127.0.0.1:8787/tcp nowa`:
+### 5c. Przydatne polecenia
 
-```bash
-bash quickstart.sh up && ../DScan/run.sh scan 127.0.0.1 --quiet; echo "kod wyjścia: $?"
-```
+| Polecenie | Wynik |
+|---|---|
+| `../DScan/run.sh scan 127.0.0.0/28 --dry-run` | plan skanu bez wysyłania pakietów |
+| `../DScan/run.sh export services --format csv --technology wordpress` | eksport usług |
+| `../DScan/run.sh diff 1 2` | porównanie przebiegów |
+| `../DScan/run.sh evaluate ../DScan/docs/analiza-lab/wzorce/vulnerable.csv --details` | trafność względem wzorca |
 
-Skan bez zmian — `brak zmian`, kod wyjścia 0:
-
-```bash
-../DScan/run.sh scan 127.0.0.1 --quiet; echo "kod wyjścia: $?"
-```
-
-Kody wyjścia (do skryptów i crona): **0** brak zmian, **1** błąd, **2** wykryto zmiany.
-Jeden skan hosta trwa ok. 1–2 minut (tyle zajmują sondy wersji `nmap -sV`).
-
-### 7b. Pozostałe stacki
-
-Uruchamiaj po jednym stacku (zatrzymaj poprzedni). Każdy skan pokazuje zmiany względem poprzedniego.
-
-Pełna sieć custom-network (dochodzą httpbin i PostgreSQL):
-
-```bash
-docker compose -f docker-compose-custom-network.yml up -d && sleep 30 && ../DScan/run.sh scan 127.0.0.1
-```
-
-Stack „modern” (WordPress, phpMyAdmin, Redis, Nginx Proxy Manager):
-
-```bash
-docker compose -f docker-compose-custom-network.yml down
-```
-
-```bash
-docker compose -f docker-compose-modern.yml -f ../DScan/docs/analiza-lab/nakladki-compose/docker-compose-modern.ipv4.yml up -d && sleep 60 && ../DScan/run.sh scan 127.0.0.1
-```
-
-Stack „vulnerable” (stary WordPress 4.7, Adminer, DVWA, FTP) — zobacz na Pulpicie ranking najciekawszych usług:
-
-```bash
-docker compose -f docker-compose-modern.yml down
-```
-
-```bash
-docker compose -f docker-compose-vulnerable.yml -f ../DScan/docs/analiza-lab/nakladki-compose/docker-compose-vulnerable.ipv4.yml up -d && sleep 60 && ../DScan/run.sh scan 127.0.0.1
-```
-
-Stack „modern-proxy” z opóźnieniem Toxiproxy (DScan pokazuje czas odpowiedzi usługi):
-
-```bash
-docker compose -f docker-compose-vulnerable.yml down && cp -n .env.example .env
-```
-
-```bash
-sed -i 's/^ENABLE_LATENCY=.*/ENABLE_LATENCY=true/; s/^LATENCY_MS=.*/LATENCY_MS=500/' .env
-```
-
-```bash
-docker compose --env-file .env -f docker-compose-modern-proxy.yml up -d && sleep 60 && ../DScan/run.sh scan 127.0.0.1
-```
-
-> Jeśli obraz `ghcr.io/shopify/toxiproxy` nie daje się pobrać, dodaj
-> `-f ../DScan/docs/analiza-lab/nakladki-compose/docker-compose-modern-proxy.dockerhub.yml`
-> (ten sam program z Docker Hub).
-
-### 7c. Inne przydatne polecenia
-
-Plan skanu bez wysyłania pakietów (adresy, podgrupy, szacowany czas):
-
-```bash
-../DScan/run.sh scan 127.0.0.0/28 --dry-run
-```
-
-Eksport usług z technologią do CSV:
-
-```bash
-../DScan/run.sh export services --format csv --technology wordpress
-```
-
-Porównanie dwóch dowolnych przebiegów (numery z Pulpitu albo z wyniku skanu):
-
-```bash
-../DScan/run.sh diff 1 2
-```
-
-Ocena trafności względem wzorców dla stacków laboratorium:
-
-```bash
-../DScan/run.sh evaluate ../DScan/docs/analiza-lab/wzorce/vulnerable.csv --details
-```
-
-Pełna lista poleceń: [`cli.md`](cli.md) albo `./run.sh --help`.
-
-## 8. Opcjonalnie: DefectDojo
-
-W katalogu `DScan` (pierwszy start pobiera obrazy i wykonuje migracje — kilka minut):
+## 6. DefectDojo (opcjonalnie)
 
 ```bash
 ./scripts/defectdojo-setup.sh
 ```
 
-Skrypt zapisuje token API w `.env` (`DSCAN_DEFECTDOJO_TOKEN`). Włącz integrację w `dscan.toml`
-(`[defectdojo] enabled = true`) i uruchom ponownie serwer (`Ctrl+C`, potem `./run.sh`).
-Następnie wyślij przebieg ze skanu stacka „vulnerable” — `N` to numer z wyniku skanu
-(„Przebieg #N”) albo z Pulpitu:
+Ustaw `[defectdojo] enabled = true` w `dscan.toml`, zrestartuj `./run.sh`. `N` = numer przebiegu:
 
 ```bash
-./run.sh dojo import N
+./run.sh dojo import N && ./run.sh dojo export N --item "127.0.0.1:8090/tcp=DVWA"
 ```
 
-```bash
-./run.sh dojo export N --item "127.0.0.1:8090/tcp=DVWA" --item "127.0.0.1:8089/tcp=Adminer"
-```
+Panel: http://127.0.0.1:8180/ (login `admin`, hasło `DEFECTDOJO_ADMIN_PASSWORD` w `.env`).
 
-DefectDojo: <http://127.0.0.1:8180/> (login `admin`, hasło `DEFECTDOJO_ADMIN_PASSWORD` w `.env`).
-Obserwacje można też zaznaczać w widoku hosta i wysyłać przyciskiem.
+## 7. Zatrzymanie
 
-## 9. Zatrzymanie i sprzątanie
+| Co | Polecenie |
+|---|---|
+| Serwer i baza (po `install.sh`) | `./install.sh --stop` |
+| Serwer (po `./run.sh`) | `Ctrl+C`, potem `docker compose stop` |
+| Laboratorium | `docker compose -f <stack>.yml down` |
+| DefectDojo | `./scripts/defectdojo-setup.sh stop` |
 
-- Serwer DScan: `Ctrl+C` w pierwszym terminalu.
-- Laboratorium (w katalogu `lab`): `docker compose -f <plik-stacka>.yml down`.
-- Baza DScan: `docker compose stop` w katalogu `DScan` (dane zostają w wolumenie).
-- DefectDojo: `./scripts/defectdojo-setup.sh stop`.
-
-## 10. Rozwiązywanie problemów
+## 8. Problemy
 
 | Objaw | Rozwiązanie |
 |---|---|
-| `permission denied` przy `docker` | Wyloguj się i zaloguj po `usermod -aG docker` (krok 2) albo użyj `sudo`. |
-| `password authentication failed for user "dscan"` | Uruchamiaj przez `./run.sh` — skrypt synchronizuje hasło bazy z `.env`. |
-| `brak ważnej sesji — zaloguj się` | `./run.sh login --user admin` (token wygasa po 12 h). |
-| `brak celów w dozwolonym zakresie [scope]` | Cel spoza `allowed_networks` w `dscan.toml` — to zabezpieczenie, nie błąd. |
-| `teraz jest poza oknem czasowym` | Używasz `dscan.example.toml` z oknem 22:00–06:00 — skopiuj `docs/jury/dscan.toml` (krok 4). |
-| `address already in use` przy starcie | Port 9080 zajęty — zmień `[server] listen` w `dscan.toml`. |
-| Port widoczny jako `tcpwrapped` | Kontener usługi nie wystartował (np. brak IPv6) — `docker compose logs`, nakładki z kroku 7. |
-| Brak programu nmap | `sudo apt-get install nmap` / `brew install nmap`. |
-
-Więcej: [`architektura.md`](architektura.md) (budowa i bezpieczeństwo),
-[`analiza-skutecznosci.md`](analiza-skutecznosci.md) (wyniki na laboratorium organizatorów).
+| `permission denied` przy `docker` | wyloguj się i zaloguj po `usermod -aG docker` |
+| `password authentication failed` | uruchamiaj przez `./run.sh` (synchronizuje hasło bazy) |
+| `brak ważnej sesji` | `./run.sh login --user admin` (token ważny 12 h) |
+| `brak celów w dozwolonym zakresie` | cel spoza `[scope] allowed_networks` — zabezpieczenie |
+| `poza oknem czasowym` | skopiuj `docs/jury/dscan.toml` (bez okien czasowych) |
+| `address already in use` | zmień `[server] listen` w `dscan.toml` |
+| port `tcpwrapped` | kontener nie wystartował — `docker compose logs`, nakładki z 5b |
