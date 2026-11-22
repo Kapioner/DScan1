@@ -1,0 +1,12 @@
+ip,hostname,port,protocol,state,service,product,version
+172.20.0.10,www.lab.local,22,tcp,open,ssh,OpenSSH,7.4
+172.20.0.10,www.lab.local,80,tcp,open,http,nginx,1.24.0
+172.20.0.11,jenkins.lab.local,22,tcp,open,ssh,OpenSSH,9.6
+172.20.0.11,jenkins.lab.local,8080,tcp,open,http,Jetty,
+172.20.0.11,jenkins.lab.local,2222,tcp,open,ssh,OpenSSH,
+172.20.0.20,staging.lab.local,80,tcp,open,http,Apache httpd,
+172.20.0.31,,80,tcp,open,http,,
+172.20.0.32,,80,tcp,open,http,,
+172.20.0.33,,80,tcp,open,http,,
+172.20.0.34,,80,tcp,open,http,,
+172.20.0.35,,80,tcp,open,http,,

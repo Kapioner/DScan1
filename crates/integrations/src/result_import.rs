@@ -213,4 +213,31 @@ mod tests {
         assert_eq!(parsed.hosts.len(), 1);
         assert_eq!(parsed.raw_xml.as_deref(), Some(xml));
     }
+
+    #[test]
+    fn demo_backup_data_parses() {
+        let first = parse_results(
+            include_str!("../../../docs/demo/przebieg-1.xml"),
+            ResultFormat::NmapXml,
+        )
+        .unwrap();
+        let second = parse_results(
+            include_str!("../../../docs/demo/przebieg-2.xml"),
+            ResultFormat::NmapXml,
+        )
+        .unwrap();
+        let reference = parse_results(
+            include_str!("../../../docs/demo/referencja.csv"),
+            ResultFormat::Csv,
+        )
+        .unwrap();
+        assert_eq!((first.hosts.len(), second.hosts.len()), (7, 7));
+        assert!(
+            second
+                .hosts
+                .iter()
+                .any(|h| h.services.iter().any(|s| s.port == 2222))
+        );
+        assert_eq!(reference.hosts.len(), 8);
+    }
 }
