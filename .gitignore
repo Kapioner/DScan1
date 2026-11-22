@@ -26,3 +26,6 @@ rustc-ice-*.txt
 # Lokalna konfiguracja i sekrety DScan
 /dscan.toml
 .env
+
+# Stan i logi skryptu install.sh
+/.dscan-install/

@@ -2,346 +2,393 @@
   <img src="docs/img/logo.png" alt="DScan — Smart Scanning" width="220">
 </p>
 
-# DScan
+<h1 align="center">DScan — Defect Scan</h1>
 
-> **Jury:** instrukcja uruchomienia od zera krok po kroku — [`docs/INSTRUKCJA-JURY.md`](docs/INSTRUKCJA-JURY.md).
+<p align="center">
+  Skanowanie i inwentaryzacja usług sieciowych z wykrywaniem zmian.<br>
+  Jedna binarka w Ruście (<code>dscan</code>): serwer WWW, REST API i CLI, dane w PostgreSQL.
+</p>
 
-**DScan (Defect Scan)**: narzędzie do skanowania i inwentaryzacji usług sieciowych,
-napisane w Rust i uruchamiane natywnie na hoście. Binarka: `dscan`.
+<p align="center">
+  <a href="#szybki-start">Szybki start</a> ·
+  <a href="#najważniejsze-funkcje">Funkcje</a> ·
+  <a href="#jak-to-działa">Architektura</a> ·
+  <a href="#polecenia-cli">CLI</a> ·
+  <a href="#api-i-role">API</a> ·
+  <a href="#bezpieczeństwo">Bezpieczeństwo</a> ·
+  <a href="#dokumentacja">Dokumentacja</a>
+</p>
 
-> Uwaga: crate o nazwie `dscan` istnieje już na crates.io, a na GitHubie są inne
-> projekty o tej nazwie. Nie przeszkadza to w budowaniu i używaniu narzędzia;
-> przy ewentualnej publikacji na crates.io trzeba by użyć innej nazwy pakietu.
+---
 
-## Uruchomienie (jedna komenda)
+## Najważniejsze funkcje
+
+| Obszar | Co daje DScan |
+|---|---|
+| **Wykrywanie** | nmap (`-sn`/`-sV`) w równoległych podgrupach CIDR, łączny limit tempa, postęp i prognoza czasu |
+| **Rozpoznawanie technologii** | HTTP/HTTPS, certyfikaty TLS, favicon (mmh3), ok. 50 sygnatur YAML z pewnością 0–100 i dowodami |
+| **Zmiany** | porównanie przebiegów: usługa **nowa / zniknęła / zmieniona**; kod wyjścia `2` = wykryto zmiany |
+| **Znaleziska** | ranking najciekawszych usług: panele admina, CI/CD, kamery IoT, środowiska testowe, stare wersje |
+| **Harmonogram** | profile skanów, okna czasowe, wstrzymanie i wznowienie od niedokończonych podgrup |
+| **Interfejs WWW** | pulpit, hosty, porównanie przebiegów, oś czasu, ręczna edycja wyników, grupy podobnych usług |
+| **Import / eksport** | cele z CSV/JSON, wyniki z nmap XML/JSON/CSV, eksport z filtrami, integracja z DefectDojo |
+| **Bezpieczeństwo** | tylko dozwolone sieci i porty, bez NSE i exploitów, AES-256-GCM dla danych poufnych, RBAC i audyt |
+
+Skuteczność na laboratorium organizatorów: **31/31 portów, 100% precyzji i czułości, 0 fałszywych zmian**
+([analiza](docs/analiza-skutecznosci.md)).
+
+## Szybki start
+
+### Automatycznie (zalecane)
+
+```bash
+git clone https://github.com/Kapioner/DScan1.git DScan && cd DScan
+```
+
+```bash
+./install.sh
+```
+
+Skrypt realizuje całą [instrukcję dla jury](docs/INSTRUKCJA-JURY.md) i pokazuje postęp każdego kroku:
+
+| Krok | Co robi |
+|---|---|
+| 1. System | wykrywa Linux / macOS / WSL2, sprawdza wolne miejsce (ok. 6 GB) |
+| 2. Narzędzia | doinstalowuje brakujące: Git, kompilator C, nmap, Docker + Compose v2, Rust ≥ 1.85 |
+| 3. Weryfikacja | wersje narzędzi, dostęp do Dockera (w razie potrzeby dodaje do grupy `docker`) |
+| 4. Konfiguracja | `docs/jury/dscan.toml` → `dscan.toml` (zakres `127.0.0.0/8`, port **9080**) |
+| 5. Kompilacja | `cargo build --release` z paskiem postępu; `.env` z kluczem szyfrowania i kontem admina |
+| 6. Serwer | PostgreSQL w Dockerze, `dscan serve` w tle, czeka na `/api/v1/health` |
+| 7. Logowanie | token CLI dla administratora (`~/.config/dscan/credentials.json`) |
+| 8. Dane | lista celów, dwa przebiegi demo ze zmianami, ocena trafności |
+
+Na końcu wypisuje adres <http://127.0.0.1:9080/>, login i hasło. Opcje:
+
+| Opcja | Działanie |
+|---|---|
+| `--lab lab.zip` | scenariusz laboratorium organizatorów: znikająca i powracająca usługa 8787 |
+| `--dojo` | lokalny DefectDojo (<http://127.0.0.1:8180/>) i włączenie integracji |
+| `--no-install` | tylko sprawdzenie narzędzi, bez instalacji pakietów |
+| `--no-demo` | bez danych demo |
+| `--force-config` | nadpisanie istniejącego `dscan.toml` konfiguracją dla jury |
+| `--stop` | zatrzymanie serwera i bazy |
+
+Skrypt jest idempotentny — ponowne uruchomienie pomija wykonane kroki. Log: `.dscan-install/install.log`.
+
+### Ręcznie
+
+Wymagania: Rust ≥ 1.85, kompilator C, Docker z Compose v2, nmap, `bash` (Linux, macOS, Windows przez WSL2).
+
+```bash
+cp docs/jury/dscan.toml dscan.toml
+```
 
 ```bash
 ./run.sh
 ```
 
-Po chwili interfejs WWW działa pod <http://127.0.0.1:8080/> (API: `/api/v1`). `Ctrl+C` zatrzymuje serwer.
-Login i hasło administratora są w pliku `.env` (`DSCAN_ADMIN_USERNAME`, `DSCAN_ADMIN_PASSWORD`) —
-konto zakłada `dscan serve` przy pierwszym starcie, gdy w bazie nie ma jeszcze użytkowników.
-
-Co robi skrypt:
-
-1. Przy pierwszym uruchomieniu tworzy `dscan.toml` (kopię `dscan.example.toml`) i `.env`
-   z wygenerowanym kluczem szyfrowania, hasłem i adresem bazy oraz kontem administratora (uprawnienia 600).
-   Brakujące wpisy dopisuje też do istniejącego `.env`.
-2. Uruchamia PostgreSQL w Dockerze (`docker compose up -d postgres`, port `127.0.0.1:5433`).
-3. Buduje wersję release (przyrostowo, więc kolejne starty są szybkie).
-4. Uruchamia natywną binarkę: domyślnie `dscan serve`, który sam wykonuje migracje bazy.
-
-Inne podkomendy przez ten sam skrypt: `./run.sh config show`, `./run.sh db status`, `./run.sh --help`.
-
-**Wymagania:** Rust (stable) z `cargo`, `bash` (Linux/macOS; na Windows przez WSL), Docker z Compose v2 i nmap (do skanów).
-Własna baza zamiast Dockera: w `.env` ustaw `USE_DOCKER_POSTGRES=0` i swój `DSCAN_DATABASE_URL`.
-
-> Plik `.env` zawiera jedyną kopię klucza szyfrowania. Bez niego nie odczytasz zaszyfrowanych
-> danych, więc zrób jego kopię zapasową. `dscan.toml` i `.env` są w `.gitignore`.
-
-### Wszystko w kontenerach (opcjonalnie)
+`run.sh` przy pierwszym starcie tworzy `.env` (klucz szyfrowania, hasło bazy, konto administratora;
+uprawnienia 600), uruchamia PostgreSQL w Dockerze (`127.0.0.1:5433`), buduje wersję release i startuje
+`dscan serve` (migracje, konto administratora, harmonogram). Login i hasło:
 
 ```bash
-./run.sh config validate
-```
-```bash
-docker compose up --build
+grep -E '^DSCAN_ADMIN_(USERNAME|PASSWORD)=' .env
 ```
 
-Pierwsza komenda przygotowuje `.env`, druga buduje obraz (`rust:slim` → `debian:trixie-slim`
-z nmap) i uruchamia DScan razem z PostgreSQL. Proces działa jako użytkownik bez roota;
-nmap ma CAP_NET_RAW do skanów SYN (`nmap --privileged -sS …`).
-
-## Polecenia (`dscan --help`)
-
-| Polecenie | Tryb | Opis |
-|---|---|---|
-| `serve` | lokalnie | Interfejs WWW, API i harmonogram skanów; migracje bazy, konto administratora przy pierwszym starcie |
-| `login --user NAZWA [--server URL]`, `logout` | API | Logowanie; token w `~/.config/dscan/credentials.json` (uprawnienia 600) |
-| `scan CEL… [--profile NAZWA] [--mode discovery\|services] [--quiet] [--local]` | API (`--local`: lokalnie) | Skan nmap celów z `[scope]` w podgrupach z fingerprintingiem HTTP; postęp, zmiany, obecność hostów |
-| `stop N`, `resume N` | API | Wstrzymanie trwającego skanu, wznowienie od niedokończonych podgrup |
-| `import PLIK [--kind targets\|results] [--format csv\|json\|nmap-xml] [--dry-run] [--local]` | API (`--local`: lokalnie) | Import celów albo wyników skanów (nmap XML, JSON, CSV) |
-| `export hosts\|services\|changes [--format json\|csv] [--run N] [--port P] [--state S] [--technology T] [--edited] [-o PLIK]` | API | Eksport z filtrami (uprawnienia według roli) |
-| `diff A B` | API | Porównanie dwóch przebiegów: usługi nowe, zniknięte, zmienione |
-| `sig list`, `sig test SYGNATURA --host URL` | API | Sygnatury serwera; test sygnatury na usłudze WWW z zakresu |
-| `targets add CEL… [--group G]`, `targets remove CEL…` | API | Dodawanie i usuwanie celów |
-| `targets check CEL…`, `targets list` | lokalnie | Sprawdzenie celów bez skanowania; cele zapisane w bazie |
-| `user create-admin LOGIN`, `user list` | lokalnie | Konto administratora (hasło argon2id), lista użytkowników |
-| `keys generate`, `keys rotate` | lokalnie | Nowy klucz; przeszyfrowanie wszystkich pól wrażliwych |
-| `config show`, `config validate` | lokalnie | Efektywna konfiguracja (sekrety ukryte), sprawdzenie i ostrzeżenia |
-| `db migrate`, `db status` | lokalnie | Migracje schematu bazy |
-
-**Tryb API (C5):** polecenia oznaczone „API” wysyłają żądania do serwera (`./run.sh` w drugim terminalu)
-z tokenem z `dscan login`, więc obowiązują je te same role co interfejs WWW. Ścieżkę pliku z tokenem
-zmienia zmienna `DSCAN_CREDENTIALS`. `--local` (skan, import) działa bez serwera, bezpośrednio na bazie.
-
-Flaga globalna `-c/--config PLIK` (lub zmienna `DSCAN_CONFIG`) wskazuje plik konfiguracji.
-Polecenia administracyjne działające bezpośrednio na bazie (`db migrate`, `user create-admin`,
-`keys rotate`, a także `import` i `targets list`) **wymagają klucza szyfrowania**.
-
-### Skanowanie
+W drugim terminalu:
 
 ```bash
-./run.sh targets check 10.10.0.0/24 app.lab.local
-```
-```bash
-./run.sh scan 10.10.0.0/22 --parallel 4
+./run.sh login --user admin
 ```
 
-- Skanowane są **wyłącznie** cele w `[scope] allowed_networks`; pozostałe są pomijane i wypisywane.
-  Sieć tylko częściowo dozwolona jest w całości pomijana.
-- Domeny są rozwiązywane systemowym DNS; nakładające się cele są scalane (`10.0.0.0/24` + `10.0.0.5` = jeden zakres),
-  a adresy są wyliczane strumieniowo, bez trzymania ich w pamięci.
-- **Podgrupy (S4):** cele są dzielone na sieci po `limits.subgroup_size` adresów (domyślnie 256 = /24).
-  Każda podgrupa to jeden proces nmap; naraz działa najwyżej `limits.max_parallel_nmap` procesów.
-  Wynik podgrupy trafia do bazy od razu po jej zakończeniu, a błąd jednej podgrupy nie przerywa reszty.
-- **Tempo (S7):** `limits.nmap_max_rate` to limit **łączny**, dzielony między równoległe procesy
-  (100 pakietów/s przy 4 procesach = 4 × 25). Dodatkowo nie przekracza przepustowości `scope.max_bandwidth_kbps`
-  (szacunek: 74 B na pakiet). Zapytania HTTP (od zadania H1) ogranicza `limits.http_requests_per_second`
-  i budżet `limits.http_requests_per_host` na host.
-- **Czas (S6):** w terminalu po każdej podgrupie widać postęp i prognozę czasu do końca; w bazie są czasy
-  całego przebiegu i każdej podgrupy. Ten sam postęp i prognozę zwraca API `GET /api/v1/scans`.
-- Bezpiecznik: skan większy niż `limits.max_addresses_per_scan` (domyślnie 1 048 576 adresów) jest odrzucany.
-- `--mode discovery` = `nmap -sn` (tylko aktywne hosty); `--mode services` (domyślnie) = `nmap -sV`
-  na portach z `[scope] allowed_ports`. Surowy XML każdej podgrupy jest zapisywany w bazie (zaszyfrowany).
-- **Fingerprinting HTTP (H1, H2):** po skanie usług każda usługa WWW (`http`, `http-proxy`, `ssl/http`…)
-  jest odpytywana: tytuł strony, kod odpowiedzi, nagłówki, ciasteczka z atrybutami, łańcuch przekierowań.
-  Tylko GET, bez wysyłania ciasteczek i haseł, bez systemowego proxy; przekierowania tylko w obrębie hosta.
-  Certyfikat HTTPS, który nie przechodzi weryfikacji (np. self-signed), nie blokuje odczytu — wynik jest
-  oznaczany „TLS niezweryfikowany”. Nagłówki i ciasteczka trafiają do bazy zaszyfrowane. Wyłączenie: `[http] enabled = false`.
-- **Sygnatury (H5):** technologie rozpoznawane są sygnaturami YAML ([`crates/fingerprint/signatures/default.yaml`](crates/fingerprint/signatures/default.yaml)):
-  matchery `header`, `cookie`, `body` (regex), `favicon` (hash), `path`; warunek `any`/`all`; wersja z regexu.
-  Pewność = suma wag pasujących matcherów (max 100), a każda detekcja ma listę dowodów.
-- **Startowa baza sygnatur (H7):** ok. 40 sygnatur — serwery WWW i aplikacyjne, frameworki, CMS-y, panele
-  administracyjne (phpMyAdmin, Grafana, Jenkins, Kibana…), IoT/kamery (Hikvision, Dahua, Axis), urządzenia sieciowe.
-  Własne sygnatury (np. przykłady od organizatora): plik YAML wskazany w `[http] signatures_file`.
-- **Pewność (H8):** każda detekcja ma pewność 0–100 (suma wag dowodów) i listę dowodów; detekcje poniżej
-  `[http] min_confidence` (domyślnie 30) są pomijane. Raport skanu i API pokazują dowody.
-- **Środowiska testowe i panele (M6):** heurystyki — nazwy hostów (dev/test/staging/uat…), nagłówki debugowania
-  (np. `X-Debug-Token`), domyślne strony serwerów, `robots.txt` (blokada całej witryny, ukryte ścieżki), tytuły paneli.
-- **Certyfikat TLS (H3):** CN/SAN, wystawca, ważność, algorytm podpisu, SHA-256; oznaczenie wygasłych,
-  wygasających w ciągu 30 dni i self-signed. Zapisywany w bazie zaszyfrowany; zmiana certyfikatu = zmiana usługi (M1).
-- **Nazwy z `/etc/hosts`:** gdy DNS nie zna domeny, DScan pyta resolver systemu (np. wpisy laboratorium w `/etc/hosts`).
-- **Sondowanie ścieżek (H6):** ścieżki z `[http] probe_paths` i z sygnatur (np. `/wp-login.php`) — wyłącznie GET,
-  bez formularzy i haseł, najwyżej `max_probes_per_service` na usługę i w budżecie `limits.http_requests_per_host`.
-- **Porównanie przebiegów (M1):** każda otwarta usługa ma odcisk (SHA-256 z produktu, wersji, nazwy, kodu i tytułu HTTP,
-  stabilnych nagłówków i stanu TLS). Po udanym skanie DScan porównuje go z poprzednim udanym przebiegiem tego samego
-  trybu po kluczu (IP, port, protokół): **nowa / zniknęła / zmieniona**. Zmiany są zapisywane w bazie i wypisywane;
-  dowolne dwa przebiegi porówna `./run.sh diff A B`.
-- **Profile (C4):** nazwane zestawy ustawień w `[profiles.NAZWA]` w `dscan.toml` (tryb, porty, tempo, równoległość,
-  rozmiar podgrup, `host_timeout_seconds`, `max_retries`, okna czasowe, ścieżki sond); wybór: `--profile NAZWA` albo lista w UI.
-- **Harmonogram (S8):** `dscan serve` co minutę sprawdza profile z bazy (`/api/v1/profiles`): w oknie czasowym
-  i po upływie `frequency_minutes` od ostatniego przebiegu startuje skan celów z grupy profilu.
-- **Okna i wznawianie (S9):** o końcu okna procesy nmap są zatrzymywane, niedokończone podgrupy wracają do kolejki,
-  a przebieg dostaje stan `paused`. Wznowienie: harmonogram w następnym oknie, `dscan resume N` albo przycisk „Wznów” w UI.
-  Przebiegi przerwane restartem serwera są przy starcie oznaczane jako wstrzymane.
-- **Obecność hostów (S11):** po każdym udanym przebiegu zapisywana jest odpowiedź każdego adresu z zakresu skanu;
-  host bez odpowiedzi w `[stability] inactive_after_missed_runs` (K) kolejnych przebiegach dostaje stan „nieaktywny”.
-- Wymaga zainstalowanego nmap (`sudo apt install nmap`).
+```bash
+./run.sh import --kind results docs/demo/przebieg-1.xml && ./run.sh import --kind results docs/demo/przebieg-2.xml
+```
 
-### Import i eksport
+> **Ważne:** `.env` zawiera jedyną kopię klucza szyfrowania — zrób kopię zapasową. `dscan.toml` i `.env` są w `.gitignore`.
+> Własna baza zamiast Dockera: `USE_DOCKER_POSTGRES=0` i własny `DSCAN_DATABASE_URL` w `.env`.
+
+Całość w kontenerach (opcjonalnie): `./run.sh config validate && docker compose up --build`
+(obraz `debian:trixie-slim` z nmap, proces bez roota, `CAP_NET_RAW` do skanów SYN).
+
+## Jak to działa
+
+```
+            przeglądarka (htmx)          dscan CLI (klient API, token)
+                    │                              │
+                    ▼                              ▼
+   ┌──────────────────────────── dscan serve ─────────────────────────────┐
+   │  dscan-web (askama)   dscan-api (axum, RBAC, OpenAPI, audyt)          │
+   │                 │              │                                      │
+   │                 ▼              ▼                                      │
+   │      dscan-engine: przebiegi, harmonogram, podgrupy, import,          │
+   │      porównania, obecność hostów, ocena znalezisk, klastry            │
+   │        │                │                     │                       │
+   │  dscan-scanner     dscan-fingerprint     dscan-integrations           │
+   │  (nmap, pula,      (HTTP, TLS, favicon,  (import/eksport, DefectDojo, │
+   │   zabezpieczenia)   sygnatury, SimHash)   ewaluacja)                  │
+   │        │                                                              │
+   │  dscan-db (sqlx, migracje, szyfrowanie pól) ── dscan-crypto (AES-GCM) │
+   └──────────────────────────────┬───────────────────────────────────────┘
+                                  ▼
+                              PostgreSQL
+```
+
+### Przebieg skanu
+
+1. **Cele** (IP, CIDR, domeny) → DNS (także `/etc/hosts`) → scalenie → odrzucenie wszystkiego spoza `[scope] allowed_networks`.
+2. **Podgrupy** CIDR (domyślnie /24); rozmiar dobierany z przepustowości i czasu pozostałego w oknie.
+3. **Pula procesów nmap** (`max_parallel_nmap`), łączny `--max-rate` dzielony między procesy i ograniczony `max_bandwidth_kbps`.
+4. **Fingerprinting usług WWW:** strona główna, nagłówki, ciasteczka, przekierowania, certyfikat, favicon,
+   bezpieczne sondy ścieżek (tylko GET), sygnatury, heurystyki (staging, debug, panele, niedokończona instalacja), czas odpowiedzi.
+5. **Zapis** każdej podgrupy od razu, wsadowo, w transakcji (10 000 hostów z 20 000 usług ≈ 0,6 s); surowy XML zaszyfrowany.
+6. **Koniec okna czasowego** → procesy zatrzymane, niedokończone podgrupy wracają do kolejki (stan `paused`).
+7. **Po przebiegu:** powtórne pomiary hostów bez odpowiedzi, obecność (host „nieaktywny” po K pominięciach),
+   porównanie z poprzednim przebiegiem profilu, opcjonalnie auto-import do DefectDojo.
+
+**Odcisk usługi** (SHA-256 z produktu, wersji, nazwy, kodu i tytułu HTTP, stabilnych nagłówków i stanu TLS)
+pozwala odróżnić usługę zmienioną od niezmienionej po kluczu (IP, port, protokół).
+
+### Workspace
+
+| Crate | Odpowiedzialność |
+|---|---|
+| `dscan-core` | modele domeny (Host, Service, Detection, Change…), porównanie przebiegów, obecność hostów |
+| `dscan-config` | konfiguracja TOML + `DSCAN_*` + flagi (figment), walidacja, profile, sekrety |
+| `dscan-crypto` | AES-256-GCM z identyfikatorem klucza, HMAC-SHA256 (ślepy indeks), tokeny sesji |
+| `dscan-db` | pula PostgreSQL (sqlx), migracje `0001`–`0009`, zapis wsadowy, rotacja kluczy |
+| `dscan-scanner` | cele i zakres, podgrupy CIDR, pula nmap z limitem tempa, parser XML, zabezpieczenia |
+| `dscan-fingerprint` | klient HTTP(S) (reqwest + rustls), TLS, favicon, silnik sygnatur YAML, SimHash |
+| `dscan-engine` | przebiegi, harmonogram, import wyników, dashboard, ocena znalezisk, klastry |
+| `dscan-integrations` | import/eksport JSON/CSV, DefectDojo, ewaluacja trafności |
+| `dscan-auth` | hasła argon2id, walidacja loginów |
+| `dscan-api` | REST API `/api/v1` (axum, utoipa), middleware RBAC, dziennik audytu |
+| `dscan-web` | interfejs WWW (askama + htmx wkompilowany w binarkę — działa offline) |
+| `dscan` | binarka i podkomendy CLI (clap); większość działa jako klient API |
+
+Wzorce projektowe: Builder (`ConfigLoader`), Command (podkomendy), Strategy (heurystyki, matchery),
+Adapter (resolver DNS), Decorator (fingerprinting nad nmap), Observer (postęp skanu, auto-import), Iterator (adresy CIDR).
+
+## Interfejs WWW
+
+| Widok | Zawartość |
+|---|---|
+| **Pulpit** | karty (hosty, usługi, ważne znaleziska, hosty aktywne/nieaktywne), trwające skany z postępem i prognozą, najciekawsze usługi z uzasadnieniem, zmiany od poprzedniego skanu, statystyki technologii |
+| **Hosty** | usługi, HTTP, certyfikat, technologie z dowodami, mapa dostępności w godzinach, tagi, ręczna edycja |
+| **Porównanie** | dwa dowolne przebiegi z kolorami: nowe / zniknięte / zmienione |
+| **W czasie** | historia usług i hostów między przebiegami |
+| **Cele i profile** | wpis ręczny, import CSV/JSON z raportem odrzuconych wierszy, profile i okna czasowe |
+| **Sygnatury** | lista, edytor i test sygnatury na usłudze przed zapisem |
+| **Użytkownicy, Audyt** | konta, własne role, dziennik zmian (tylko administracja) |
+
+Ręczne poprawki wyników są przechowywane osobno od obserwacji, przypięte do adresu (nie do przebiegu)
+i nakładane przy odczycie — przetrwają kolejne skany, a porównanie widzi tylko to, co zaobserwował skaner.
+Grupy podobnych usług (SimHash) pozwalają oznaczyć np. „te same 4 kamery” jednym tagiem.
+
+## Polecenia CLI
+
+| Polecenie | Opis |
+|---|---|
+| `serve` | serwer WWW, API i harmonogram; migracje bazy, konto administratora przy pierwszym starcie |
+| `login --user NAZWA [--password-stdin]`, `logout` | logowanie do API; token w pliku z uprawnieniami 600 |
+| `scan CEL… [--profile P] [--mode discovery\|services] [--dry-run] [--quiet]` | skan celów z `[scope]`; `--dry-run` pokazuje plan bez wysyłania pakietów |
+| `stop N`, `resume N` | wstrzymanie i wznowienie przebiegu |
+| `import PLIK [--kind targets\|results] [--dry-run]` | import celów (CSV/JSON) albo wyników (nmap XML, JSON, CSV) |
+| `export hosts\|services\|changes [--format json\|csv] [--run N] [--port P] [--technology T]` | eksport z filtrami (uprawnienia według roli) |
+| `diff A B` | porównanie dwóch przebiegów |
+| `evaluate PLIK [--details]` | trafność względem wyników referencyjnych: precyzja, czułość, F1 |
+| `targets add\|remove\|check\|list` | zarządzanie celami, sprawdzenie bez skanowania |
+| `sig list`, `sig test SYGNATURA --host URL` | sygnatury i ich test na usłudze z zakresu |
+| `dojo import N`, `dojo export N --item IP:PORT/PROTO=Technologia` | wysyłka do DefectDojo |
+| `user create-admin`, `user list` | konta (bezpośrednio na bazie) |
+| `keys generate\|rotate\|reencrypt\|status` | klucze szyfrowania, rotacja jednorazowa lub stopniowa |
+| `config show\|validate\|init`, `db migrate\|status` | konfiguracja i migracje |
+| `docs`, `completions SHELL` | dokumentacja CLI (markdown/man) i autouzupełnianie |
+
+Kody wyjścia `scan` i `diff`: **0** brak zmian, **1** błąd, **2** wykryto zmiany (do skryptów i crona).
+Polecenia `scan`, `import`, `export`, `diff`, `sig`, `targets add/remove`, `stop`, `resume` działają przez API
+z tokenem z `dscan login`, więc obowiązują je te same role co w WWW; `--local` (skan, import) działa bez serwera.
+Pełna lista argumentów: [`docs/cli.md`](docs/cli.md) albo `./run.sh --help`.
 
 ```bash
-./run.sh import docs/examples/cele.csv --dry-run
+./run.sh scan 127.0.0.0/28 --dry-run
 ```
-```bash
-./run.sh import --kind results wynik-nmap.xml
-```
+
 ```bash
 ./run.sh export services --format csv --technology wordpress -o uslugi.csv
 ```
 
-**Wyniki (I2):** nmap XML (`-oX`), JSON (format `dscan export hosts`) i CSV (format `dscan export services`)
-przechodzą to samo przetwarzanie co skan: przebieg w bazie, obecność hostów i porównanie z poprzednim przebiegiem
-tego samego profilu (domyślnie `import`). Hosty spoza `[scope]` są pomijane. **Eksport (I3):** hosty (JSON), usługi
-i zmiany (JSON/CSV); filtry `--run`, `--port`, `--state`, `--technology`, `--edited`. Rola tylko do odczytu dostaje
-eksport bez notatek operatorów i nie może filtrować po ręcznych poprawkach.
+## API i role
 
-**Cele (I1):**
-
-CSV z nagłówkiem `target` (opcjonalnie `group`, `note`; dopuszczalne `cel`, `grupa`, `notatka`) albo tablica JSON
-napisów lub obiektów — przykłady w [`docs/examples/`](docs/examples/). Błędne i powtórzone wiersze trafiają do raportu
-z numerem wiersza i powodem; poprawne są zapisywane w bazie (istniejące są pomijane). `--dry-run` niczego nie zapisuje.
-
-### Szyfrowanie i rotacja klucza
-
-Które dane są szyfrowane, a które jawne i dlaczego: [`docs/klasyfikacja-danych.md`](docs/klasyfikacja-danych.md).
-Pola wrażliwe (notatki, banery, nagłówki, ciasteczka, certyfikaty, surowy XML, nadpisania) są szyfrowane
-AES-256-GCM po stronie aplikacji: losowy nonce dla każdej wartości, nazwa kolumny jako dane uwierzytelniane (AAD),
-bajt wersji formatu. Baza widzi tylko szyfrogram.
-
-```bash
-NOWY_KLUCZ=$(./run.sh keys generate) && echo "$NOWY_KLUCZ"
-```
-```bash
-DSCAN_NEW_ENCRYPTION_KEY=$NOWY_KLUCZ ./run.sh keys rotate
-```
-
-Rotacja działa w jednej transakcji (błąd = brak zmian). Po niej wpisz wypisany nowy klucz
-jako `DSCAN_ENCRYPTION_KEY` w `.env` (zachowaj kopię zapasową).
-Zmienne podane w linii poleceń mają pierwszeństwo przed wartościami z `.env`.
-
-> Nie usuwaj `.env`: oprócz klucza zawiera hasło bazy w wolumenie Dockera. Nowo wygenerowane hasło
-> nie pasowałoby do istniejącej bazy.
-
-## Interfejs WWW
-
-Strony renderowane w Ruście (askama), interakcje przez htmx (wkompilowany w binarkę — działa bez internetu).
-Logowanie formularzem, menu zależne od roli (np. „Użytkownicy” tylko dla administracji), pulpit z listą
-przebiegów odświeżaną co 5 s (postęp, czas, prognoza), cele i profile skanów.
-**Pulpit (F2):** karty (hosty, otwarte usługi, ważne znaleziska, hosty aktywne/nieaktywne), trwające skany z paskiem
-postępu, czasem i prognozą, najważniejsze znaleziska (panele administracyjne, CI/CD, kamery, środowiska testowe,
-TLS niezweryfikowany), usługi nowe/zniknięte/zmienione od poprzedniego skanu i statystyki technologii — odświeżane co 10 s.
-Formularz „Uruchom skan” z wyborem profilu z `[profiles]` oraz przyciski „Wstrzymaj”/„Wznów” (tylko role z `targets:write`).
-**Formularz celów (F3):** wpis ręczny, wgranie pliku CSV/JSON z tabelą odrzuconych wierszy (opcja „tylko sprawdź”)
-i usuwanie — dostępne dla ról z prawem zapisu; pozostali widzą tylko listę.
-Nagłówki bezpieczeństwa: `Content-Security-Policy` (tylko zasoby z własnego serwera), `X-Frame-Options: DENY`.
-
-## API
-
-Wszystko poza `health`, `auth/login` i `openapi.json` wymaga sesji: ciasteczka `dscan_session`
-(przeglądarka) albo nagłówka `Authorization: Bearer <token>` (token zwraca logowanie).
-
-**RBAC (A3):** middleware sprawdza uprawnienia **każdego** żądania według jednej tabeli
-([`crates/api/src/auth/rbac.rs`](crates/api/src/auth/rbac.rs)); trasa spoza tabeli wymaga roli administratora.
-
-| Rola | Uprawnienia | Co może |
-|---|---|---|
-| `administracja` | wszystko | także konta użytkowników |
-| `dodawanie_usuwanie_modyfikacja` | `targets:write`, `results:write`, `read` | cele, profile, skany, import, sygnatury, poprawki |
-| `modyfikacja_odczyt` | `results:write`, `read` | ręczne poprawki wyników, odczyt i eksport |
-| `odczyt` | `read` | odczyt, dashboard, eksport bez notatek |
+Wszystko poza `health`, `auth/login` i `openapi.json` wymaga sesji: ciasteczka `dscan_session` (przeglądarka)
+albo nagłówka `Authorization: Bearer <token>`. Opis OpenAPI 3.1: `GET /api/openapi.json`.
 
 | Endpoint | Opis |
 |---|---|
-| `GET /api/v1/health` | Stan usługi i połączenia z bazą |
-| `POST /api/v1/auth/login`, `POST /api/v1/auth/logout`, `GET /api/v1/auth/me` | Logowanie (`{"username","password"}`), wylogowanie, bieżący użytkownik |
-| `GET/POST /api/v1/targets`, `GET/PUT/DELETE /api/v1/targets/{id}` | Cele (filtr `?group=`); PUT zmienia grupę i notatkę |
-| `GET /api/v1/groups` | Grupy celów z liczbą celów |
-| `GET/POST /api/v1/profiles`, `GET/PUT/DELETE /api/v1/profiles/{id}` | Profile skanów: tryb, grupa celów, porty, okna czasowe, częstotliwość |
-| `GET /api/v1/scans?limit=N`, `GET /api/v1/scans/{id}` | Przebiegi: stan, postęp, czas trwania, prognoza do końca |
-| `GET /api/v1/scans/{id}/hosts` | Hosty przebiegu z usługami, HTTP i detekcjami (z dowodami), z nałożonymi poprawkami |
-| `GET/PUT/DELETE /api/v1/overrides` | Ręczne poprawki wyników (A6): `hostname`, `host_note`, `product`, `version`, `service_name`, `service_note` |
-| `POST /api/v1/scans` | Zlecenie skanu `{"targets":[…],"profile":"…","mode":"…"}` → 202 z numerem przebiegu |
-| `POST /api/v1/scans/{id}/stop`, `POST /api/v1/scans/{id}/resume` | Wstrzymanie i wznowienie (S9) |
-| `GET /api/v1/scans/{id}/changes`, `GET /api/v1/diff?from=A&to=B` | Zmiany przebiegu; porównanie dowolnych dwóch |
-| `GET /api/v1/scan-profiles` | Nazwy profili z `[profiles]` (C4) |
-| `POST /api/v1/imports/targets`, `POST /api/v1/imports/results` | Import `{"format","content","dry_run"}` (I1, I2) |
-| `GET /api/v1/exports/{hosts\|services\|changes}` | Eksport z filtrami `format, run, port, state, technology, edited` (I3) |
-| `GET /api/v1/signatures`, `POST /api/v1/signatures/test` | Sygnatury i ich test na usłudze |
-| `GET /api/v1/dashboard` | Znaleziska, zmiany, technologie, trwające skany, obecność hostów (A8) |
-| `GET /api/v1/users` | Konta (tylko administracja) |
-| `GET /api/openapi.json` | Opis API (OpenAPI 3.1), np. do Swagger Editor lub Postmana |
+| `GET /api/v1/health` | stan usługi i połączenia z bazą |
+| `POST /api/v1/auth/login`, `POST /api/v1/auth/logout`, `GET /api/v1/auth/me` | sesja |
+| `GET/POST /api/v1/targets`, `GET/PUT/DELETE /api/v1/targets/{id}`, `GET /api/v1/groups` | cele i grupy |
+| `GET/POST /api/v1/profiles`, `GET/PUT/DELETE /api/v1/profiles/{id}` | profile skanów, okna, częstotliwość |
+| `GET/POST /api/v1/scans`, `GET /api/v1/scans/{id}`, `POST …/stop`, `POST …/resume` | przebiegi: postęp, prognoza, sterowanie |
+| `GET /api/v1/scans/{id}/hosts`, `GET /api/v1/scans/{id}/changes`, `GET /api/v1/diff?from=A&to=B` | wyniki i zmiany |
+| `GET/PUT/DELETE /api/v1/overrides` | ręczne poprawki wyników |
+| `POST /api/v1/imports/{targets\|results}`, `GET /api/v1/exports/{hosts\|services\|changes}` | import i eksport |
+| `GET /api/v1/signatures`, `POST /api/v1/signatures/test` | sygnatury |
+| `GET /api/v1/dashboard`, `GET /api/v1/users` | pulpit; konta (administracja) |
 
-Błędy zwracane są jako JSON `{"error": "..."}` (400, 401, 403, 404, 409, 413).
+Błędy: JSON `{"error": "..."}` (400, 401, 403, 404, 409, 413).
 
-### Bezpieczeństwo logowania
+| Rola | Uprawnienia | Zakres |
+|---|---|---|
+| `administracja` | `admin`, `targets:write`, `results:write`, `read` | wszystko, konta, role, dziennik audytu |
+| `dodawanie_usuwanie_modyfikacja` | `targets:write`, `results:write`, `read` | cele, profile, skany, importy, sygnatury, poprawki |
+| `modyfikacja_odczyt` | `results:write`, `read` | poprawki wyników, tagi, DefectDojo, odczyt |
+| `odczyt` | `read` | odczyt, pulpit, eksport bez notatek |
 
-- Hasła: argon2id. Przy nieznanym loginie też liczony jest skrót, żeby czas odpowiedzi nie zdradzał, które loginy istnieją.
-- Sesje w PostgreSQL (przetrwają restart, można je unieważnić); w bazie tylko skrót SHA-256 tokenu.
-- Ciasteczko `HttpOnly; SameSite=Strict` (ochrona przed CSRF), `Secure` po ustawieniu `server.secure_cookies = true`.
-- Zablokowane konto traci dostęp natychmiast; wygasłe sesje są usuwane przy starcie serwera.
+Middleware RBAC sprawdza **każde** żądanie według jednej tabeli ([`crates/api/src/auth/rbac.rs`](crates/api/src/auth/rbac.rs));
+trasa spoza tabeli wymaga roli administratora. Administrator może tworzyć własne role z tych uprawnień.
+Każda zmiana trafia do dziennika audytu (kto, co, kiedy — bez wartości pól poufnych).
 
-### Ręczne poprawki wyników (A6)
+## Bezpieczeństwo
 
-Poprawki są przechowywane osobno od obserwacji, przypięte do adresu (IP, opcjonalnie port i protokół),
-a nie do przebiegu, i nakładane przy odczycie. Działają więc także w trakcie skanu i przetrwają kolejne
-przebiegi, a porównanie przebiegów (M1) widzi tylko to, co faktycznie zaobserwował skaner.
-Poprawione pola są wymienione w `edited_fields`. Zapis wymaga uprawnienia `results:write`
-(role: administracja, dodawanie/usuwanie/modyfikacja, modyfikacja i odczyt); wartości są szyfrowane.
+### Skaner wykrywa, nie atakuje
+
+Zasady są wymuszone w kodzie ([szczegóły](docs/bezpieczenstwo-skanera.md)):
+
+- nmap tylko `-sn` albo `-sV` — żadnych skryptów NSE (`--script`, `-sC`, `-A`), exploitów, brute force ani prób logowania;
+- brak fałszowania źródła i omijania zapór (`-S`, `-D`, `--spoof-mac`, `-f`), zawsze limit `--max-rate`;
+- skanowane wyłącznie sieci z `[scope] allowed_networks` i porty z `allowed_ports` (także w profilach);
+- HTTP tylko GET, bez haseł, ciasteczek i formularzy, przekierowania w obrębie hosta, limity zapytań na host;
+- zależności sprawdzane `cargo audit` w CI.
+
+### Dane
+
+| Poziom | Gdzie | Ochrona |
+|---|---|---|
+| **Sekret** | tylko `.env` (uprawnienia 600) | klucz szyfrowania, hasła bazy i admina, token DefectDojo — nigdy w bazie ani w logach |
+| **Poufne** | kolumny `BYTEA` | AES-256-GCM po stronie aplikacji: notatki, banery, nagłówki, ciasteczka, certyfikaty, surowy XML, poprawki |
+| **Wewnętrzne** | kolumny jawne | IP, porty, produkty, tytuły — potrzebne do indeksów, porównań i filtrów; dostęp przez RBAC |
+
+- Losowy nonce dla każdej wartości, nazwa kolumny jako AAD, identyfikator klucza w rekordzie.
+- Wyszukiwanie po polach szyfrowanych: ślepy indeks HMAC-SHA256.
+- Rotacja klucza w jednej transakcji (`keys rotate`) albo stopniowo, partiami (`keys reencrypt`).
+- Hasła argon2id (stały czas także dla nieznanych loginów); w bazie tylko SHA-256 tokenu sesji;
+  ciasteczko `HttpOnly; SameSite=Strict`; nagłówki `Content-Security-Policy` i `X-Frame-Options: DENY`.
+
+Uzasadnienie dla każdej kolumny: [`docs/klasyfikacja-danych.md`](docs/klasyfikacja-danych.md).
 
 ```bash
-curl -X PUT -H "Authorization: Bearer $TOKEN" -H 'content-type: application/json' \
-  -d '{"ip":"10.10.0.5","port":80,"protocol":"tcp","field":"product","value":"Kamera Hikvision"}' \
-  http://127.0.0.1:8080/api/v1/overrides
+NOWY_KLUCZ=$(./run.sh keys generate) && DSCAN_NEW_ENCRYPTION_KEY=$NOWY_KLUCZ ./run.sh keys rotate
 ```
 
-## DefectDojo do testów integracji (D4)
+Po rotacji wpisz nowy klucz jako `DSCAN_ENCRYPTION_KEY` w `.env`.
+
+## Sygnatury technologii
+
+Startowa baza ([`crates/fingerprint/signatures/default.yaml`](crates/fingerprint/signatures/default.yaml)): serwery WWW
+i aplikacyjne, frameworki, CMS-y, panele (phpMyAdmin, Grafana, Jenkins, Portainer, Adminer…), CI/CD, IoT i kamery
+(Hikvision, Dahua, Axis), urządzenia sieciowe, bazy i brokery. Własne sygnatury: plik w `[http] signatures_file` albo edytor w UI.
+
+```yaml
+- name: Jenkins
+  category: ci-cd            # wrażliwe: panel-admina, iot-kamera, iot-drukarka, ci-cd, baza-danych
+  condition: any             # any — wystarczy jeden matcher; all — wszystkie
+  matchers:
+    - { type: header, name: X-Jenkins, weight: 60 }
+    - { type: cookie, name: JSESSIONID, weight: 10 }
+    - { type: body, pattern: 'Dashboard \[Jenkins\]', weight: 40 }
+    - { type: favicon, hash: 81586312, weight: 50 }                     # mmh3, jak w Shodanie
+    - { type: path, path: /login, status: 200, pattern: 'Jenkins', weight: 30 }
+  version: { source: header, name: X-Jenkins, pattern: '([\d.]+)' }
+```
+
+Pewność = suma wag pasujących matcherów (max 100); detekcje poniżej `[http] min_confidence` (domyślnie 30) są pomijane.
+
+## Konfiguracja
+
+Kolejność ważności: **wartości domyślne < `dscan.toml` < zmienne `DSCAN_<SEKCJA>__<POLE>` < flagi CLI**.
+Wszystkie pola: [`dscan.example.toml`](dscan.example.toml) albo `./run.sh config init`. Nieznane pola kończą się błędem.
+
+| Sekcja | Zawartość |
+|---|---|
+| `[scope]` | dozwolone sieci i porty, limit przepustowości |
+| `[limits]` | tempo nmap, równoległe procesy, rozmiar podgrupy, limit adresów, limity zapytań HTTP |
+| `[[schedule.windows]]` | okna czasowe skanowania (`HH:MM`, także przez północ) |
+| `[stability]` | K przebiegów do stanu „nieaktywny”, ponowienia |
+| `[server]`, `[database]` | adres nasłuchiwania, sesje, flaga `Secure`; pula połączeń |
+| `[http]` | fingerprinting: limity czasu, przekierowania, sondy ścieżek, `min_confidence`, własne sygnatury |
+| `[defectdojo]`, `[scoring]` | integracja z DefectDojo; wagi rankingu znalezisk |
+| `[profiles.NAZWA]` | nazwane zestawy ustawień skanu (`--profile NAZWA` albo lista w UI) |
+
+Przykład: `DSCAN_LIMITS__NMAP_MAX_RATE=50 ./run.sh scan 10.0.0.0/24 --parallel 4`.
+Sekrety (`DSCAN_ENCRYPTION_KEY`, `DSCAN_DATABASE_URL`, `DSCAN_ADMIN_*`, `DSCAN_DEFECTDOJO_TOKEN`) tylko ze zmiennych
+środowiskowych — wpis w TOML jest odrzucany, a `config show` i logi pokazują je zamaskowane.
+
+## Skuteczność na laboratorium
+
+Laboratorium organizatorów (4 stacki Docker + scenariusz quickstart), szczegóły i odtworzenie: [`docs/analiza-skutecznosci.md`](docs/analiza-skutecznosci.md).
+
+| Miara | Wynik |
+|---|---|
+| Wykryte otwarte porty (4 stacki) | 31/31 — precyzja i czułość 100% |
+| Fałszywe zmiany przy skanie bez zmian | 0 |
+| Poprawna nazwa usługi / rozpoznana aplikacja | 20/20 / 20/20 |
+| Scenariusz quickstart (zniknięcie i powrót 8787) | zaliczony |
+| Czas odpowiedzi przez Toxiproxy (opóźnienie 500 ms) | 71 ms → 1057 ms |
+| Test uogólnienia (Grafana, Jenkins, Portainer, MongoDB) | 4/4 rozpoznane |
+
+Przykładowy ranking (stack „vulnerable”): WordPress 4.7 — 135 pkt (niedokończona instalacja, przestarzałe Apache i PHP,
+panel logowania), DVWA — 130 pkt, Adminer — 85 pkt, FTP — 30 pkt.
+
+## DefectDojo
 
 ```bash
 ./scripts/defectdojo-setup.sh
 ```
 
-Uruchamia lokalny DefectDojo 3.5.202 (`compose.defectdojo.yaml`, osobny projekt, http://127.0.0.1:8180),
-generuje jego sekrety w `.env`, pobiera token API i tworzy testowy produkt „DScan lab” oraz engagement
-„DScan — testy”. Wynik trafia do `.env`: `DSCAN_DEFECTDOJO_URL`, `DSCAN_DEFECTDOJO_TOKEN`,
-`DSCAN_DEFECTDOJO_PRODUCT_ID`, `DSCAN_DEFECTDOJO_ENGAGEMENT_ID` (użyje ich eksport w zadaniach I4/I5).
-Login do DefectDojo: `admin`, hasło `DEFECTDOJO_ADMIN_PASSWORD` z `.env`. Zatrzymanie: `./scripts/defectdojo-setup.sh stop`.
-Przy limicie pobrań Docker Hub: `DEFECTDOJO_REGISTRY=registry.defectdojo.com` w `.env`.
+Uruchamia lokalny DefectDojo (<http://127.0.0.1:8180/>), zapisuje token i identyfikatory w `.env`.
+Po włączeniu `[defectdojo] enabled = true`:
 
-## Konfiguracja
+```bash
+./run.sh dojo import N
+```
 
-Kolejność ważności: **wartości domyślne < plik TOML < zmienne `DSCAN_*` < flagi CLI**.
+```bash
+./run.sh dojo export N --item "127.0.0.1:8090/tcp=DVWA"
+```
 
-- Plik: `dscan.toml` w bieżącym katalogu albo `--config PLIK`. Wszystkie pola opisuje [`dscan.example.toml`](dscan.example.toml).
-- Zmienne: `DSCAN_<SEKCJA>__<POLE>`, np. `DSCAN_LIMITS__NMAP_MAX_RATE=50`, `DSCAN_SCOPE__ALLOWED_PORTS='["22","80"]'`.
-- Flagi: `--listen ADRES:PORT`, `--max-rate N`, `--parallel N` (w `serve`, `scan`, `config show/validate`).
-- **Sekrety tylko ze zmiennych środowiskowych:** `DSCAN_ENCRYPTION_KEY` (64 znaki hex),
-  `DSCAN_DATABASE_URL` oraz `DSCAN_ADMIN_USERNAME` / `DSCAN_ADMIN_PASSWORD` (pierwszy administrator). Wpis w TOML jest odrzucany, a `config show` i logi pokazują je zamaskowane.
-- Nieznane pola (literówki) kończą się błędem, także w zmiennych `DSCAN_<SEKCJA>__…`.
+`dojo import` wysyła surowy XML nmap (parser „Nmap Scan”), `dojo export` — wybrane obserwacje jako findingi
+z dowodami (wartości ciasteczek i tokenów ukryte). Obserwacje można też zaznaczać w widoku hosta.
 
-| Sekcja | Zawartość |
-|---|---|
-| `[scope]` | dozwolone sieci i porty, limit ruchu (dane od organizatora laboratorium) |
-| `[limits]` | łączne tempo nmap, równoległe procesy, rozmiar podgrupy, limit adresów, limity zapytań HTTP |
-| `[[schedule.windows]]` | okna czasowe skanowania (`HH:MM`, mogą przechodzić przez północ) |
-| `[stability]` | K przebiegów do statusu „nieaktywny”, N ponowień, odstęp ponowień |
-| `[server]` | adres nasłuchiwania, limit rozmiaru żądania, ważność sesji, flaga `Secure` ciasteczka |
-| `[database]` | rozmiar puli połączeń, timeout połączenia |
-| `[http]` | fingerprinting HTTP: włączony, limit czasu, przekierowania, limit treści, User-Agent, sondowane ścieżki |
+## Rozwój i testy
 
-### Środowisko testowe (D3)
+```bash
+cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace
+```
 
-Wartości w sekcji `[scope]` pliku przykładowego są **zastępcze**. Przed pierwszym
-skanem wpisz do `dscan.toml` adresację kontenerów laboratorium, dozwolone porty
-i limity ruchu z regulaminu organizatora.
+CI (GitHub Actions): fmt, clippy `-D warnings`, ok. 400 testów (parser nmap, sygnatury, porównania, szyfrowanie,
+RBAC dla 4 ról, import/eksport, skala /18 = 16 384 adresów, harmonogram, okna i wznawianie), `cargo audit`, obraz Docker.
+Testy na prawdziwej bazie uruchamiają się z `DSCAN_TEST_DATABASE_URL` (każdy test w osobnym schemacie).
+
+Wytyczne rozwoju: [`.claude/skills/rust-senior-engineer/SKILL.md`](.claude/skills/rust-senior-engineer/SKILL.md).
+Plan zadań ze statusami: [`docs/plan_DScan.xlsx`](docs/plan_DScan.xlsx).
 
 ## Dokumentacja
 
-- [`docs/architektura.md`](docs/architektura.md) — architektura, uruchomienie, konfiguracja, format sygnatur, szyfrowanie, role
-- [`docs/cli.md`](docs/cli.md) — wszystkie polecenia (generowane: `dscan docs`)
-- [`docs/bezpieczenstwo-skanera.md`](docs/bezpieczenstwo-skanera.md), [`docs/klasyfikacja-danych.md`](docs/klasyfikacja-danych.md)
-- [`docs/prezentacja.md`](docs/prezentacja.md) — slajdy (Marp), demo: `scripts/demo.sh`
+| Dokument | Zawartość |
+|---|---|
+| [`docs/INSTRUKCJA-JURY.md`](docs/INSTRUKCJA-JURY.md) | uruchomienie od zera krok po kroku, laboratorium, DefectDojo, rozwiązywanie problemów |
+| [`docs/architektura.md`](docs/architektura.md) | architektura, przebieg skanu, konfiguracja, format sygnatur, szyfrowanie, role |
+| [`docs/cli.md`](docs/cli.md) | wszystkie polecenia i argumenty (generowane: `dscan docs`) |
+| [`docs/analiza-skutecznosci.md`](docs/analiza-skutecznosci.md) | wyniki na laboratorium organizatorów i wprowadzone poprawki |
+| [`docs/bezpieczenstwo-skanera.md`](docs/bezpieczenstwo-skanera.md) | zasady bezpiecznego skanowania z odnośnikami do kodu |
+| [`docs/klasyfikacja-danych.md`](docs/klasyfikacja-danych.md) | które dane są szyfrowane, a które jawne i dlaczego |
+| [`docs/testowanie-neovim.md`](docs/testowanie-neovim.md) | testy ręczne wszystkich zadań planu |
+| [`docs/prezentacja.md`](docs/prezentacja.md) | slajdy (Marp); demo na żywo: `scripts/demo.sh` |
 
-## Struktura workspace
+> Nazwa `dscan` jest zajęta na crates.io — nie przeszkadza to w budowaniu i używaniu narzędzia,
+> ale przy publikacji pakietu trzeba by użyć innej nazwy.
 
-| Crate | Katalog | Odpowiedzialność |
-|---|---|---|
-| `dscan-core` | `crates/core` | Model domeny: `Target`, `Host`, `Service`, `HttpInfo`, `Detection`, `ScanRun`, `Change` (serde) |
-| `dscan-config` | `crates/config` | Konfiguracja warstwowa (figment), walidacja, sekrety z env |
-| `dscan-db` | `crates/db` | PostgreSQL (sqlx): migracje, `Encrypted<T>`, rotacja klucza, użytkownicy, cele |
-| `dscan-crypto` | `crates/crypto` | AES-256-GCM dla pól wrażliwych |
-| `dscan-auth` | `crates/auth` | Hasła argon2id, walidacja loginów |
-| `dscan-api` | `crates/api` | REST API (axum, tower-http, utoipa): logowanie i sesje, cele, profile, przebiegi |
-| `dscan-web` | `crates/web` | Interfejs WWW (askama + htmx): logowanie, menu zależne od roli, pulpit, listy |
-| `dscan-scanner` | `crates/scanner` | Cele (parsowanie, DNS, scalanie, zakres), wrapper nmap, podgrupy, pula workerów, tempo |
-| `dscan-engine` | `crates/engine` | Przebieg skanu: podgrupy → pula → zapis w bazie, postęp i prognoza (Observer) |
-| `dscan-integrations` | `crates/integrations` | Import celów z CSV/JSON |
-| `dscan-fingerprint` | `crates/fingerprint` | Klient HTTP/HTTPS (reqwest + rustls), ekstrakcja (scraper), silnik sygnatur YAML, sondowanie ścieżek, limiter |
-| `dscan` | `crates/cli` | Binarka `dscan` (clap) |
+## Licencja
 
-Schemat bazy (migracje `0001`–`0003`): `targets`, `scan_profiles`, `sessions`,, `scan_runs`, `subgroups`, `hosts`, `services`,
-`http_info`, `detections`, `signatures`, `changes`, `overrides`, `users`, `roles`, `audit_log`.
-Kolumny z danymi wrażliwymi to `BYTEA` z szyfrogramem AES-256-GCM. Wyniki są zapisywane wsadowo
-(INSERT z wieloma wierszami, po 1000): 10 000 hostów z 20 000 usług zapisuje się w ok. 0,6 s.
-Indeksy pod porównania przebiegów: `hosts (ip, scan_run_id)`, `services (host_id, port, protocol) INCLUDE (fingerprint_hash, state)`.
-
-## Weryfikacja (to samo robi CI)
-
-```bash
-cargo fmt --all -- --check
-cargo clippy --workspace --all-targets -- -D warnings
-cargo test --workspace
-cargo build --release
-```
-
-Testy na prawdziwej bazie uruchamiają się, gdy ustawiona jest zmienna `DSCAN_TEST_DATABASE_URL`
-(każdy test tworzy i usuwa własny schemat). Test wrappera z prawdziwym nmap uruchamia się, gdy nmap jest zainstalowany.
-
-Instrukcja testów ręcznych w Neovimie: [`docs/testowanie-neovim.md`](docs/testowanie-neovim.md).
-Plan zadań ze statusami: [`docs/plan_DScan.xlsx`](docs/plan_DScan.xlsx).
-
-## Zasady rozwoju
-
-Wytyczne dla kolejnych etapów: [`.claude/skills/rust-senior-engineer/SKILL.md`](.claude/skills/rust-senior-engineer/SKILL.md).
+[MIT](LICENSE)

@@ -20,6 +20,9 @@ pub struct LoginArgs {
     /// Adres serwera (domyślnie z [server] listen w dscan.toml).
     #[arg(long, value_name = "URL")]
     pub server: Option<String>,
+    /// Czyta hasło z pierwszej linii standardowego wejścia (do skryptów) zamiast pytać w terminalu.
+    #[arg(long)]
+    pub password_stdin: bool,
 }
 
 impl Command for LoginArgs {
@@ -34,8 +37,16 @@ impl Command for LoginArgs {
                     .listen,
             ),
         };
-        let password = rpassword::prompt_password(format!("Hasło dla {}: ", self.user))
-            .map_err(CliError::Input)?;
+        let password = if self.password_stdin {
+            let mut line = String::new();
+            std::io::stdin()
+                .read_line(&mut line)
+                .map_err(CliError::Input)?;
+            line.trim_end_matches(['\n', '\r']).to_string()
+        } else {
+            rpassword::prompt_password(format!("Hasło dla {}: ", self.user))
+                .map_err(CliError::Input)?
+        };
         let client = ApiClient::new(&server, "")?;
         let response = reqwest::Client::new()
             .post(client.url("/api/v1/auth/login"))
