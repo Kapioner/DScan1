@@ -28,7 +28,9 @@ administratora i ładuje dane demo. Na końcu wypisuje adres **http://127.0.0.1:
 | `--dojo` | dodatkowo DefectDojo (krok 6) |
 | `--stop` | zatrzymanie serwera i bazy |
 
-Po `./install.sh` przejdź od razu do kroku 5.
+Serwer zostaje uruchomiony **w tle** — nie uruchamiaj już `./run.sh` (zgłosi, że serwer działa).
+Istniejący `dscan.toml` (np. z wcześniejszego `./run.sh`, port 8080) jest zastępowany, kopia: `dscan.toml.bak`.
+Po restarcie komputera: `./install.sh --no-install`. Po `./install.sh` przejdź od razu do kroku 5.
 
 ## 3. Instalacja ręczna
 
@@ -158,5 +160,6 @@ Panel: http://127.0.0.1:8180/ (login `admin`, hasło `DEFECTDOJO_ADMIN_PASSWORD`
 | `brak ważnej sesji` | `./run.sh login --user admin` (token ważny 12 h) |
 | `brak celów w dozwolonym zakresie` | cel spoza `[scope] allowed_networks` — zabezpieczenie |
 | `poza oknem czasowym` | skopiuj `docs/jury/dscan.toml` (bez okien czasowych) |
-| `address already in use` | zmień `[server] listen` w `dscan.toml` |
+| `address already in use` | serwer już działa (np. po `install.sh`) albo zmień `[server] listen` |
+| pod 9080 nic nie ma, brak demo | `dscan.toml` z innym portem — uruchom ponownie `./install.sh` |
 | port `tcpwrapped` | kontener nie wystartował — `docker compose logs`, nakładki z 5b |
