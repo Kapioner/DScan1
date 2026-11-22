@@ -256,6 +256,23 @@ Wypisuje nowy losowy klucz (64 znaki hex)
 |---|---|
 | `-c, --config` | Plik konfiguracji TOML (domyślnie ./dscan.toml, jeśli istnieje) |
 
+## `dscan keys status`
+
+Pokazuje, ile rekordów zaszyfrowano którym kluczem (B6)
+
+| Argument | Opis |
+|---|---|
+| `-c, --config` | Plik konfiguracji TOML (domyślnie ./dscan.toml, jeśli istnieje) |
+
+## `dscan keys reencrypt`
+
+Stopniowa rotacja (B6): przeszyfrowuje partiami rekordy zapisane starszym kluczem
+
+| Argument | Opis |
+|---|---|
+| `--batch` | Rekordów na transakcję |
+| `-c, --config` | Plik konfiguracji TOML (domyślnie ./dscan.toml, jeśli istnieje) |
+
 ## `dscan docs`
 
 Generuje dokumentację CLI (markdown albo strona man)
@@ -321,6 +338,7 @@ Loguje do serwera API i zapisuje token w pliku użytkownika
 |---|---|
 | `-u, --user` | Nazwa użytkownika |
 | `--server` | Adres serwera (domyślnie z [server] listen w dscan.toml) |
+| `--password-stdin` | Czyta hasło z pierwszej linii standardowego wejścia (do skryptów) zamiast pytać w terminalu |
 | `-c, --config` | Plik konfiguracji TOML (domyślnie ./dscan.toml, jeśli istnieje) |
 
 ## `dscan logout`

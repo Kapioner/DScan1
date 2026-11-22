@@ -7,6 +7,10 @@
 Instrukcja prowadzi od czystego systemu do działającego skanera z danymi i przykładowymi skanami
 laboratorium organizatorów. Każdy blok poleceń można skopiować w całości.
 
+> **Szybka ścieżka:** kroki 2–6 (a z opcjami także 7a i 8) wykonuje automatycznie skrypt
+> [`install.sh`](../install.sh) z paskiem postępu: `git clone https://github.com/Kapioner/DScan1.git DScan && cd DScan && ./install.sh`
+> (opcje: `--lab ../lab.zip`, `--dojo`, `--stop`, `--help`). Poniżej te same kroki ręcznie.
+
 | Krok | Co robimy | Czas |
 |---|---|---|
 | [1](#1-wymagania) | Wymagania | — |
