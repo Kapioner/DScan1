@@ -1,3 +1,5 @@
+<img src="img/logo-mark.png" alt="DScan" width="64" align="right">
+
 # DScan — dokumentacja techniczna (Q6)
 
 DScan (*Defect Scan*) wykrywa hosty i usługi w dozwolonym zakresie sieci, rozpoznaje

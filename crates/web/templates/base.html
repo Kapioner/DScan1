@@ -7,11 +7,12 @@
   <meta name="htmx-config" content='{"includeIndicatorStyles": false}'>
   <title>{% block title %}DScan{% endblock %} · DScan</title>
   <link rel="stylesheet" href="/static/style.css">
+  <link rel="icon" type="image/png" href="/static/img/favicon.png">
   <script src="/static/htmx.min.js" defer></script>
 </head>
 <body>
   <header class="topbar">
-    <a class="brand" href="/">DScan <span>Defect Scan</span></a>
+    <a class="brand" href="/" aria-label="DScan — pulpit"><img src="/static/img/logo-mark.png" alt="DScan" width="32" height="34"></a>
     <nav class="menu">
       {% for item in menu %}
       <a href="{{ item.href }}"{% if item.active %} class="active" aria-current="page"{% endif %}>{{ item.label }}</a>

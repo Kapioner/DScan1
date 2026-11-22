@@ -10,7 +10,8 @@ body { margin: 0; font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-seri
 a { color: var(--accent); }
 code { font-family: ui-monospace, "SFMono-Regular", Menlo, monospace; font-size: 0.9em; }
 .topbar { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; padding: 10px 24px; background: var(--card); border-bottom: 1px solid var(--border); }
-.brand { font-weight: 700; text-decoration: none; color: var(--text); }
+.brand { font-weight: 700; text-decoration: none; color: var(--text); display: inline-flex; align-items: center; gap: 8px; }
+.brand img { height: 34px; width: auto; display: block; }
 .brand span { font-weight: 400; color: var(--muted); font-size: 0.85em; }
 .menu { display: flex; gap: 4px; flex: 1; flex-wrap: wrap; }
 .menu a { padding: 6px 12px; border-radius: 6px; text-decoration: none; color: var(--text); }
@@ -36,8 +37,17 @@ button.link { background: none; color: var(--accent); padding: 0; }
 .centered { display: grid; place-items: center; min-height: 100vh; padding: 16px; }
 .login { width: 100%; max-width: 360px; display: grid; gap: 12px; }
 .login h1 { margin: 0; }
+.login-logo { display: block; width: 180px; max-width: 70%; height: auto; margin: 0 auto 4px; }
+.logo-mark { display: block; width: 72px; height: auto; margin: 0 auto 8px; opacity: 0.9; }
+.empty-state { text-align: center; padding: 24px 16px; }
 label { display: grid; gap: 4px; font-size: 0.9em; color: var(--muted); }
-input { font: inherit; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--text); }
+/* Pola formularzy wyglądają jednakowo: input, select i textarea. */
+input, select, textarea { font: inherit; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--text); }
+input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); outline-offset: 0; border-color: var(--accent); }
+select { appearance: none; -webkit-appearance: none; padding-right: 32px; cursor: pointer;
+  background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+  background-position: calc(100% - 16px) 50%, calc(100% - 11px) 50%; background-size: 5px 5px, 5px 5px; background-repeat: no-repeat; }
+input[type="checkbox"] { padding: 0; width: auto; accent-color: var(--accent); }
 .forms { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
 .forms form { display: grid; gap: 10px; align-content: start; }
 label.inline { display: flex; gap: 8px; align-items: center; }

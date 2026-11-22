@@ -2,7 +2,7 @@
 # docker-compose.yml DefectDojo 3.5.202. Uruchamiaj skryptem: ./scripts/defectdojo-setup.sh
 #
 # Działa obok DScan, ale jako osobny projekt (własna baza, własne wolumeny).
-# Interfejs: http://127.0.0.1:8081 (login admin, hasło DEFECTDOJO_ADMIN_PASSWORD z .env).
+# Interfejs: http://127.0.0.1:8180 (login admin, hasło DEFECTDOJO_ADMIN_PASSWORD z .env).
 # Obrazy: Docker Hub; przy limicie pobrań ustaw w .env DEFECTDOJO_REGISTRY=registry.defectdojo.com.
 
 name: dscan-defectdojo
@@ -36,7 +36,7 @@ services:
     volumes:
       - media:/usr/share/nginx/html/media
     ports:
-      - "127.0.0.1:${DEFECTDOJO_PORT:-8081}:8080"
+      - "127.0.0.1:${DEFECTDOJO_PORT:-8180}:8080"
 
   uwsgi:
     <<: *django

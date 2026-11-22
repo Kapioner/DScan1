@@ -90,6 +90,10 @@ pub fn web_routes() -> Router<AppState> {
         .route("/logout", post(login::logout))
         .route("/static/htmx.min.js", get(assets::htmx))
         .route("/static/style.css", get(assets::stylesheet))
+        .route("/static/img/logo.png", get(assets::logo))
+        .route("/static/img/logo-mark.png", get(assets::logo_mark))
+        .route("/static/img/favicon.png", get(assets::favicon))
+        .route("/favicon.ico", get(assets::favicon))
         .layer(SetResponseHeaderLayer::overriding(
             CONTENT_SECURITY_POLICY,
             HeaderValue::from_static(CSP),

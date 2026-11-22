@@ -5,10 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Logowanie · DScan</title>
   <link rel="stylesheet" href="/static/style.css">
+  <link rel="icon" type="image/png" href="/static/img/favicon.png">
 </head>
 <body class="centered">
   <form class="card login" method="post" action="/login">
-    <h1>DScan</h1>
+    <img class="login-logo" src="/static/img/logo.png" alt="DScan — Smart Scanning" width="362" height="513">
     <p class="muted">Defect Scan — zaloguj się</p>
     {% if let Some(message) = error %}<p class="error" role="alert">{{ message }}</p>{% endif %}
     <label>Login <input name="username" value="{{ username }}" autocomplete="username" required autofocus></label>
