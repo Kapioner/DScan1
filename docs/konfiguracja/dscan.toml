@@ -1,10 +1,10 @@
-# Konfiguracja DScan dla jury: laboratorium organizatorów na tym samym komputerze.
-# Użycie (przed pierwszym ./run.sh):  cp docs/jury/dscan.toml dscan.toml
+# Konfiguracja lokalna DScan: skanowanie usług na tym samym komputerze (127.0.0.0/8) i dane demo (172.20.0.0/24).
+# ./run.sh i ./install.sh kopiują ten plik do dscan.toml, jeśli go jeszcze nie ma.
 # Pełny opis wszystkich parametrów: dscan.example.toml (albo ./run.sh config init --force).
 
 [scope]
-# 127.0.0.0/8 — usługi labu wystawione przez Dockera na localhost;
-# 172.20.0.0/24 — sieć z zapasowych danych demo (docs/demo).
+# 127.0.0.0/8 - usługi labu wystawione przez Dockera na localhost;
+# 172.20.0.0/24 - sieć z zapasowych danych demo (docs/demo).
 allowed_networks = ["127.0.0.0/8", "172.20.0.0/24"]
 # Porty ze wszystkich czterech stacków laboratorium + typowe usługi.
 allowed_ports = ["21", "22", "80", "81", "443", "2223", "3000-3001", "3306", "5432", "5672-5673", "6379",
@@ -25,18 +25,18 @@ unstable_retries = 1
 retry_delay_seconds = 5
 
 [server]
-# 9080, bo porty 8080/8081 zajmuje stack „modern” laboratorium.
+# Port 9080, bo 8080/8081 często zajmują inne usługi WWW (np. stack „modern” laboratorium).
 listen = "127.0.0.1:9080"
 
 [http]
 max_probes_per_service = 20
 
-# Opcjonalnie DefectDojo (krok 8 instrukcji): ustaw enabled = true.
+# Opcjonalnie DefectDojo: ustaw enabled = true.
 [defectdojo]
 enabled = false
 url = "http://127.0.0.1:8180"
 product_name = "DScan lab"
-engagement_name = "DScan — testy"
+engagement_name = "DScan - testy"
 
 # Nazwane profile do wyboru: ./run.sh scan 127.0.0.1 --profile szybki
 [profiles.szybki]

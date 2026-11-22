@@ -1,4 +1,4 @@
-# Modyfikacja na potrzeby analizy: ghcr.io niedostępne w tym środowisku —
+# Modyfikacja na potrzeby analizy: ghcr.io niedostępne w tym środowisku -
 # Toxiproxy z Docker Hub (2.1.4, to samo API proxies/toxics).
 services:
   toxiproxy:

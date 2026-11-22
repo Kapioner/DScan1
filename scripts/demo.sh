@@ -4,8 +4,8 @@
 # Działa bez sieci laboratorium. Wymaga działającego serwera (./run.sh w drugim terminalu)
 # i zalogowania: ./run.sh login --user admin
 #
-#   scripts/demo.sh            — dane zapasowe (import dwóch przebiegów)
-#   scripts/demo.sh --live CEL — dwa prawdziwe skany CEL z przerwą na zmianę w laboratorium
+#   scripts/demo.sh            - dane zapasowe (import dwóch przebiegów)
+#   scripts/demo.sh --live CEL - dwa prawdziwe skany CEL z przerwą na zmianę w laboratorium
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -19,19 +19,19 @@ if [ "${1:-}" = "--live" ]; then
     dscan scan "$target" --quiet || true
     echo "Wprowadź zmianę w laboratorium (np. uruchom nową usługę), potem Enter."
     pause
-    step "2. Drugi skan — kod wyjścia 2 oznacza wykryte zmiany"
+    step "2. Drugi skan - kod wyjścia 2 oznacza wykryte zmiany"
     set +e; dscan scan "$target" --quiet; code=$?; set -e
     echo "kod wyjścia: $code"
 else
     step "1. Import pierwszego przebiegu (nmap XML)"
     dscan import --kind results docs/demo/przebieg-1.xml
     pause
-    step "2. Import drugiego przebiegu — porównanie z pierwszym"
+    step "2. Import drugiego przebiegu - porównanie z pierwszym"
     dscan import --kind results docs/demo/przebieg-2.xml
 fi
 pause
 
-step "3. Najciekawsze usługi i zmiany (dashboard): http://127.0.0.1:8080/"
+step "3. Najciekawsze usługi i zmiany: Pulpit w interfejsie WWW (adres z [server] listen)"
 step "4. Eksport usług z technologią nginx (CSV)"
 dscan export services --format csv --technology nginx
 pause

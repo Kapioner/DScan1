@@ -1,7 +1,7 @@
 # Docker Compose dla DScan (zadanie D2).
 #
-#   ./run.sh                    — uruchamia tylko PostgreSQL, a DScan natywnie (zalecane)
-#   docker compose up --build   — uruchamia całość w kontenerach
+#   ./run.sh                    - uruchamia tylko PostgreSQL, a DScan natywnie (zalecane)
+#   docker compose up --build   - uruchamia całość w kontenerach
 #
 # Sekrety (hasło bazy, klucz szyfrowania) są w pliku .env, który tworzy ./run.sh.
 

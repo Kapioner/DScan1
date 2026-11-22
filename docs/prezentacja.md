@@ -1,12 +1,12 @@
 ---
 marp: true
-title: DScan — Defect Scan
+title: DScan - Defect Scan
 paginate: true
 ---
 
 ![w:220](img/logo.png)
 
-# DScan — Defect Scan
+# DScan - Defect Scan
 
 Inwentaryzacja usług sieciowych z wykrywaniem zmian
 
@@ -25,18 +25,18 @@ Inwentaryzacja usług sieciowych z wykrywaniem zmian
 
 ## Architektura
 
-- `scanner` — nmap w podgrupach CIDR, pula procesów, łączny limit tempa, zabezpieczenia (bez NSE)
-- `fingerprint` — HTTP/TLS, favicon (mmh3), ~40 sygnatur YAML, heurystyki staging/debug/panele
-- `engine` — przebiegi, harmonogram, wstrzymanie i wznowienie, porównania, ocena, klastry
-- `api` + `web` — REST z RBAC i audytem, interfejs htmx; CLI jako klient API
-- `db` + `crypto` — szyfrowanie pól AES-256-GCM, ślepy indeks, rotacja kluczy
+- `scanner` - nmap w podgrupach CIDR, pula procesów, łączny limit tempa, zabezpieczenia (bez NSE)
+- `fingerprint` - HTTP/TLS, favicon (mmh3), ~40 sygnatur YAML, heurystyki staging/debug/panele
+- `engine` - przebiegi, harmonogram, wstrzymanie i wznowienie, porównania, ocena, klastry
+- `api` + `web` - REST z RBAC i audytem, interfejs htmx; CLI jako klient API
+- `db` + `crypto` - szyfrowanie pól AES-256-GCM, ślepy indeks, rotacja kluczy
 
 ---
 
 ## Demo 1: import → skan
 
 - `./run.sh import --kind results docs/demo/przebieg-1.xml`
-- `./run.sh scan 172.20.0.0/24 --profile pelny` — postęp, prognoza czasu
+- `./run.sh scan 172.20.0.0/24 --profile pelny` - postęp, prognoza czasu
 - `--dry-run`: adresy, podgrupy i szacowany czas bez wysyłania pakietów
 
 ---

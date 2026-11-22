@@ -1,11 +1,17 @@
 #!/usr/bin/env bash
 # Uruchamia DScan jedną komendą:  ./run.sh [podkomenda dscan i argumenty]
 #
-#   ./run.sh                  → dscan serve (interfejs WWW i API na http://127.0.0.1:8080)
+#   ./run.sh                  → dscan serve (interfejs WWW i API, adres z [server] listen)
 #   ./run.sh config show      → dowolna inna podkomenda
 #
+# Kroki (wypisywane na stderr):
+#   1. konfiguracja: dscan.toml (kopia docs/konfiguracja/dscan.toml) i .env z sekretami,
+#   2. baza PostgreSQL w Dockerze (tylko dla poleceń, które jej używają),
+#   3. kompilacja wersji release (tylko gdy kod się zmienił, z paskiem postępu cargo),
+#   4. uruchomienie binarki.
+#
 # Przy pierwszym uruchomieniu (lub gdy czegoś brakuje):
-#   - tworzy dscan.toml z dscan.example.toml,
+#   - tworzy dscan.toml z docs/konfiguracja/dscan.toml,
 #   - uzupełnia .env: klucz szyfrowania, hasło i adres bazy, konto administratora (uprawnienia 600).
 # Za każdym razem: wczytuje .env, w razie potrzeby uruchamia PostgreSQL w Dockerze,
 # buduje wersję release (przyrostowo) i startuje natywną binarkę.
@@ -18,9 +24,26 @@ cd "$(dirname "$0")"
 CONFIG_FILE="dscan.toml"
 ENV_FILE=".env"
 BINARY="target/release/dscan"
+DEFAULT_CONFIG="docs/konfiguracja/dscan.toml"
+COMMAND="${1:-serve}"
+STEP_PREFIX=""
+[ "$COMMAND" = "serve" ] && STEP_PREFIX="[3/4] "
 
 log() {
     echo "[run.sh] $*" >&2
+}
+
+# Kroki wypisujemy przy starcie serwera; przy innych poleceniach tylko to, co trwa dłużej.
+step() {
+    if [ "$COMMAND" = "serve" ]; then
+        echo "[run.sh] [$1/4] $2" >&2
+    fi
+}
+
+server_port() {
+    local listen
+    listen="$(sed -n 's/^[[:space:]]*listen[[:space:]]*=[[:space:]]*"\(.*\)"/\1/p' "$CONFIG_FILE" | head -n1)"
+    echo "${listen##*:}"
 }
 
 random_hex() {
@@ -29,8 +52,8 @@ random_hex() {
 
 create_config_if_missing() {
     if [ ! -f "$CONFIG_FILE" ]; then
-        cp dscan.example.toml "$CONFIG_FILE"
-        log "Utworzono $CONFIG_FILE — uzupełnij sekcję [scope] danymi od organizatora."
+        cp "$DEFAULT_CONFIG" "$CONFIG_FILE"
+        log "Utworzono $CONFIG_FILE (zakres 127.0.0.0/8 i 172.20.0.0/24). Wszystkie opcje: dscan.example.toml"
     fi
 }
 
@@ -99,7 +122,7 @@ command_needs_database() {
 # Skan wymaga programu nmap na hoście.
 warn_if_nmap_missing() {
     if [ "${1:-}" = "scan" ] && ! command -v nmap > /dev/null 2>&1; then
-        log "Brak programu nmap — zainstaluj go (np. sudo apt install nmap / brew install nmap)."
+        log "Brak programu nmap - zainstaluj go (np. sudo apt install nmap / brew install nmap)."
     fi
 }
 
@@ -108,25 +131,27 @@ start_database() {
         return
     fi
     if ! command -v docker > /dev/null 2>&1; then
-        log "Brak Dockera — zakładam, że PostgreSQL pod DSCAN_DATABASE_URL już działa."
+        log "Brak Dockera - zakładam, że PostgreSQL pod DSCAN_DATABASE_URL już działa."
         log "(Zainstaluj Dockera albo ustaw w $ENV_FILE USE_DOCKER_POSTGRES=0 i własny adres bazy.)"
         return
     fi
     if [ -z "$(docker compose ps --status running --quiet postgres 2> /dev/null)" ]; then
-        log "Uruchamiam PostgreSQL (docker compose)…"
-        docker compose --progress quiet up -d --wait postgres
+        log "Uruchamiam PostgreSQL w Dockerze (pierwszy raz pobiera obraz)..."
+        docker compose up -d --wait postgres
+    else
+        step 2 "Baza PostgreSQL działa"
     fi
     sync_database_credentials
 }
 
 # POSTGRES_PASSWORD działa tylko przy pierwszym utworzeniu wolumenu. Jeśli .env ma inne hasło
-# (np. odtworzony plik albo nowy klon repozytorium przy starym wolumenie), logowanie się nie uda —
+# (np. odtworzony plik albo nowy klon repozytorium przy starym wolumenie), logowanie się nie uda -
 # dlatego ustawiamy hasło roli zgodnie z .env. Wewnątrz kontenera psql łączy się przez gniazdo
 # lokalne, które nie wymaga hasła.
 sync_database_credentials() {
     local psql=(docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -qtA -U "$POSTGRES_USER" -d postgres)
     if ! "${psql[@]}" -c "ALTER ROLE \"${POSTGRES_USER}\" WITH PASSWORD '${POSTGRES_PASSWORD}'" > /dev/null 2>&1; then
-        log "Nie można ustawić hasła roli ${POSTGRES_USER} w kontenerze bazy — wolumen utworzono"
+        log "Nie można ustawić hasła roli ${POSTGRES_USER} w kontenerze bazy - wolumen utworzono"
         log "prawdopodobnie z inną nazwą użytkownika. Jeśli dane w bazie nie są potrzebne:"
         log "  docker compose down -v && ./run.sh"
         return
@@ -137,33 +162,51 @@ sync_database_credentials() {
     fi
 }
 
-# Serwer już działa (np. uruchomiony w tle przez install.sh) — drugi nie wystartuje na tym samym porcie.
+# Drugi serwer nie wystartuje na zajętym porcie - wtedy tylko wskazujemy adres działającego.
 exit_if_server_running() {
-    case "${1:-serve}" in
-        serve) ;;
-        *) return ;;
-    esac
-    local listen port
-    listen="$(sed -n 's/^[[:space:]]*listen[[:space:]]*=[[:space:]]*"\(.*\)"/\1/p' "$CONFIG_FILE" | head -n1)"
-    port="${listen##*:}"
+    [ "$COMMAND" = "serve" ] || return 0
+    local port
+    port="$(server_port)"
     if [ -n "$port" ] && command -v curl > /dev/null 2>&1 \
         && curl -fsS --max-time 2 "http://127.0.0.1:${port}/api/v1/health" > /dev/null 2>&1; then
-        log "DScan już działa: http://127.0.0.1:${port}/ — otwórz ten adres w przeglądarce."
-        log "Zatrzymanie serwera uruchomionego przez install.sh: ./install.sh --stop"
+        log "DScan działa już na http://127.0.0.1:${port}/ - otwórz ten adres w przeglądarce."
+        log "Serwer uruchomiony przez install.sh zatrzymuje: ./install.sh --stop"
         exit 0
     fi
 }
 
+# Kompilacja tylko wtedy, gdy binarki nie ma albo źródła są nowsze (kolejne starty bez czekania).
+build_if_needed() {
+    if [ -x "$BINARY" ] \
+        && [ -z "$(find crates Cargo.toml Cargo.lock -newer "$BINARY" -print -quit 2> /dev/null)" ]; then
+        step 3 "Kompilacja: bez zmian w kodzie, pomijam"
+        return
+    fi
+    if [ -x "$BINARY" ]; then
+        log "${STEP_PREFIX}Kompilacja zmienionego kodu..."
+    else
+        log "${STEP_PREFIX}Pierwsza kompilacja DScan - trwa kilka minut, postęp poniżej (Building N/M)..."
+    fi
+    cargo build --release -p dscan
+    touch "$BINARY"
+}
+
+step 1 "Konfiguracja: $CONFIG_FILE i $ENV_FILE"
 create_config_if_missing
-exit_if_server_running "$@"
+exit_if_server_running
 prepare_env_file
-if command_needs_database "$@"; then
+if command_needs_database "$COMMAND"; then
+    step 2 "Baza danych PostgreSQL"
     start_database
 fi
 warn_if_nmap_missing "$@"
-cargo build --release --quiet -p dscan
+build_if_needed
 
 if [ "$#" -eq 0 ]; then
     set -- serve
+fi
+if [ "$COMMAND" = "serve" ]; then
+    step 4 "Start serwera: migracje bazy, konto administratora, harmonogram"
+    log "Interfejs WWW: http://127.0.0.1:$(server_port)/ (login i hasło w $ENV_FILE, Ctrl+C kończy)"
 fi
 exec "$BINARY" "$@"

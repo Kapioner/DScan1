@@ -1,4 +1,4 @@
-# Modyfikacja na potrzeby analizy: środowisko bez IPv6 — Adminer słucha na IPv4.
+# Modyfikacja na potrzeby analizy: środowisko bez IPv6 - Adminer słucha na IPv4.
 services:
   adminer:
     command: ["php", "-S", "0.0.0.0:8080", "-t", "/var/www/html"]
