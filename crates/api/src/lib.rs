@@ -17,6 +17,10 @@ mod state;
 pub use error::{ApiError, ErrorBody};
 pub use openapi::ApiDoc;
 pub use router::{build_router, build_router_with};
+pub use routes::defectdojo::{
+    DojoResponse, ObservationRef, import_run as defectdojo_import_run,
+    observations as defectdojo_observations,
+};
 pub use routes::health::{DatabaseStatus, HealthResponse};
 pub use routes::profiles::{ProfileInput, WindowDto};
 pub use routes::scans::ScanRunView;

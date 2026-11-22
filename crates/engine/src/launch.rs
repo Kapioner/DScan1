@@ -4,10 +4,10 @@ use std::net::IpAddr;
 use std::sync::Arc;
 
 use dscan_config::{Settings, resolve_profile};
-use dscan_scanner::safety::ports_within;
 use dscan_scanner::ScannerError;
 use dscan_scanner::nmap::{NmapProfile, ScanOutput, ports_argument};
 use dscan_scanner::pool::{NmapScanner, SubgroupScanner};
+use dscan_scanner::safety::ports_within;
 use dscan_scanner::targets::{SystemResolver, TargetPlan, prepare_targets};
 use ipnet::IpNet;
 

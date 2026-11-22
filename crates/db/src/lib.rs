@@ -69,7 +69,9 @@ pub use scan_runs::{
 pub use sessions::{
     SessionUser, create_session, delete_expired_sessions, delete_session, find_session_user,
 };
-pub use subgroups::{SubgroupCompletion, complete_subgroup, fail_subgroup, mark_subgroup_running};
+pub use subgroups::{
+    SubgroupCompletion, complete_subgroup, fail_subgroup, mark_subgroup_running, run_raw_xml,
+};
 pub use target_crud::{
     TargetGroup, create_target, delete_target, get_target, list_target_groups, update_target,
 };

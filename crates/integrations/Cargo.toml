@@ -14,6 +14,8 @@ serde.workspace = true
 serde_json.workspace = true
 csv.workspace = true
 chrono.workspace = true
+dscan-config.workspace = true
+reqwest = { workspace = true, features = ["multipart", "json"] }
 
 [lints]
 workspace = true

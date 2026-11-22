@@ -4,6 +4,7 @@
 pub mod config;
 pub mod db;
 pub mod diff;
+pub mod dojo;
 pub mod evaluate;
 pub mod export;
 pub mod import;
@@ -141,6 +142,7 @@ impl Command for Commands {
             Commands::Config(args) => args.execute(context).await,
             Commands::Db(args) => args.execute(context).await,
             Commands::Keys(args) => args.execute(context).await,
+            Commands::Dojo(args) => args.execute(context).await,
             Commands::Evaluate(args) => args.execute(context).await,
             Commands::Login(args) => args.execute(context).await,
             Commands::Logout(args) => args.execute(context).await,

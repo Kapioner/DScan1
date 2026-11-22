@@ -859,8 +859,10 @@ version = "0.1.0"
 dependencies = [
  "chrono",
  "csv",
+ "dscan-config",
  "dscan-core",
  "dscan-scanner",
+ "reqwest",
  "serde",
  "serde_json",
 ]
@@ -2514,6 +2516,7 @@ dependencies = [
  "base64 0.22.1",
  "bytes",
  "futures-core",
+ "futures-util",
  "http",
  "http-body",
  "http-body-util",
@@ -2522,6 +2525,7 @@ dependencies = [
  "hyper-util",
  "js-sys",
  "log",
+ "mime_guess",
  "percent-encoding",
  "pin-project-lite",
  "quinn",

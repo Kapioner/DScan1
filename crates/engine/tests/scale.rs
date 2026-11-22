@@ -30,12 +30,17 @@ impl SubgroupScanner for ManyHostsScanner {
             .step_by(10)
             .map(|ip| {
                 let mut host = Host::new(ip, Utc::now());
-                host.services.push(Service::new(22, Protocol::Tcp, ServiceState::Open));
-                host.services.push(Service::new(80, Protocol::Tcp, ServiceState::Open));
+                host.services
+                    .push(Service::new(22, Protocol::Tcp, ServiceState::Open));
+                host.services
+                    .push(Service::new(80, Protocol::Tcp, ServiceState::Open));
                 host
             })
             .collect();
-        Ok(ScanOutput { hosts, raw_xml: "<nmaprun/>".into() })
+        Ok(ScanOutput {
+            hosts,
+            raw_xml: "<nmaprun/>".into(),
+        })
     }
 }
 
@@ -53,8 +58,15 @@ async fn scan_of_sixteen_thousand_addresses() {
         return;
     };
     let schema = format!("test_scale_{}", std::process::id());
-    let admin = PgPoolOptions::new().max_connections(1).connect(&url).await.unwrap();
-    admin.execute(format!("CREATE SCHEMA {schema}").as_str()).await.unwrap();
+    let admin = PgPoolOptions::new()
+        .max_connections(1)
+        .connect(&url)
+        .await
+        .unwrap();
+    admin
+        .execute(format!("CREATE SCHEMA {schema}").as_str())
+        .await
+        .unwrap();
     let search_path = format!("SET search_path TO {schema}");
     let pool = PgPoolOptions::new()
         .max_connections(8)
@@ -87,7 +99,14 @@ async fn scan_of_sixteen_thousand_addresses() {
     let started = Instant::now();
     let summary = tokio::time::timeout(
         Duration::from_secs(300),
-        run_scan_job(&pool, &Cipher::new(&[3; 32]), &networks, Arc::new(ManyHostsScanner), &settings, &SilentObserver),
+        run_scan_job(
+            &pool,
+            &Cipher::new(&[3; 32]),
+            &networks,
+            Arc::new(ManyHostsScanner),
+            &settings,
+            &SilentObserver,
+        ),
     )
     .await
     .expect("przebieg nie zakończył się w 5 minut — możliwe zakleszczenie")
@@ -96,10 +115,19 @@ async fn scan_of_sixteen_thousand_addresses() {
 
     assert_eq!(summary.status, ScanStatus::Completed);
     assert_eq!(summary.subgroups, 64);
-    assert!(summary.hosts.len() > 1_500, "hosty: {}", summary.hosts.len());
-    let stored: i64 = sqlx::query_scalar("SELECT count(*) FROM services").fetch_one(&pool).await.unwrap();
+    assert!(
+        summary.hosts.len() > 1_500,
+        "hosty: {}",
+        summary.hosts.len()
+    );
+    let stored: i64 = sqlx::query_scalar("SELECT count(*) FROM services")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
     assert_eq!(stored as usize, summary.hosts.len() * 2);
-    let memory_growth = peak_memory_kb().zip(memory_before).map(|(after, before)| after.saturating_sub(before));
+    let memory_growth = peak_memory_kb()
+        .zip(memory_before)
+        .map(|(after, before)| after.saturating_sub(before));
     eprintln!(
         "Q2: 16384 adresów, {} hostów, {} usług — {:.1} s, przyrost pamięci {:?} kB",
         summary.hosts.len(),
@@ -107,8 +135,14 @@ async fn scan_of_sixteen_thousand_addresses() {
         elapsed.as_secs_f64(),
         memory_growth
     );
-    assert!(memory_growth.is_none_or(|kb| kb < 512 * 1024), "za duży przyrost pamięci");
+    assert!(
+        memory_growth.is_none_or(|kb| kb < 512 * 1024),
+        "za duży przyrost pamięci"
+    );
 
     pool.close().await;
-    admin.execute(format!("DROP SCHEMA {schema} CASCADE").as_str()).await.unwrap();
+    admin
+        .execute(format!("DROP SCHEMA {schema} CASCADE").as_str())
+        .await
+        .unwrap();
 }

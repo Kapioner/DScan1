@@ -70,7 +70,9 @@ use crate::routes::users::UserListItem;
         crate::routes::accounts::create_role,
         crate::routes::accounts::update_role,
         crate::routes::accounts::delete_role,
-        crate::routes::audit_log::audit_log
+        crate::routes::audit_log::audit_log,
+        crate::routes::defectdojo::dojo_import,
+        crate::routes::defectdojo::dojo_findings
     ),
     components(schemas(
         HealthResponse, DatabaseStatus, ErrorBody, ScanRunView, LoginRequest, LoginResponse, UserView,
@@ -80,7 +82,9 @@ use crate::routes::users::UserListItem;
         DetectionView, EvidenceView, DashboardView, RunState, FindingView, TechnologyCount, crate::routes::search::SearchHit,
         crate::routes::accounts::UserDetailsView, crate::routes::accounts::RoleView, crate::routes::accounts::NewUser,
         crate::routes::accounts::UserChanges, crate::routes::accounts::NewPassword, crate::routes::accounts::RoleInput,
-        crate::routes::accounts::Created, crate::routes::audit_log::AuditView
+        crate::routes::accounts::Created, crate::routes::audit_log::AuditView, crate::routes::defectdojo::DojoImportRequest,
+        crate::routes::defectdojo::DojoResponse, crate::routes::defectdojo::ObservationRef,
+        crate::routes::defectdojo::DojoFindingsRequest
     )),
     tags(
         (name = "system", description = "Stan usługi"),

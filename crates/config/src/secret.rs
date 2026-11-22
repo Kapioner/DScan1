@@ -15,6 +15,33 @@ pub const NEW_ENCRYPTION_KEY_ENV: &str = "DSCAN_NEW_ENCRYPTION_KEY";
 /// Zmienna środowiskowa z adresem bazy, np. `postgres://dscan:haslo@127.0.0.1:5433/dscan`.
 pub const DATABASE_URL_ENV: &str = "DSCAN_DATABASE_URL";
 
+/// Token API DefectDojo (I4, I5) — tylko ze zmiennej środowiskowej.
+pub const DEFECTDOJO_TOKEN_ENV: &str = "DSCAN_DEFECTDOJO_TOKEN";
+
+/// Token API DefectDojo; w logach i `Debug` zamaskowany.
+#[derive(Clone, PartialEq, Eq)]
+pub struct ApiToken(String);
+
+impl ApiToken {
+    /// `None` dla pustej wartości.
+    pub fn from_value(value: Option<&str>) -> Option<Self> {
+        value
+            .map(str::trim)
+            .filter(|v| !v.is_empty())
+            .map(|v| ApiToken(v.to_string()))
+    }
+
+    pub fn expose(&self) -> &str {
+        &self.0
+    }
+}
+
+impl fmt::Debug for ApiToken {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "ApiToken(***)")
+    }
+}
+
 /// Długość klucza AES-256 w bajtach.
 pub const ENCRYPTION_KEY_LEN: usize = 32;
 

@@ -123,6 +123,14 @@ fn api_routes() -> Router<AppState> {
             "/api/v1/roles/{id}",
             put(crate::routes::accounts::update_role).delete(crate::routes::accounts::delete_role),
         )
+        .route(
+            "/api/v1/defectdojo/import",
+            post(crate::routes::defectdojo::dojo_import),
+        )
+        .route(
+            "/api/v1/defectdojo/findings",
+            post(crate::routes::defectdojo::dojo_findings),
+        )
         .route("/api/v1/audit", get(crate::routes::audit_log::audit_log))
         .route("/api/openapi.json", get(openapi_json))
 }

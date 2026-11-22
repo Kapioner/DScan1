@@ -6,6 +6,8 @@ use dscan_core::models::{Detection, Service};
 use crate::host_views::{FieldView, field};
 
 pub struct DetectionView {
+    /// Nazwa technologii bez wersji (identyfikator obserwacji dla DefectDojo).
+    pub name: String,
     pub technology: String,
     pub confidence: u8,
     pub evidence: String,
@@ -19,6 +21,7 @@ impl From<&Detection> for DetectionView {
             .map(|v| format!(" {v}"))
             .unwrap_or_default();
         DetectionView {
+            name: d.technology.clone(),
             technology: format!("{}{version}", d.technology),
             confidence: d.confidence,
             evidence: d

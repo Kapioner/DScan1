@@ -3,6 +3,7 @@
 //! Import celów z CSV/JSON (I1), import wyników skanów — nmap XML, JSON, CSV (I2) —
 //! oraz eksport hostów, usług i zmian do JSON/CSV z filtrami (I3).
 
+pub mod defectdojo;
 mod error;
 mod evaluation;
 mod export;

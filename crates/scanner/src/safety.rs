@@ -9,25 +9,44 @@ use crate::ScannerError;
 /// Opcje nmap, których DScan nigdy nie przekazuje: skrypty NSE (w tym kategorie exploit,
 /// brute, intrusive, vuln, auth), skan agresywny (`-A` = m.in. skrypty domyślne), fałszowanie
 /// źródła i omijanie zapór.
-pub const FORBIDDEN_NMAP_OPTIONS: [&str; 10] =
-    ["--script", "-sC", "-A", "--script-args", "-S", "-D", "--spoof-mac", "--data", "-f", "--badsum"];
+pub const FORBIDDEN_NMAP_OPTIONS: [&str; 10] = [
+    "--script",
+    "-sC",
+    "-A",
+    "--script-args",
+    "-S",
+    "-D",
+    "--spoof-mac",
+    "--data",
+    "-f",
+    "--badsum",
+];
 
 /// Sprawdza argumenty nmap przed uruchomieniem procesu.
 pub fn check_nmap_args(args: &[String]) -> Result<(), ScannerError> {
     if let Some(bad) = args.iter().find(|arg| {
-        FORBIDDEN_NMAP_OPTIONS.iter().any(|forbidden| arg.as_str() == *forbidden || arg.starts_with(&format!("{forbidden}=")))
+        FORBIDDEN_NMAP_OPTIONS.iter().any(|forbidden| {
+            arg.as_str() == *forbidden || arg.starts_with(&format!("{forbidden}="))
+        })
     }) {
-        return Err(ScannerError::Forbidden(format!("niedozwolona opcja nmap: {bad}")));
+        return Err(ScannerError::Forbidden(format!(
+            "niedozwolona opcja nmap: {bad}"
+        )));
     }
     if !args.iter().any(|arg| arg == "--max-rate") {
-        return Err(ScannerError::Forbidden("brak limitu tempa (--max-rate)".into()));
+        return Err(ScannerError::Forbidden(
+            "brak limitu tempa (--max-rate)".into(),
+        ));
     }
     Ok(())
 }
 
 /// Czy wszystkie porty `requested` mieszczą się w zakresach `allowed` (np. profil vs `[scope]`).
 pub fn ports_within(requested: &[String], allowed: &[String]) -> bool {
-    let allowed: Vec<_> = allowed.iter().filter_map(|p| parse_port_range(p).ok()).collect();
+    let allowed: Vec<_> = allowed
+        .iter()
+        .filter_map(|p| parse_port_range(p).ok())
+        .collect();
     requested.iter().all(|port| {
         parse_port_range(port).is_ok_and(|range| {
             // Każdy port zakresu musi być w którymś dozwolonym zakresie.
@@ -61,7 +80,16 @@ mod tests {
 
     #[test]
     fn scripts_and_missing_rate_are_rejected() {
-        assert!(check_nmap_args(&strings(&["-sV", "--script", "ssh-brute", "--max-rate", "5"])).is_err());
+        assert!(
+            check_nmap_args(&strings(&[
+                "-sV",
+                "--script",
+                "ssh-brute",
+                "--max-rate",
+                "5"
+            ]))
+            .is_err()
+        );
         assert!(check_nmap_args(&strings(&["-sV", "--script=vuln", "--max-rate", "5"])).is_err());
         assert!(check_nmap_args(&strings(&["-A", "--max-rate", "5"])).is_err());
         assert!(check_nmap_args(&strings(&["-sV"])).is_err());

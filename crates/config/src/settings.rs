@@ -17,6 +17,8 @@ pub struct Settings {
     pub server: ServerSettings,
     pub database: DatabaseSettings,
     pub http: HttpSettings,
+    /// Integracja z DefectDojo (I4, I5).
+    pub defectdojo: DefectDojoSettings,
     /// Nazwane profile skanów (C4): `[profiles.NAZWA]`.
     pub profiles: std::collections::BTreeMap<String, crate::ScanProfileSettings>,
 }
@@ -205,6 +207,36 @@ impl Default for HttpSettings {
             max_probes_per_service: 12,
             min_confidence: 30,
             signatures_file: None,
+        }
+    }
+}
+
+/// DefectDojo (I4, I5): adres, produkt i engagement. Token: zmienna `DSCAN_DEFECTDOJO_TOKEN`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct DefectDojoSettings {
+    pub enabled: bool,
+    /// Np. `http://127.0.0.1:8081`.
+    pub url: String,
+    pub product_name: String,
+    pub product_type: String,
+    pub engagement_name: String,
+    /// Po każdym udanym przebiegu automatycznie wysyłaj surowy XML nmap.
+    pub auto_import: bool,
+    /// Weryfikacja certyfikatu TLS DefectDojo (wyłącz tylko dla lokalnego laboratorium).
+    pub verify_tls: bool,
+}
+
+impl Default for DefectDojoSettings {
+    fn default() -> Self {
+        DefectDojoSettings {
+            enabled: false,
+            url: "http://127.0.0.1:8081".into(),
+            product_name: "DScan".into(),
+            product_type: "Research and Development".into(),
+            engagement_name: "Skany DScan".into(),
+            auto_import: false,
+            verify_tls: true,
         }
     }
 }

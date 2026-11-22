@@ -40,7 +40,9 @@ impl fmt::Display for ScannerError {
                     stderr.trim()
                 )
             }
-            ScannerError::Forbidden(reason) => write!(f, "zablokowane przez zabezpieczenia skanera: {reason}"),
+            ScannerError::Forbidden(reason) => {
+                write!(f, "zablokowane przez zabezpieczenia skanera: {reason}")
+            }
             ScannerError::InvalidNmapOutput(reason) => {
                 write!(f, "niepoprawny wynik XML z nmap: {reason}")
             }

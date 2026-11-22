@@ -2,6 +2,7 @@
 {% block title %}Host {{ ip }}{% endblock %}
 {% block content %}
 <p><a href="/hosts?run={{ run }}">← Hosty</a></p>
+{% if let Some(msg) = message %}<p class="notice" role="status">{{ msg }}</p>{% endif %}
 <h1>Host <code>{{ ip }}</code> <small class="muted">przebieg #{{ run }} · stan: {{ status }}</small></h1>
 <section class="card">
   <h2>Host</h2>
@@ -21,16 +22,24 @@
   {% if !s.detections.is_empty() %}
   <h3>Technologie</h3>
   <table>
-    <thead><tr><th>Technologia</th><th>Pewność</th><th>Dowody</th></tr></thead>
+    <thead><tr>{% if can_export %}<th></th>{% endif %}<th>Technologia</th><th>Pewność</th><th>Dowody</th></tr></thead>
     <tbody>
       {% for d in s.detections %}
-      <tr><td>{{ d.technology }}</td><td><progress max="100" value="{{ d.confidence }}"></progress> {{ d.confidence }}%</td><td>{{ d.evidence }}</td></tr>
+      <tr>{% if can_export %}<td><input type="checkbox" form="dojo-form" name="item" value="{{ s.port }}/{{ s.protocol }}={{ d.name }}" aria-label="Wyślij {{ d.name }}"></td>{% endif %}<td>{{ d.technology }}</td><td><progress max="100" value="{{ d.confidence }}"></progress> {{ d.confidence }}%</td><td>{{ d.evidence }}</td></tr>
       {% endfor %}
     </tbody>
   </table>
   {% endif %}
 </section>
 {% endfor %}
+{% if can_export %}
+<section class="card">
+  <form id="dojo-form" method="post" action="/ui/hosts/{{ ip }}/dojo">
+    <input type="hidden" name="run" value="{{ run }}">
+    <button type="submit">Wyślij zaznaczone obserwacje do DefectDojo</button>
+  </form>
+</section>
+{% endif %}
 <section class="card">
   <h2>Historia zmian</h2>
   {% if changes.is_empty() %}<p class="muted">Brak zapisanych zmian.</p>{% else %}

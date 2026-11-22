@@ -155,12 +155,16 @@ pub struct HostPage {
     pub changes: Vec<ChangeEntry>,
     pub history: Vec<ResponseEntry>,
     pub can_edit: bool,
+    /// Zaznaczanie obserwacji do DefectDojo (I5): skonfigurowane i rola z `results:write`.
+    pub can_export: bool,
+    pub message: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct RunParam {
     #[serde(default)]
     pub run: String,
+    pub msg: Option<String>,
 }
 
 pub async fn host_page(
@@ -206,5 +210,7 @@ pub async fn host_page(
             .map(|(run, ok)| ResponseEntry { run, ok })
             .collect(),
         can_edit: user.has(permissions::RESULTS_WRITE),
+        can_export: user.has(permissions::RESULTS_WRITE) && state.defectdojo.is_some(),
+        message: param.msg,
     })
 }

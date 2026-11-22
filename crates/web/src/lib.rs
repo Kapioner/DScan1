@@ -10,6 +10,7 @@ mod admin;
 mod assets;
 mod compare;
 mod dashboard;
+mod dojo_ui;
 mod edits;
 mod host_views;
 mod hosts;
@@ -44,6 +45,7 @@ pub fn web_routes() -> Router<AppState> {
         .route("/hosts", get(hosts::hosts_page))
         .route("/hosts/{ip}", get(hosts::host_page))
         .route("/ui/hosts/{ip}/edit", post(edits::edit_result))
+        .route("/ui/hosts/{ip}/dojo", post(dojo_ui::send_to_dojo))
         .route("/compare", get(compare::compare_page))
         .route("/ui/profiles", post(profiles_form::create_profile))
         .route("/ui/profiles/{id}", post(profiles_form::update_profile))

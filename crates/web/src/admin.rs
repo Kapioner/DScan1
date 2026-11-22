@@ -214,7 +214,7 @@ pub fn parse_role_form(body: &str) -> (String, Vec<String>) {
 }
 
 /// Dekodowanie `application/x-www-form-urlencoded` (`+` = spacja, `%XX`).
-fn decode(text: &str) -> String {
+pub(crate) fn decode(text: &str) -> String {
     let bytes = text.as_bytes();
     let mut out = Vec::with_capacity(bytes.len());
     let mut i = 0;

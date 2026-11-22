@@ -17,7 +17,7 @@ const ENV_SECTION_SEPARATOR: &str = "__";
 /// Sekcje [`Settings`]. Z env czytamy tylko zmienne `DSCAN_<SEKCJA>__<POLE>`,
 /// więc inne zmienne z prefiksem (sekrety, `DSCAN_CONFIG`, `DSCAN_TEST_…`) nie psują
 /// konfiguracji, a literówka w nazwie pola znanej sekcji nadal daje błąd.
-const SETTINGS_SECTIONS: [&str; 8] = [
+const SETTINGS_SECTIONS: [&str; 9] = [
     "scope",
     "limits",
     "schedule",
@@ -26,6 +26,7 @@ const SETTINGS_SECTIONS: [&str; 8] = [
     "database",
     "http",
     "profiles",
+    "defectdojo",
 ];
 
 /// Gotowa, zwalidowana konfiguracja.
@@ -38,6 +39,8 @@ pub struct AppConfig {
     pub database_url: Option<DatabaseUrl>,
     /// Konto administratora tworzone przy pierwszym starcie (gdy w bazie nie ma użytkowników).
     pub initial_admin: Option<InitialAdmin>,
+    /// Token DefectDojo (`DSCAN_DEFECTDOJO_TOKEN`).
+    pub defectdojo_token: Option<crate::ApiToken>,
 }
 
 impl AppConfig {
@@ -136,6 +139,7 @@ impl ConfigLoader {
                 encryption_key: None,
                 database_url: None,
                 initial_admin: None,
+                defectdojo_token: None,
             });
         }
         let key = std::env::var(ENCRYPTION_KEY_ENV).ok();
@@ -149,6 +153,9 @@ impl ConfigLoader {
             initial_admin: InitialAdmin::from_values(
                 admin_name.as_deref(),
                 admin_password.as_deref(),
+            ),
+            defectdojo_token: crate::ApiToken::from_value(
+                std::env::var(crate::DEFECTDOJO_TOKEN_ENV).ok().as_deref(),
             ),
         })
     }

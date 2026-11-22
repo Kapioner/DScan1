@@ -25,13 +25,13 @@ pub use overrides::CliOverrides;
 pub use profiles::{ResolvedProfile, ScanProfileSettings, profile_names, resolve_profile};
 pub use schedule::{parse_clock_time, window_length_minutes};
 pub use secret::{
-    ADMIN_PASSWORD_ENV, ADMIN_USERNAME_ENV, DATABASE_URL_ENV, DatabaseUrl, ENCRYPTION_KEY_ENV,
-    ENCRYPTION_KEY_LEN, EncryptionKey, InitialAdmin, NEW_ENCRYPTION_KEY_ENV, decode_hex_key,
-    mask_url_password,
+    ADMIN_PASSWORD_ENV, ADMIN_USERNAME_ENV, ApiToken, DATABASE_URL_ENV, DEFECTDOJO_TOKEN_ENV,
+    DatabaseUrl, ENCRYPTION_KEY_ENV, ENCRYPTION_KEY_LEN, EncryptionKey, InitialAdmin,
+    NEW_ENCRYPTION_KEY_ENV, decode_hex_key, mask_url_password,
 };
 pub use settings::{
-    DatabaseSettings, HttpSettings, RateLimitSettings, ScheduleSettings, ScopeSettings,
-    ServerSettings, Settings, StabilitySettings, TimeWindow,
+    DatabaseSettings, DefectDojoSettings, HttpSettings, RateLimitSettings, ScheduleSettings,
+    ScopeSettings, ServerSettings, Settings, StabilitySettings, TimeWindow,
 };
 pub use show::render_effective_config;
 pub use validation::{collect_warnings, validate_settings};

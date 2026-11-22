@@ -3,6 +3,7 @@
 pub mod accounts;
 pub mod audit_log;
 pub mod dashboard;
+pub mod defectdojo;
 pub mod exports;
 pub mod health;
 pub mod imports;

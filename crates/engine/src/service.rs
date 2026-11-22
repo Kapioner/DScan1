@@ -33,6 +33,8 @@ pub struct ScanService {
     cipher: Cipher,
     settings: Settings,
     running: Mutex<HashMap<i64, watch::Sender<bool>>>,
+    /// Powiadomienia o zakończonych przebiegach (wzorzec Observer), np. auto-import do DefectDojo.
+    completed: tokio::sync::broadcast::Sender<i64>,
 }
 
 impl ScanService {
@@ -42,7 +44,13 @@ impl ScanService {
             cipher,
             settings,
             running: Mutex::new(HashMap::new()),
+            completed: tokio::sync::broadcast::channel(64).0,
         })
+    }
+
+    /// Odbiornik numerów udanie zakończonych przebiegów.
+    pub fn subscribe_completed(&self) -> tokio::sync::broadcast::Receiver<i64> {
+        self.completed.subscribe()
     }
 
     pub fn pool(&self) -> &PgPool {
@@ -171,7 +179,13 @@ impl ScanService {
             )
             .await;
             match result {
-                Ok(summary) => tracing::info!("przebieg #{run_id}: {}", summary.status.as_str()),
+                Ok(summary) => {
+                    tracing::info!("przebieg #{run_id}: {}", summary.status.as_str());
+                    if summary.status == dscan_core::models::ScanStatus::Completed {
+                        // Brak odbiorców to nie błąd.
+                        let _ = service.completed.send(run_id);
+                    }
+                }
                 Err(error) => tracing::warn!("przebieg #{run_id} przerwany błędem: {error}"),
             }
             service.lock().remove(&run_id);
