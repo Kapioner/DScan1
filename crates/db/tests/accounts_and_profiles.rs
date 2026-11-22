@@ -203,6 +203,7 @@ async fn http_info_is_saved_with_encrypted_headers_and_cookies() {
         tls_verified: Some(false),
         certificate: None,
         favicon: None,
+        simhash: None,
     });
     host.services = vec![web, Service::new(22, Protocol::Tcp, ServiceState::Open)];
 

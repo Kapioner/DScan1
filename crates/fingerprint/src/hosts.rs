@@ -7,6 +7,7 @@ use crate::environment::environment_findings;
 use crate::favicon::fetch_favicon;
 use crate::probe::{merge_probe_paths, probe_paths};
 use crate::signatures::{SignatureSet, WebEvidence};
+use crate::simhash::response_simhash;
 use crate::{HttpFetcher, WebScheme, fetch_certificate, service_url, to_http_info, web_scheme};
 
 /// Analiza usług WWW: sygnatury, heurystyki, ścieżki do sondowania i próg pewności.
@@ -106,6 +107,7 @@ pub async fn fingerprint_hosts(
             )
             .await;
             info.favicon = fetch_favicon(fetcher, &info.url, ip, &body).await;
+            info.simhash = Some(response_simhash(&info, &body));
             let evidence = WebEvidence {
                 info: &info,
                 body: &body,

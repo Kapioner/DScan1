@@ -14,6 +14,7 @@ pub mod scan_control;
 pub mod scans;
 pub mod search;
 pub mod signatures;
+pub mod tags;
 pub mod targets;
 pub mod users;
 pub mod validation;

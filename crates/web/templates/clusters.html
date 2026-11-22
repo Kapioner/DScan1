@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Grupy usług{% endblock %}
+{% block content %}
+<h1>Grupy podobnych usług {% if let Some(r) = run %}<small class="muted">przebieg #{{ r }}</small>{% endif %}</h1>
+<p class="muted">Usługi WWW o podobnym tytule, nagłówkach i strukturze HTML (SimHash) — np. wiele identycznych kamer.</p>
+{% if clusters.is_empty() %}<section class="card"><p class="muted">Brak grup (co najmniej 2 podobne usługi).</p></section>{% endif %}
+{% for c in clusters %}
+<section class="card">
+  <h2>{{ c.label }} <small class="muted">{{ c.members.len() }} usług</small></h2>
+  {% if !c.technologies.is_empty() %}<p>{% for t in c.technologies %}<span class="badge">{{ t }}</span> {% endfor %}</p>{% endif %}
+  <p>{% for m in c.members %}<a href="/hosts/{{ m.ip }}{% if let Some(r) = run %}?run={{ r }}{% endif %}"><code>{{ m.ip }}:{{ m.port }}</code></a> {% endfor %}</p>
+  {% if can_tag %}{% if let Some(r) = run %}
+  <form method="post" action="/ui/clusters/tag" class="inline-form compact">
+    <input type="hidden" name="run" value="{{ r }}"><input type="hidden" name="cluster" value="{{ c.id }}">
+    <input name="tag" placeholder="tag, np. kamery-biuro" required maxlength="40" aria-label="Tag">
+    <button type="submit">Otaguj całą grupę</button>
+  </form>
+  {% endif %}{% endif %}
+</section>
+{% endfor %}
+{% endblock %}

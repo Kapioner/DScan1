@@ -18,6 +18,8 @@
         {% for o in statuses %}<option value="{{ o.value }}"{% if o.selected %} selected{% endif %}>{{ o.label }}</option>{% endfor %}
       </select>
     </label>
+    <label>Tag <input name="tag" value="{{ filter.tag }}" size="12"></label>
+    <label>Grupa usług <input name="cluster" value="{{ filter.cluster }}" size="4" placeholder="nr"></label>
     <label class="checkbox"><input type="checkbox" name="edited" value="1"{% if !filter.edited.is_empty() %} checked{% endif %}> tylko edytowane</label>
     <button type="submit">Filtruj</button>
   </form>
@@ -30,12 +32,12 @@
   {% else %}
   <p class="muted">Hostów: {{ hosts.len() }}</p>
   <table>
-    <thead><tr><th>Adres</th><th>Nazwa</th><th>Stan</th><th>Stabilność</th><th>Usługi</th><th>Technologie</th><th></th></tr></thead>
+    <thead><tr><th>Adres</th><th>Nazwa</th><th>Stan</th><th>Stabilność</th><th>Usługi</th><th>Technologie</th><th>Tagi</th><th></th></tr></thead>
     <tbody>
       {% for h in hosts %}
       <tr>
         <td><a href="/hosts/{{ h.ip }}{% if let Some(r) = run %}?run={{ r }}{% endif %}"><code>{{ h.ip }}</code></a></td>
-        <td>{{ h.hostname }}</td><td>{{ h.status }}</td><td>{{ h.stability }}</td><td>{{ h.ports }}</td><td>{{ h.technologies }}</td>
+        <td>{{ h.hostname }}</td><td>{{ h.status }}</td><td>{{ h.stability }}</td><td>{{ h.ports }}</td><td>{{ h.technologies }}</td><td>{{ h.tags }}</td>
         <td>{% if h.edited %}<span class="badge">edytowane ręcznie</span>{% endif %}</td>
       </tr>
       {% endfor %}

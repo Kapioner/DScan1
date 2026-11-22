@@ -120,6 +120,7 @@ async fn rebuild_blind_index(
             tls_verified: None,
             certificate: None,
             favicon: None,
+            simhash: None,
         };
         infos.push((service_id, info));
     }

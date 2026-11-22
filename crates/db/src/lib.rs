@@ -24,6 +24,7 @@ mod scan_runs;
 mod sessions;
 mod signatures;
 mod subgroups;
+mod tags;
 mod target_crud;
 mod targets;
 mod users;
@@ -77,6 +78,7 @@ pub use signatures::{
 pub use subgroups::{
     SubgroupCompletion, complete_subgroup, fail_subgroup, mark_subgroup_running, run_raw_xml,
 };
+pub use tags::{Tag, add_tag, delete_tag, list_tags, normalize_tag};
 pub use target_crud::{
     TargetGroup, create_target, delete_target, get_target, list_target_groups, update_target,
 };

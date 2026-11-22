@@ -8,6 +8,7 @@
 
 mod admin;
 mod assets;
+mod clusters_ui;
 mod compare;
 mod dashboard;
 mod dojo_ui;
@@ -53,6 +54,13 @@ pub fn web_routes() -> Router<AppState> {
         .route(
             "/ui/signatures/{id}/delete",
             post(signatures_ui::delete_signature),
+        )
+        .route("/clusters", get(clusters_ui::clusters_page))
+        .route("/ui/clusters/tag", post(clusters_ui::tag_cluster))
+        .route("/ui/hosts/{ip}/tags", post(clusters_ui::add_tag))
+        .route(
+            "/ui/hosts/{ip}/tags/{id}/delete",
+            post(clusters_ui::delete_tag),
         )
         .route("/compare", get(compare::compare_page))
         .route("/ui/profiles", post(profiles_form::create_profile))

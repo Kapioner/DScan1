@@ -38,6 +38,12 @@ pub struct HostFilter {
     pub status: String,
     #[serde(default)]
     pub edited: String,
+    /// Tag (F11).
+    #[serde(default)]
+    pub tag: String,
+    /// Numer klastra podobnych usług (M4) w wybranym przebiegu.
+    #[serde(default)]
+    pub cluster: String,
 }
 
 fn non_empty(text: &str) -> Option<String> {
@@ -118,6 +124,19 @@ pub async fn hosts_page(
             )
         };
         let needle = filter.q.trim().to_lowercase();
+        let tags = dscan_db::list_tags(&state.db).await?;
+        let wanted_tag = dscan_db::normalize_tag(&filter.tag);
+        let cluster_ips: Option<Vec<String>> = match filter.cluster.trim().parse::<usize>() {
+            Ok(id) => Some(
+                crate::clusters_ui::run_clusters(&state, run_id)
+                    .await?
+                    .into_iter()
+                    .find(|c| c.id == id)
+                    .map(|c| c.members.into_iter().map(|m| m.ip).collect())
+                    .unwrap_or_default(),
+            ),
+            Err(_) => None,
+        };
         rows = filter_hosts(&hosts, &export_filter)
             .iter()
             .filter(|h| {
@@ -127,7 +146,28 @@ pub async fn hosts_page(
                         .iter()
                         .any(|n| n.to_lowercase().contains(&needle))
             })
-            .map(|h| HostRow::new(h, &presence, stability(&h.ip)))
+            .filter(|h| {
+                wanted_tag
+                    .as_ref()
+                    .is_none_or(|t| tags.iter().any(|x| x.ip == h.ip && &x.tag == t))
+            })
+            .filter(|h| {
+                cluster_ips
+                    .as_ref()
+                    .is_none_or(|ips| ips.contains(&h.ip.to_string()))
+            })
+            .map(|h| {
+                let mut row = HostRow::new(h, &presence, stability(&h.ip));
+                let mut host_tags: Vec<&str> = tags
+                    .iter()
+                    .filter(|t| t.ip == h.ip)
+                    .map(|t| t.tag.as_str())
+                    .collect();
+                host_tags.sort_unstable();
+                host_tags.dedup();
+                row.tags = host_tags.join(", ");
+                row
+            })
             .filter(|row| filter.status.is_empty() || row.status == filter.status)
             .collect();
     }
@@ -165,6 +205,10 @@ pub struct HostPage {
     /// Klasa stabilności (M5) i mapa godzinowa (M2).
     pub stability: String,
     pub hours: Vec<HourCell>,
+    /// Tagi (F11): (id, tag, zakres).
+    pub tags: Vec<(i64, String, String)>,
+    /// Usługi do wyboru przy dodawaniu tagu: `PORT/PROTOKÓŁ`.
+    pub service_keys: Vec<String>,
     pub can_edit: bool,
     /// Zaznaczanie obserwacji do DefectDojo (I5): skonfigurowane i rola z `results:write`.
     pub can_export: bool,
@@ -222,6 +266,23 @@ pub async fn host_page(
             .map(|(run, ok)| ResponseEntry { run, ok })
             .collect(),
         stability: classify_stability(&timeline).label(),
+        tags: dscan_db::list_tags(&state.db)
+            .await?
+            .into_iter()
+            .filter(|t| t.ip == ip)
+            .map(|t| {
+                let scope = match (t.port, &t.protocol) {
+                    (Some(port), Some(protocol)) => format!("{port}/{protocol}"),
+                    _ => "host".into(),
+                };
+                (t.id, t.tag, scope)
+            })
+            .collect(),
+        service_keys: host
+            .services
+            .iter()
+            .map(|s| format!("{}/{}", s.port, s.protocol.as_str()))
+            .collect(),
         hours: hour_cells(&timeline),
         can_edit: user.has(permissions::RESULTS_WRITE),
         can_export: user.has(permissions::RESULTS_WRITE) && state.defectdojo.is_some(),

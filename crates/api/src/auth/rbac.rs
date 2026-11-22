@@ -38,7 +38,7 @@ const PUBLIC_ROUTES: [(&str, &str); 4] = [
 ];
 
 /// Zapis: (prefiks wzorca ścieżki, wymagane uprawnienie). Pierwsze dopasowanie wygrywa.
-const WRITE_RULES: [(&str, &str); 9] = [
+const WRITE_RULES: [(&str, &str); 10] = [
     ("/api/v1/targets", permissions::TARGETS_WRITE),
     ("/api/v1/profiles", permissions::TARGETS_WRITE),
     ("/api/v1/scans", permissions::TARGETS_WRITE),
@@ -46,6 +46,7 @@ const WRITE_RULES: [(&str, &str); 9] = [
     ("/api/v1/signatures", permissions::TARGETS_WRITE),
     ("/api/v1/defectdojo", permissions::RESULTS_WRITE),
     ("/api/v1/overrides", permissions::RESULTS_WRITE),
+    ("/api/v1/tags", permissions::RESULTS_WRITE),
     ("/api/v1/users", permissions::ADMIN),
     ("/api/v1/roles", permissions::ADMIN),
 ];

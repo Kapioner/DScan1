@@ -9,9 +9,9 @@ use crate::columns::{HTTP_INFO_CERTIFICATE, HTTP_INFO_COOKIES, HTTP_INFO_HEADERS
 use crate::results::POSTGRES_MAX_PARAMETERS;
 use crate::{DbError, Encrypted};
 
-/// Wpisów HTTP w jednym INSERT (10 parametrów na wiersz).
+/// Wpisów HTTP w jednym INSERT (11 parametrów na wiersz).
 pub const HTTP_INFO_PER_INSERT: usize = 1000;
-const _: () = assert!(HTTP_INFO_PER_INSERT * 10 <= POSTGRES_MAX_PARAMETERS);
+const _: () = assert!(HTTP_INFO_PER_INSERT * 11 <= POSTGRES_MAX_PARAMETERS);
 /// Detekcji w jednym INSERT (5 parametrów na wiersz).
 pub const DETECTIONS_PER_INSERT: usize = 1000;
 const _: () = assert!(DETECTIONS_PER_INSERT * 5 <= POSTGRES_MAX_PARAMETERS);
@@ -52,7 +52,7 @@ pub(crate) async fn insert_http_info(
     }
 
     let mut query: QueryBuilder<Postgres> = QueryBuilder::new(
-        "INSERT INTO http_info (service_id, url, status_code, title, headers, cookies, redirect_chain, tls_verified, certificate, favicon) ",
+        "INSERT INTO http_info (service_id, url, status_code, title, headers, cookies, redirect_chain, tls_verified, certificate, favicon, simhash) ",
     );
     query.push_values(
         prepared,
@@ -68,7 +68,8 @@ pub(crate) async fn insert_http_info(
                 .push_bind(http.tls_verified)
                 .push_bind(certificate)
                 .push_bind(favicon)
-                .push_unseparated("::jsonb");
+                .push_unseparated("::jsonb")
+                .push_bind(http.simhash);
         },
     );
 

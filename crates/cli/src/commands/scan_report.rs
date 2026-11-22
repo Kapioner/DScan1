@@ -307,6 +307,7 @@ mod tests {
             tls_verified: Some(false),
             certificate: None,
             favicon: None,
+            simhash: None,
         };
         assert_eq!(
             format_http(&http),

@@ -185,6 +185,7 @@ mod tests {
             tls_verified: Some(false),
             certificate: None,
             favicon: None,
+            simhash: None,
         });
         host.services = vec![
             service(80, &["Jenkins", "nginx"]),

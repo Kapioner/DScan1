@@ -77,6 +77,8 @@ pub struct HostRow {
     pub ports: String,
     pub technologies: String,
     pub edited: bool,
+    /// Tagi hosta i jego usług (F11).
+    pub tags: String,
 }
 
 impl HostRow {
@@ -103,6 +105,7 @@ impl HostRow {
             technologies: technologies.join(", "),
             edited: !host.edited_fields.is_empty()
                 || host.services.iter().any(|s| !s.edited_fields.is_empty()),
+            tags: String::new(),
         }
     }
 }

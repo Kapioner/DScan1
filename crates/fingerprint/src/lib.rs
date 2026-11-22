@@ -19,6 +19,7 @@ mod rate_limit;
 mod redirect;
 mod robots;
 pub mod signatures;
+pub mod simhash;
 mod tls;
 mod web_service;
 

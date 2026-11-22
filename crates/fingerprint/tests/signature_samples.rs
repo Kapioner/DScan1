@@ -174,6 +174,7 @@ fn info(sample: &Sample) -> HttpInfo {
         tls_verified: None,
         certificate: None,
         favicon: None,
+        simhash: None,
     }
 }
 
