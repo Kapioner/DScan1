@@ -59,7 +59,9 @@ mod tests {
             vec![
                 "Pulpit",
                 "Hosty",
+                "Grupy usług",
                 "Porównanie",
+                "W czasie",
                 "Cele",
                 "Profile skanów",
                 "Sygnatury"
