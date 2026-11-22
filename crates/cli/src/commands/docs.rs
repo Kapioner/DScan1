@@ -170,7 +170,7 @@ mod tests {
                 for field in fields.keys() {
                     assert!(
                         EXAMPLE_CONFIG.contains(&format!("{field} ="))
-                            || EXAMPLE_CONFIG.contains(&format!("{field}")),
+                            || EXAMPLE_CONFIG.contains(field.as_str()),
                         "brak {section}.{field}"
                     );
                 }
